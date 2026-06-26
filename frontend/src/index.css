@@ -1,0 +1,98 @@
+@import url('https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Base typography ──────────────────────────────────────────────────────── */
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Monospace for all financial numbers */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+  font-family: 'Courier Prime', 'Courier New', monospace;
+}
+
+/* ── Ledger line motif ────────────────────────────────────────────────────── */
+/* Subtle ruled-paper texture on the page background */
+.ledger-bg {
+  background-image: repeating-linear-gradient(
+    transparent,
+    transparent 31px,
+    oklch(var(--bc) / 0.04) 31px,
+    oklch(var(--bc) / 0.04) 32px
+  );
+}
+
+/* Receipt-tape divider */
+.receipt-divider {
+  border: none;
+  border-top: 2px dashed oklch(var(--bc) / 0.12);
+  margin: 1rem 0;
+}
+
+/* ── Sidebar accent line ──────────────────────────────────────────────────── */
+.sidebar-active-indicator {
+  position: relative;
+}
+.sidebar-active-indicator::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 20%;
+  height: 60%;
+  width: 3px;
+  border-radius: 0 2px 2px 0;
+  background: oklch(var(--p));
+}
+
+/* ── Stat value — feels like a ticker ────────────────────────────────────── */
+.stat-value-mono {
+  font-family: 'Courier Prime', 'Courier New', monospace;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+/* ── Card with left accent border ─────────────────────────────────────────── */
+.card-ledger {
+  border-left: 3px solid oklch(var(--p));
+}
+
+.card-ledger-warning {
+  border-left: 3px solid oklch(var(--wa));
+}
+
+.card-ledger-success {
+  border-left: 3px solid oklch(var(--su));
+}
+
+/* ── AG Grid ─────────────────────────────────────────────────────────────── */
+.ag-theme-alpine {
+  --ag-background-color: oklch(var(--b1));
+  --ag-header-background-color: oklch(var(--b2));
+  --ag-odd-row-background-color: oklch(var(--b1));
+  --ag-row-hover-color: oklch(var(--b2));
+  --ag-border-color: oklch(var(--bc) / 0.12);
+  --ag-header-foreground-color: oklch(var(--bc));
+  --ag-foreground-color: oklch(var(--bc));
+  --ag-font-family: inherit;
+  --ag-font-size: 13px;
+  --ag-row-height: 44px;
+  --ag-header-height: 40px;
+  --ag-selected-row-background-color: oklch(var(--p) / 0.08);
+}
+
+/* ── Loading shimmer ──────────────────────────────────────────────────────── */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(90deg, oklch(var(--b2)) 25%, oklch(var(--b3)) 50%, oklch(var(--b2)) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease infinite;
+}
