@@ -136,11 +136,53 @@ export const adminApi = {
 
   deleteRequest: (id: string) => client.delete(`/admin/requests/${id}`),
 
-  // CSV exports — open in new tab to trigger browser download
-  exportAccountsCsv: () => window.open(`${client.defaults.baseURL}/admin/export/accounts.csv`, "_blank"),
-  exportPaymentsCsv: () => window.open(`${client.defaults.baseURL}/admin/export/payments.csv`, "_blank"),
-  exportAccountFullCsv: (accountId: string) =>
-    window.open(`${client.defaults.baseURL}/admin/export/accounts/${accountId}/full.csv`, "_blank"),
+  // CSV exports — fetch with axios so Authorization header is included, then trigger download
+  exportAccountsCsv: async (): Promise<void> => {
+    const res = await client.get<Blob>(`/admin/export/accounts.csv`, { responseType: "blob" as const });
+    const disposition = res.headers["content-disposition"] || "";
+    const match = /filename=(.+)$/.exec(disposition);
+    const filename = match ? match[1].replace(/"/g, "") : "accounts.csv";
+    const url = URL.createObjectURL(res.data);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  },
+
+  exportPaymentsCsv: async (): Promise<void> => {
+    const res = await client.get<Blob>(`/admin/export/payments.csv`, { responseType: "blob" as const });
+    const disposition = res.headers["content-disposition"] || "";
+    const match = /filename=(.+)$/.exec(disposition);
+    const filename = match ? match[1].replace(/"/g, "") : "payments.csv";
+    const url = URL.createObjectURL(res.data);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  },
+
+  exportAccountFullCsv: async (accountId: string): Promise<void> => {
+    const res = await client.get<Blob>(`/admin/export/accounts/${accountId}/full.csv`, {
+      responseType: "blob" as const,
+    });
+    const disposition = res.headers["content-disposition"] || "";
+    const match = /filename=(.+)$/.exec(disposition);
+    const filename = match ? match[1].replace(/"/g, "") : `${accountId}.csv`;
+    const url = URL.createObjectURL(res.data);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  },
 };
 
 // ── Loan Requests ─────────────────────────────────────────────────────────────
