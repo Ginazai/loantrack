@@ -5,7 +5,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.interest_engine import (
+from app.modules.accounts.interest_engine import (
     advance_cycle,
     get_next_due_date,
     next_cycle_date,

@@ -5,7 +5,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.interest_engine import compute_current_balance, next_cycle_date, upcoming_cycle_dates
+from app.modules.accounts.interest_engine import compute_current_balance, next_cycle_date, upcoming_cycle_dates
 from app.core.repository import BaseRepository
 from app.modules.accounts.models import LoanAccount
 from app.modules.accounts.schemas import (

@@ -336,7 +336,7 @@ export function AccountDetailPage() {
                   </tbody>
                 </table>
               </div>
-              {isAdmin && payments.length > 0 && (
+              {isAdmin && (
                 <div className="flex justify-end pt-1">
                   <button
                     className="btn btn-ghost btn-xs gap-1.5 text-base-content/50"
