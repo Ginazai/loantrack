@@ -15,6 +15,7 @@ const schema = z.object({
   cycle: z.coerce.number().refine((v) => v === 15 || v === 30) as z.ZodType<15 | 30>,
   start_date: z.string().min(1, "Required"),
   linked_user_id: z.string().optional(),
+  status: z.enum(["open", "active", "paid", "closed"]).optional(),
 });
 
 interface Props {
@@ -65,6 +66,7 @@ export function AccountForm({ account, onSubmit, onCancel, isLoading }: Props) {
           rate: parseFloat(account.rate) * 100,
           cycle: account.cycle,
           start_date: account.start_date,
+          status: account.status,
         }
       : {
           cycle: 15,
@@ -269,6 +271,18 @@ export function AccountForm({ account, onSubmit, onCancel, isLoading }: Props) {
           <input type="date" className={inp(errors.start_date)} disabled={isEdit} {...register("start_date")} />
           {errors.start_date && <span className="label-text-alt text-error text-xs mt-0.5">{errors.start_date.message}</span>}
         </div>
+
+        {isEdit && (
+          <div className="form-control sm:col-span-2">
+            <label className="label py-1"><span className={lbl}>Status</span></label>
+            <select className="select select-bordered select-sm" {...register("status")}>
+              <option value="open">Open</option>
+              <option value="active">Active</option>
+              <option value="paid">Paid</option>
+              <option value="closed">Closed</option>
+            </select>
+          </div>
+        )}
       </div>
 
       {!isEdit && (

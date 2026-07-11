@@ -100,6 +100,7 @@ export interface AccountFormData {
   cycle: 15 | 30;
   start_date: string;
   linked_user_id?: string;
+  status?: AccountStatus;
 }
 
 export interface PaymentFormData {

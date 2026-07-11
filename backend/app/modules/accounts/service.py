@@ -43,8 +43,8 @@ class LoanAccountService:
         accounts = list(result.scalars().all())
         return [await self._enrich(a) for a in accounts]
 
-    async def get_account(self, account_id: UUID, user_id: UUID) -> dict:
-        account = await self._get_or_404(account_id, user_id)
+    async def get_account(self, account_id: UUID, user_id: UUID, is_admin: bool = False) -> dict:
+        account = await self._get_or_404(account_id, user_id, is_admin)
         return await self._enrich(account)
 
     async def create_account(
@@ -79,14 +79,17 @@ class LoanAccountService:
         return enriched
 
     async def update_account(
-        self, account_id: UUID, user_id: UUID, data: LoanAccountUpdate, ip: str | None = None
+        self, account_id: UUID, user_id: UUID, data: LoanAccountUpdate,
+        ip: str | None = None, is_admin: bool = False
     ) -> dict:
-        account = await self._get_or_404(account_id, user_id)
+        account = await self._get_or_404(account_id, user_id, is_admin)
         before = {"name": account.account_name, "rate": str(account.rate)}
         if data.account_name is not None:
             account.account_name = data.account_name
         if data.rate is not None:
             account.rate = data.rate
+        if data.status is not None:
+            account.status = data.status
         await self.repo.flush()
         await self.db.refresh(account)
         await self.audit.log(
@@ -99,9 +102,10 @@ class LoanAccountService:
         return enriched
 
     async def close_account(
-        self, account_id: UUID, user_id: UUID, data: LoanAccountClose, ip: str | None = None
+        self, account_id: UUID, user_id: UUID, data: LoanAccountClose,
+        ip: str | None = None, is_admin: bool = False
     ) -> dict:
-        account = await self._get_or_404(account_id, user_id)
+        account = await self._get_or_404(account_id, user_id, is_admin)
         if account.status == "closed":
             raise HTTPException(status.HTTP_409_CONFLICT, "Account already closed")
         before = {"status": account.status}
@@ -117,8 +121,11 @@ class LoanAccountService:
         await self._fire_webhook(account, "status.changed", enriched)
         return enriched
 
-    async def purge_account(self, account_id: UUID, user_id: UUID, ip: str | None = None, force: bool = False) -> None:
-        account = await self._get_or_404(account_id, user_id)
+    async def purge_account(
+        self, account_id: UUID, user_id: UUID,
+        ip: str | None = None, force: bool = False, is_admin: bool = False
+    ) -> None:
+        account = await self._get_or_404(account_id, user_id, is_admin or force)
         if not force and account.status != "closed":
             raise HTTPException(
                 status.HTTP_409_CONFLICT, "Only closed accounts can be purged (use force=true as admin)"
@@ -131,11 +138,52 @@ class LoanAccountService:
         )
         await self.repo.delete(account)
 
-    async def get_cycle_preview(self, account_id: UUID, user_id: UUID) -> list[date]:
-        await self._get_or_404(account_id, user_id)
+    async def get_cycle_preview(self, account_id: UUID, user_id: UUID, is_admin: bool = False) -> list[date]:
+        await self._get_or_404(account_id, user_id, is_admin)
         return upcoming_cycle_dates(date.today(), count=6)
 
     # ── Admin helpers ─────────────────────────────────────────────────────────
+
+    async def get_account_any(self, account_id: UUID) -> dict:
+        """Admin: get any account regardless of owner."""
+        from sqlalchemy import select as sql_select
+        result = await self.db.execute(
+            sql_select(LoanAccount).where(LoanAccount.id == account_id)
+        )
+        account = result.scalar_one_or_none()
+        if not account:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Account not found")
+        return await self._enrich(account)
+
+    async def update_account_any(
+        self, account_id: UUID, admin_id: UUID, data: LoanAccountUpdate, ip: str | None = None
+    ) -> dict:
+        """Admin: update any account regardless of owner, including status."""
+        from sqlalchemy import select as sql_select
+        result = await self.db.execute(
+            sql_select(LoanAccount).where(LoanAccount.id == account_id)
+        )
+        account = result.scalar_one_or_none()
+        if not account:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Account not found")
+        before = {"name": account.account_name, "rate": str(account.rate), "status": account.status}
+        if data.account_name is not None:
+            account.account_name = data.account_name
+        if data.rate is not None:
+            account.rate = data.rate
+        if data.status is not None:
+            account.status = data.status
+        await self.repo.flush()
+        await self.db.refresh(account)
+        await self.audit.log(
+            admin_id, "loan_account", str(account_id), "update",
+            before=before,
+            after={"name": account.account_name, "rate": str(account.rate), "status": account.status},
+            ip=ip,
+        )
+        enriched = await self._enrich(account)
+        await self._fire_webhook(account, "account.updated", enriched)
+        return enriched
 
     async def list_all_accounts(self, filters: LoanAccountFilter) -> list[dict]:
         """Admin: list all accounts across all users."""
@@ -157,12 +205,20 @@ class LoanAccountService:
 
     # ── Helpers ───────────────────────────────────────────────────────────────
 
-    async def _get_or_404(self, account_id: UUID, user_id: UUID) -> LoanAccount:
-        result = await self.db.execute(
-            select(LoanAccount).where(
-                and_(LoanAccount.id == account_id, LoanAccount.user_id == user_id)
+    async def _get_or_404(
+        self, account_id: UUID, user_id: UUID, is_admin: bool = False
+    ) -> LoanAccount:
+        from sqlalchemy import select as sql_select
+        if is_admin:
+            result = await self.db.execute(
+                sql_select(LoanAccount).where(LoanAccount.id == account_id)
             )
-        )
+        else:
+            result = await self.db.execute(
+                sql_select(LoanAccount).where(
+                    and_(LoanAccount.id == account_id, LoanAccount.user_id == user_id)
+                )
+            )
         account = result.scalar_one_or_none()
         if not account:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Account not found")

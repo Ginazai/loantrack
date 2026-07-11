@@ -20,6 +20,7 @@ class LoanAccountCreate(BaseModel):
 class LoanAccountUpdate(BaseModel):
     account_name: str | None = Field(None, min_length=1, max_length=255)
     rate: Decimal | None = Field(None, gt=0, le=1, decimal_places=4)
+    status: Literal["open", "active", "paid", "closed"] | None = None
 
 
 class LoanAccountClose(BaseModel):
