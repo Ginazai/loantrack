@@ -43,12 +43,19 @@ class PaymentService:
         user_id: UUID,
         data: PaymentCreate,
         ip: str | None = None,
+        is_admin: bool = False,
     ) -> Payment:
-        result = await self.db.execute(
-            select(LoanAccount).where(
-                and_(LoanAccount.id == account_id, LoanAccount.user_id == user_id)
+        if is_admin:
+            from sqlalchemy import select as sql_select
+            result = await self.db.execute(
+                sql_select(LoanAccount).where(LoanAccount.id == account_id)
             )
-        )
+        else:
+            result = await self.db.execute(
+                select(LoanAccount).where(
+                    and_(LoanAccount.id == account_id, LoanAccount.user_id == user_id)
+                )
+            )
         account = result.scalar_one_or_none()
         if not account:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Account not found")
@@ -165,12 +172,18 @@ class PaymentService:
 
         return payment
 
-    async def list_payments(self, account_id: UUID, user_id: UUID) -> list[Payment]:
-        result = await self.db.execute(
-            select(LoanAccount).where(
-                and_(LoanAccount.id == account_id, LoanAccount.user_id == user_id)
+    async def list_payments(self, account_id: UUID, user_id: UUID, is_admin: bool = False) -> list[Payment]:
+        if is_admin:
+            from sqlalchemy import select as sql_select
+            result = await self.db.execute(
+                sql_select(LoanAccount).where(LoanAccount.id == account_id)
             )
-        )
+        else:
+            result = await self.db.execute(
+                select(LoanAccount).where(
+                    and_(LoanAccount.id == account_id, LoanAccount.user_id == user_id)
+                )
+            )
         account = result.scalar_one_or_none()
         if not account:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Account not found")

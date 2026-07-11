@@ -21,8 +21,8 @@ class WebhookConfigService:
         self.db = db
         self.repo = BaseRepository(WebhookConfig, db)
 
-    async def create(self, account_id: UUID, user_id: UUID, data: WebhookConfigCreate) -> WebhookConfig:
-        account = await self._get_account_or_404(account_id, user_id)
+    async def create(self, account_id: UUID, user_id: UUID, data: WebhookConfigCreate, is_admin: bool = False) -> WebhookConfig:
+        account = await self._get_account_or_404(account_id, user_id, is_admin)
         config = WebhookConfig(
             account_id=account.id,
             target_url=str(data.target_url),
@@ -31,26 +31,31 @@ class WebhookConfigService:
         )
         return await self.repo.create(config)
 
-    async def list_for_account(self, account_id: UUID, user_id: UUID) -> list[WebhookConfig]:
-        await self._get_account_or_404(account_id, user_id)
+    async def list_for_account(self, account_id: UUID, user_id: UUID, is_admin: bool = False) -> list[WebhookConfig]:
+        await self._get_account_or_404(account_id, user_id, is_admin)
         result = await self.db.execute(
             select(WebhookConfig).where(WebhookConfig.account_id == account_id)
         )
         return list(result.scalars().all())
 
-    async def delete(self, webhook_id: UUID, user_id: UUID) -> None:
+    async def delete(self, webhook_id: UUID, user_id: UUID, is_admin: bool = False) -> None:
         config = await self.repo.get_by_id(webhook_id)
         if not config:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Webhook not found")
-        await self._get_account_or_404(config.account_id, user_id)
+        await self._get_account_or_404(config.account_id, user_id, is_admin)
         await self.repo.delete(config)
 
-    async def _get_account_or_404(self, account_id: UUID, user_id: UUID) -> LoanAccount:
-        result = await self.db.execute(
-            select(LoanAccount).where(
-                and_(LoanAccount.id == account_id, LoanAccount.user_id == user_id)
+    async def _get_account_or_404(self, account_id: UUID, user_id: UUID, is_admin: bool = False) -> LoanAccount:
+        if is_admin:
+            result = await self.db.execute(
+                select(LoanAccount).where(LoanAccount.id == account_id)
             )
-        )
+        else:
+            result = await self.db.execute(
+                select(LoanAccount).where(
+                    and_(LoanAccount.id == account_id, LoanAccount.user_id == user_id)
+                )
+            )
         account = result.scalar_one_or_none()
         if not account:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Account not found")

@@ -27,6 +27,8 @@ async def list_accounts(
 ):
     svc = LoanAccountService(db)
     filters = LoanAccountFilter(status=status, search=search)
+    if current_user.role == "admin":
+        return await svc.list_all_accounts(filters)
     return await svc.list_accounts(current_user.id, filters)
 
 
@@ -39,8 +41,11 @@ async def create_account(
 ):
     svc = LoanAccountService(db)
     ip = request.client.host if request.client else None
-    # Admin can create an account for a different user
-    target_user_id = data.linked_user_id if (data.linked_user_id and current_user.role == "admin") else current_user.id
+    target_user_id = (
+        data.linked_user_id
+        if (data.linked_user_id and current_user.role == "admin")
+        else current_user.id
+    )
     return await svc.create_account(data, target_user_id, ip=ip)
 
 
@@ -51,7 +56,8 @@ async def get_account(
     db: AsyncSession = Depends(get_db),
 ):
     svc = LoanAccountService(db)
-    return await svc.get_account(account_id, current_user.id)
+    is_admin = current_user.role == "admin"
+    return await svc.get_account(account_id, current_user.id, is_admin=is_admin)
 
 
 @router.patch("/{account_id}", response_model=LoanAccountOut)
@@ -64,7 +70,8 @@ async def update_account(
 ):
     svc = LoanAccountService(db)
     ip = request.client.host if request.client else None
-    return await svc.update_account(account_id, current_user.id, data, ip=ip)
+    is_admin = current_user.role == "admin"
+    return await svc.update_account(account_id, current_user.id, data, ip=ip, is_admin=is_admin)
 
 
 @router.post("/{account_id}/close", response_model=LoanAccountOut)
@@ -77,7 +84,8 @@ async def close_account(
 ):
     svc = LoanAccountService(db)
     ip = request.client.host if request.client else None
-    return await svc.close_account(account_id, current_user.id, data, ip=ip)
+    is_admin = current_user.role == "admin"
+    return await svc.close_account(account_id, current_user.id, data, ip=ip, is_admin=is_admin)
 
 
 @router.delete("/{account_id}", status_code=204)
@@ -90,8 +98,11 @@ async def purge_account(
 ):
     svc = LoanAccountService(db)
     ip = request.client.host if request.client else None
-    # Admins can force-delete any account; regular users only closed ones
-    await svc.purge_account(account_id, current_user.id, ip=ip, force=current_user.role == "admin" and force)
+    is_admin = current_user.role == "admin"
+    await svc.purge_account(
+        account_id, current_user.id, ip=ip,
+        force=is_admin and force, is_admin=is_admin,
+    )
 
 
 @router.get("/{account_id}/cycle-preview")
@@ -101,4 +112,5 @@ async def cycle_preview(
     db: AsyncSession = Depends(get_db),
 ) -> list[date]:
     svc = LoanAccountService(db)
-    return await svc.get_cycle_preview(account_id, current_user.id)
+    is_admin = current_user.role == "admin"
+    return await svc.get_cycle_preview(account_id, current_user.id, is_admin=is_admin)

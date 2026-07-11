@@ -18,7 +18,7 @@ async def list_webhooks(
     db: AsyncSession = Depends(get_db),
 ):
     svc = WebhookConfigService(db)
-    return await svc.list_for_account(account_id, current_user.id)
+    return await svc.list_for_account(account_id, current_user.id, is_admin=current_user.role == "admin")
 
 
 @router.post("", response_model=WebhookConfigOut, status_code=201)
@@ -29,7 +29,7 @@ async def create_webhook(
     db: AsyncSession = Depends(get_db),
 ):
     svc = WebhookConfigService(db)
-    return await svc.create(account_id, current_user.id, data)
+    return await svc.create(account_id, current_user.id, data, is_admin=current_user.role == "admin")
 
 
 @router.delete("/{webhook_id}", status_code=204)
@@ -40,4 +40,4 @@ async def delete_webhook(
     db: AsyncSession = Depends(get_db),
 ):
     svc = WebhookConfigService(db)
-    await svc.delete(webhook_id, current_user.id)
+    await svc.delete(webhook_id, current_user.id, is_admin=current_user.role == "admin")

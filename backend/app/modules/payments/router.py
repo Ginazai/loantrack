@@ -21,7 +21,7 @@ async def list_payments(
     db: AsyncSession = Depends(get_db),
 ):
     svc = PaymentService(db)
-    return await svc.list_payments(account_id, current_user.id)
+    return await svc.list_payments(account_id, current_user.id, is_admin=current_user.role == "admin")
 
 
 @router.post("", response_model=PaymentOut, status_code=201)
@@ -34,7 +34,9 @@ async def add_payment(
 ):
     svc = PaymentService(db)
     ip = request.client.host if request.client else None
-    return await svc.add_payment(account_id, current_user.id, data, ip=ip)
+    return await svc.add_payment(
+        account_id, current_user.id, data, ip=ip, is_admin=current_user.role == "admin"
+    )
 
 
 @router.delete("/{payment_id}", status_code=204)

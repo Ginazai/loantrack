@@ -57,10 +57,10 @@ export const accountsApi = {
       .then((r) => r.data),
 
   update: (id: string, data: Partial<AccountFormData>) => {
-    // Only send fields the backend accepts; rate arrives as % → convert to decimal
     const payload: Record<string, unknown> = {};
     if (data.account_name !== undefined) payload.account_name = data.account_name;
     if (data.rate !== undefined) payload.rate = data.rate / 100;
+    if (data.status !== undefined) payload.status = data.status;
     return client.patch<LoanAccount>(`/accounts/${id}`, payload).then((r) => r.data);
   },
 
