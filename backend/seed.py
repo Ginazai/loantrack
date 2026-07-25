@@ -3,12 +3,12 @@ Idempotent seed — creates the first admin user if no users exist.
 Safe to run on every startup; does nothing if the DB already has users.
 """
 import asyncio
-import sys
 
 from sqlalchemy import select
 
 from app.core.config import get_settings
 from app.core.database import AsyncSessionLocal
+from app.core.models_registry import *  # noqa: F401, F403 — registers all models with SQLAlchemy
 from app.core.security import hash_password
 from app.modules.users.models import User
 
