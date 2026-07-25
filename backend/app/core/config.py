@@ -3,6 +3,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    # Seed admin user (created on first boot if no users exist)
+    SEED_ADMIN_EMAIL: str = "admin@loantrack.dev"
+    SEED_ADMIN_PASSWORD: str = "ChangeMe123!"
+    SEED_ADMIN_NAME: str = "Admin User"
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=False)
 
     APP_NAME: str = "Interests Calculator"
