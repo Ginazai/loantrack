@@ -3,6 +3,11 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+# Vite bakes VITE_* vars into the JS bundle at build time — must be an ARG, not a runtime ENV.
+# Set VITE_API_BASE_URL in Railway as a build variable (not a service env var).
+ARG VITE_API_BASE_URL
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+
 # Copy package files first for layer caching
 COPY package.json package-lock.json* ./
 
