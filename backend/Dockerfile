@@ -38,7 +38,7 @@ ENV PATH="/app/.venv/bin:$PATH" \
 
 # Entrypoint: run migrations then start the server
 COPY --chown=app:app entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+RUN sed -i 's/\r$//' /entrypoint.sh && chmod +x /entrypoint.sh
 
 USER app
 

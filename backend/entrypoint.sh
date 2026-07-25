@@ -1,5 +1,5 @@
 #!/bin/sh
-set -e
+set -eu
 
 echo "Running database migrations..."
 /app/.venv/bin/alembic upgrade head
@@ -8,9 +8,10 @@ echo "Seeding initial data..."
 python /app/seed.py
 
 echo "🚀 Starting server..."
+
 LOG_LEVEL_LOWER=$(echo "${LOG_LEVEL:-info}" | tr '[:upper:]' '[:lower:]')
 
-exec python -m uvicorn app.main:app \
+exec /app/.venv/bin/python -m uvicorn app.main:app \
     --host 0.0.0.0 \
     --port "${PORT:-8000}" \
     --workers "${UVICORN_WORKERS:-2}" \
