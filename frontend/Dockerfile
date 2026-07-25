@@ -9,14 +9,9 @@ COPY package.json package-lock.json* ./
 # --mount=type=cache persists the npm cache across builds (requires BuildKit, enabled by default in Docker 23+)
 # --no-audit --no-fund skip extra network roundtrips that aren't needed in CI/Docker
 # Switch to `npm ci` once you have a committed package-lock.json
-<<<<<<< Updated upstream
-RUN --mount=type=cache,id=npm-cache,target=/root/.npm \
-    npm install --no-audit --no-fund
-=======
 #RUN --mount=type=cache,target=/root/.npm \
 #    npm install --no-audit --no-fund
 RUN npm install --no-audit --no-fund
->>>>>>> Stashed changes
 
 COPY . .
 
