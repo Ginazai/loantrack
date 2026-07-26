@@ -1,8 +1,12 @@
 import axios, { AxiosError } from "axios";
 import { useAuthStore } from "../stores/authStore";
 
+// VITE_API_BASE_URL is baked in at build time by Vite.
+// Falls back to relative path for local dev (where frontend and backend share the same origin via docker-compose proxy).
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api/v1";
+
 const client = axios.create({
-  baseURL: "/api/v1",
+  baseURL: BASE_URL,
   headers: { "Content-Type": "application/json" },
 });
 
@@ -41,12 +45,25 @@ client.interceptors.response.use(
     const store = useAuthStore.getState();
 
     try {
-      const { data } = await axios.post("/api/v1/auth/refresh", {
+      const { data } = await axios.post(`${BASE_URL}/auth/refresh`, {
         refresh_token: store.refreshToken,
       });
       store.setTokens(data.access_token, data.refresh_token);
       queue.forEach((cb) => cb(data.access_token));
       queue = [];
+      original.headers.Authorization = `Bearer ${data.access_token}`;
+      return client(original);
+    } catch {
+      store.logout();
+      window.location.href = "/login";
+      return Promise.reject(error);
+    } finally {
+      refreshing = false;
+    }
+  }
+);
+
+export default client;
       original.headers.Authorization = `Bearer ${data.access_token}`;
       return client(original);
     } catch {
