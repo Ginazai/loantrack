@@ -3,6 +3,8 @@ import {
   Download,
   Inbox,
   Link2,
+  Loader2,
+  Paperclip,
   Trash2,
   X,
 } from "lucide-react";
@@ -21,6 +23,7 @@ import type { AccountFormData, PaymentFormData, WebhookFormData } from "../../ty
 import { AccountForm } from "./AccountForm";
 import { BalanceChart, InterestChart } from "./Charts";
 import { PaymentForm } from "../payments/PaymentForm";
+import { PaymentAttachmentsModal } from "../payments/PaymentAttachments";
 import { WebhookForm } from "../webhooks/WebhookForm";
 import { useAuthStore } from "../../stores/authStore";
 
@@ -41,6 +44,7 @@ export function AccountDetailPage() {
   const [showWebhook, setShowWebhook] = useState(false);
   const [closeReason, setCloseReason] = useState("");
   const [deletePaymentId, setDeletePaymentId] = useState<string | null>(null);
+  const [attachmentsPaymentId, setAttachmentsPaymentId] = useState<string | null>(null);
 
   // ── Queries ───────────────────────────────────────────────────────────────
 
@@ -294,6 +298,7 @@ export function AccountDetailPage() {
                       <th className="text-right">Balance After</th>
                       <th>Next Due</th>
                       <th>Mode</th>
+                      <th />
                       {isAdmin && <th />}
                     </tr>
                   </thead>
@@ -319,6 +324,16 @@ export function AccountDetailPage() {
                         </td>
                         <td>
                           <span className="badge badge-xs badge-outline">{p.method}</span>
+                        </td>
+                        <td>
+                          <button
+                            className="btn btn-ghost btn-xs gap-1 text-base-content/60"
+                            title="Comprobantes"
+                            onClick={() => setAttachmentsPaymentId(p.id)}
+                          >
+                            <Paperclip className="w-3 h-3" />
+                            {p.attachment_count > 0 && p.attachment_count}
+                          </button>
                         </td>
                         {isAdmin && (
                           <td>
@@ -486,9 +501,11 @@ export function AccountDetailPage() {
                 Cancel
               </button>
               <button
-                className={`btn btn-warning btn-sm ${closeAccount.isPending ? "loading" : ""}`}
+                className="btn btn-warning btn-sm gap-2"
                 onClick={() => closeAccount.mutate()}
+                disabled={closeAccount.isPending}
               >
+                {closeAccount.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
                 Close Account
               </button>
             </div>
@@ -509,6 +526,15 @@ export function AccountDetailPage() {
           dangerous
           onConfirm={() => purgeAccount.mutate()}
           onCancel={() => setShowPurge(false)}
+        />
+      )}
+
+      {attachmentsPaymentId && (
+        <PaymentAttachmentsModal
+          accountId={id!}
+          paymentId={attachmentsPaymentId}
+          isAdmin={isAdmin}
+          onClose={() => setAttachmentsPaymentId(null)}
         />
       )}
 

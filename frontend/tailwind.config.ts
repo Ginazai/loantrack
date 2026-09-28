@@ -19,7 +19,12 @@ export default {
           // Backgrounds: cool blue-grey (not warm cream)
           "base-100": "#F4F6FA",   // card white-blue
           "base-200": "#E8ECF4",   // page background
-          "base-300": "#D0D7E8",   // dividers
+          "base-300": "#7D818B",   // dividers/borders — darkened from the original
+                                   // #D0D7E8 (1.33:1 against base-100, well under
+                                   // WCAG 1.4.11's 3:1 minimum for UI component
+                                   // boundaries like input borders) to #7D818B
+                                   // (3.60:1). Affects every input/card border
+                                   // app-wide via daisyUI's `-bordered` variants.
           "base-content": "#1A1F2E", // near-ink text
           // Primary: slate-navy (trust, formality)
           "primary": "#2B4590",

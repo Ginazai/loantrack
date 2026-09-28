@@ -73,6 +73,7 @@ services:
       WEBHOOK_TIMEOUT_SECONDS:    ${WEBHOOK_TIMEOUT_SECONDS:-10}
       WEBHOOK_MAX_RETRIES:        ${WEBHOOK_MAX_RETRIES:-3}
       WEBHOOK_RETRY_DELAY_SECONDS: ${WEBHOOK_RETRY_DELAY_SECONDS:-60}
+      CYCLE_SCAN_INTERVAL_SECONDS: ${CYCLE_SCAN_INTERVAL_SECONDS:-3600}
     expose:
       - "8000"
     healthcheck:
@@ -95,6 +96,13 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+    environment:
+      # Resolves via Docker's embedded DNS since both services share the
+      # `loantrack` network below — not a host-machine path. Only needs to
+      # change if frontend/backend are ever split onto separate hosts or
+      # platforms (see docs/adr for context); no rebuild needed either way,
+      # this is substituted into nginx.conf at container start.
+      BACKEND_URL: ${BACKEND_URL:-http://backend:8000}
     ports:
       - "${APP_PORT:-80}:80"
     healthcheck:

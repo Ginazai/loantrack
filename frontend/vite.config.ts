@@ -2,7 +2,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
 // Dev server proxies /api to the local FastAPI instance.
-// In Docker, nginx handles this proxy itself (see nginx.conf).
+// In Docker, nginx handles this proxy itself (see nginx.conf.template).
 export default defineConfig({
   plugins: [react()],
   server: {

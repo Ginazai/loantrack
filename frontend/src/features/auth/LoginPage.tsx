@@ -1,4 +1,4 @@
-import { AlertTriangle, Wallet } from "lucide-react";
+import { AlertTriangle, Loader2, Wallet } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
@@ -47,7 +47,7 @@ export function LoginPage() {
           </div>
           <div>
             <span className="font-bold text-lg text-white">LoanTrack</span>
-            <p className="text-xs text-white/30 font-mono tracking-widest uppercase">Ledger</p>
+            <p className="text-xs text-white/60 font-mono tracking-widest uppercase">Ledger</p>
           </div>
         </div>
 
@@ -55,12 +55,12 @@ export function LoginPage() {
           <blockquote className="text-3xl font-bold text-white/90 leading-snug mb-4">
             "A promissory note is only as good as the system behind it."
           </blockquote>
-          <p className="text-sm text-white/40 font-mono">
+          <p className="text-sm text-white/65 font-mono">
             Private loan tracking · Interest calculator · Payment records
           </p>
         </div>
 
-        <div className="flex gap-8 text-white/20 text-xs font-mono uppercase tracking-widest">
+        <div className="flex gap-8 text-white/50 text-xs font-mono uppercase tracking-widest">
           <span>Secure</span>
           <span>·</span>
           <span>Private</span>
@@ -80,8 +80,8 @@ export function LoginPage() {
             <span className="font-bold text-xl">LoanTrack</span>
           </div>
 
-          <h2 className="text-xl font-bold mb-1">Sign in</h2>
-          <p className="text-sm text-base-content/40 mb-8">Access your loan ledger</p>
+          <h2 className="text-2xl font-bold mb-1.5">Sign in</h2>
+          <p className="text-sm text-base-content/65 mb-8">Access your loan ledger</p>
 
           {error && (
             <div className="alert alert-error py-2.5 text-sm mb-5">
@@ -133,13 +133,21 @@ export function LoginPage() {
 
             <button
               type="submit"
-              className={`btn btn-primary w-full mt-3 ${isSubmitting ? "loading" : ""}`}
+              className="btn btn-primary w-full mt-3"
+              disabled={isSubmitting}
             >
-              Sign In
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Signing in…
+                </>
+              ) : (
+                "Sign In"
+              )}
             </button>
           </form>
 
-          <p className="text-center text-xs text-base-content/25 font-mono mt-10 uppercase tracking-widest">
+          <p className="text-center text-xs text-base-content/65 font-mono mt-10 uppercase tracking-widest">
             Ledger v2 · Private Use Only
           </p>
         </div>

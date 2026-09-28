@@ -1,5 +1,5 @@
 import {
-  ChevronLeft, ChevronRight, ClipboardList, FileText, LayoutDashboard,
+  ChevronLeft, ChevronRight, ClipboardList, FileText, FileUp, LayoutDashboard,
   LogOut, Moon, Settings, Sun, Users, Wallet, Webhook,
 } from "lucide-react";
 import { useState } from "react";
@@ -74,6 +74,10 @@ export function DashboardLayout() {
               <NavLink to="/admin/webhooks" className={navCls}>
                 <Webhook className={`flex-shrink-0 text-neutral-content/50 ${sidebarOpen ? "w-4 h-4" : "w-5 h-5"}`} />
                 {sidebarOpen && <span>Webhooks</span>}
+              </NavLink>
+              <NavLink to="/admin/imports" className={navCls}>
+                <FileUp className={`flex-shrink-0 text-neutral-content/50 ${sidebarOpen ? "w-4 h-4" : "w-5 h-5"}`} />
+                {sidebarOpen && <span>Imports</span>}
               </NavLink>
             </>
           ) : (

@@ -9,6 +9,7 @@ const ALL_EVENTS: { value: WebhookEventType; label: string; desc: string }[] = [
   { value: "payment.added",   label: "Payment Added",   desc: "Fires when a payment is recorded" },
   { value: "status.changed",  label: "Status Changed",  desc: "Fires when account status changes" },
   { value: "account.purged",  label: "Account Purged",  desc: "Fires when a closed account is permanently deleted" },
+  { value: "cycle.closed",    label: "Cycle Closed",    desc: "Fires when a billing cycle (15th/30th) closes, even with no payment that day" },
 ];
 
 const PAYLOAD_SAMPLE = {

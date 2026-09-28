@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { Loader2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -179,8 +180,10 @@ export function PaymentForm({ account, onSubmit, onCancel, isLoading }: Props) {
         </button>
         <button
           type="submit"
-          className={`btn btn-primary btn-sm ${isLoading ? "loading" : ""}`}
+          className="btn btn-primary btn-sm gap-2"
+          disabled={isLoading}
         >
+          {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
           Record Payment
         </button>
       </div>

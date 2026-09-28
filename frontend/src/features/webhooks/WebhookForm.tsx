@@ -1,4 +1,4 @@
-import { ShieldCheck } from "lucide-react";
+import { Loader2, ShieldCheck } from "lucide-react";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -22,6 +22,7 @@ const ALL_EVENTS: { value: WebhookEventType; label: string; desc: string }[] = [
     desc: "Fires when account details change",
   },
   { value: "account.purged", label: "Account Purged", desc: "Fires before a hard delete" },
+  { value: "cycle.closed", label: "Cycle Closed", desc: "Fires when a billing cycle closes, even with no payment that day" },
 ];
 
 const schema = z.object({
@@ -130,8 +131,10 @@ export function WebhookForm({ onSubmit, onCancel, isLoading }: Props) {
         </button>
         <button
           type="submit"
-          className={`btn btn-primary btn-sm ${isLoading ? "loading" : ""}`}
+          className="btn btn-primary btn-sm gap-2"
+          disabled={isLoading}
         >
+          {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
           Save Webhook
         </button>
       </div>

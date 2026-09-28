@@ -302,7 +302,8 @@ export function AccountForm({ account, onSubmit, onCancel, isLoading }: Props) {
 
       <div className="flex gap-2 justify-end pt-1">
         <button type="button" className="btn btn-ghost btn-sm" onClick={onCancel}>Cancel</button>
-        <button type="submit" className={`btn btn-primary btn-sm ${isLoading ? "loading" : ""}`}>
+        <button type="submit" className="btn btn-primary btn-sm gap-2" disabled={isLoading}>
+          {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
           {isEdit ? "Save Changes" : "Create Account"}
         </button>
       </div>
