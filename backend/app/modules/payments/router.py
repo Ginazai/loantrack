@@ -1,6 +1,8 @@
+import io
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -8,7 +10,7 @@ from app.core.database import get_db
 from app.core.dependencies import get_current_user
 from app.modules.accounts.models import LoanAccount
 from app.modules.payments.models import Payment
-from app.modules.payments.schemas import PaymentCreate, PaymentOut
+from app.modules.payments.schemas import PaymentAttachmentOut, PaymentCreate, PaymentOut
 from app.modules.payments.service import PaymentService
 
 router = APIRouter(prefix="/accounts/{account_id}/payments", tags=["payments"])
@@ -66,3 +68,70 @@ async def delete_payment(
 
     await db.delete(payment)
     await db.flush()
+
+
+# ── Attachments ──────────────────────────────────────────────────────────────
+# Stored as bytea in Postgres (ADR-005) — no static file serving, every
+# download is streamed through this authenticated endpoint.
+
+@router.get("/{payment_id}/attachments", response_model=list[PaymentAttachmentOut])
+async def list_attachments(
+    account_id: UUID,
+    payment_id: UUID,
+    current_user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    svc = PaymentService(db)
+    return await svc.list_attachments(
+        account_id, payment_id, current_user.id, is_admin=current_user.role == "admin"
+    )
+
+
+@router.post("/{payment_id}/attachments", response_model=PaymentAttachmentOut, status_code=201)
+async def upload_attachment(
+    account_id: UUID,
+    payment_id: UUID,
+    file: UploadFile = File(...),
+    current_user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    svc = PaymentService(db)
+    return await svc.add_attachment(
+        account_id, payment_id, current_user.id, file, is_admin=current_user.role == "admin"
+    )
+
+
+@router.get("/{payment_id}/attachments/{attachment_id}")
+async def download_attachment(
+    account_id: UUID,
+    payment_id: UUID,
+    attachment_id: UUID,
+    current_user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    svc = PaymentService(db)
+    attachment = await svc.get_attachment(
+        account_id, payment_id, attachment_id, current_user.id,
+        is_admin=current_user.role == "admin",
+    )
+    return StreamingResponse(
+        io.BytesIO(attachment.content),
+        media_type=attachment.content_type,
+        headers={
+            "Content-Disposition": f'inline; filename="{attachment.original_filename}"'
+        },
+    )
+
+
+@router.delete("/{payment_id}/attachments/{attachment_id}", status_code=204)
+async def delete_attachment(
+    account_id: UUID,
+    payment_id: UUID,
+    attachment_id: UUID,
+    current_user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    if current_user.role != "admin":
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Admin only")
+    svc = PaymentService(db)
+    await svc.delete_attachment(account_id, payment_id, attachment_id, current_user.id)

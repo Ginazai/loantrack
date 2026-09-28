@@ -18,10 +18,11 @@ from app.core.models_registry import *  # noqa: F401, F403
 from app.modules.accounts.router import router as accounts_router
 from app.modules.admin.router import router as admin_router
 from app.modules.auth.router import router as auth_router
+from app.modules.imports.router import router as imports_router
 from app.modules.loan_requests.router import router as loan_requests_router
 from app.modules.payments.router import router as payments_router
 from app.modules.webhooks.router import router as webhooks_router
-from app.modules.webhooks.service import WebhookDeliveryService
+from app.modules.webhooks.service import CycleCloseScanService, WebhookDeliveryService
 
 settings = get_settings()
 configure_logging(settings.LOG_LEVEL if hasattr(settings, "LOG_LEVEL") else "INFO")
@@ -60,12 +61,33 @@ async def _webhook_retry_loop() -> None:
             logger.exception("webhook_retry_error", extra={"error": str(exc)})
 
 
+async def _cycle_close_scan_loop() -> None:
+    """Detects cycle closes and enqueues `cycle.closed` webhook events.
+
+    Sibling of `_webhook_retry_loop` above — same pattern (an asyncio task
+    in the FastAPI lifespan), deliberately not a separate worker/queue
+    (ADR-006). Idempotent: `AccountCycleNotification` rows make re-running
+    this safe on every interval and across restarts.
+    """
+    while True:
+        await asyncio.sleep(settings.CYCLE_SCAN_INTERVAL_SECONDS)
+        try:
+            async with AsyncSessionLocal() as db:
+                svc = CycleCloseScanService(db)
+                await svc.scan()
+                await db.commit()
+        except Exception as exc:
+            logger.exception("cycle_close_scan_error", extra={"error": str(exc)})
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("startup", extra={"version": settings.APP_VERSION})
-    task = asyncio.create_task(_webhook_retry_loop())
+    webhook_task = asyncio.create_task(_webhook_retry_loop())
+    cycle_scan_task = asyncio.create_task(_cycle_close_scan_loop())
     yield
-    task.cancel()
+    webhook_task.cancel()
+    cycle_scan_task.cancel()
     logger.info("shutdown")
 
 
@@ -98,6 +120,7 @@ app.include_router(payments_router, prefix=prefix)
 app.include_router(webhooks_router, prefix=prefix)
 app.include_router(admin_router, prefix=prefix)
 app.include_router(loan_requests_router, prefix=prefix)
+app.include_router(imports_router, prefix=prefix)
 
 
 @app.get(f"{prefix}/health", tags=["health"])

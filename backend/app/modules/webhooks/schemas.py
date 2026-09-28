@@ -10,6 +10,7 @@ WEBHOOK_EVENTS = Literal[
     "account.created",
     "account.updated",
     "account.purged",
+    "cycle.closed",
 ]
 
 
@@ -23,6 +24,7 @@ class WebhookConfigCreate(BaseModel):
         allowed = {
             "payment.added", "status.changed",
             "account.created", "account.updated", "account.purged",
+            "cycle.closed",
         }
         bad = [e for e in v if e not in allowed]
         if bad:

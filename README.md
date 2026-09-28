@@ -50,7 +50,7 @@ docker compose run --rm seed
 cd backend
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
-cp ../.env.example .env  # edit DATABASE_URL to point at local Postgres
+cp .env.example .env  # edit DATABASE_URL to point at local Postgres
 alembic upgrade head
 uvicorn app.main:app --reload
 ```
@@ -60,7 +60,9 @@ uvicorn app.main:app --reload
 ```bash
 cd frontend
 npm install
-cp .env.example .env.local  # set VITE_API_BASE_URL=http://localhost:8000/api/v1
+cp .env.example .env.local  # optional — the dev server already proxies /api
+                             # to localhost:8000 on its own (vite.config.ts);
+                             # only edit this if your backend runs elsewhere
 npm run dev
 ```
 
@@ -113,9 +115,15 @@ See `docs/adr/` for architectural decisions.
 
 ## Environment Variables
 
-See `.env.example` for all variables with descriptions.
+Three `.env.example` files, each scoped to how you're running that piece:
 
-Key required variables:
+- `.env.example` (repo root) — feeds `docker compose up`; copy to `.env` here for the normal Docker workflow.
+- `backend/.env.example` — for running the backend directly (`uvicorn`, pytest, alembic), outside Docker.
+- `frontend/.env.example` — for running the frontend directly (`npm run dev`), outside Docker.
+
+Each file documents only the variables that path actually reads — see the comments at the top of each for how they relate to the other two.
+
+Key required variables (root `.env.example`):
 - `SECRET_KEY` — JWT signing secret (min 32 chars, random)
 - `POSTGRES_PASSWORD` — DB password
 

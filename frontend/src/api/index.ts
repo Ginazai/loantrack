@@ -1,10 +1,15 @@
 import client from "./client";
 import type {
+  AccountMapping,
+  ImportBatch,
+  ImportCommitResult,
+  ImportPreview,
   LoanAccount,
   LoginFormData,
   LoanRequest,
   LoanRequestFormData,
   Payment,
+  PaymentAttachment,
   PaymentFormData,
   TokenResponse,
   User,
@@ -93,6 +98,55 @@ export const paymentsApi = {
     client.delete(`/accounts/${accountId}/payments/${paymentId}`),
 };
 
+// ── Payment attachments (ADR-005 — stored as bytea, streamed through here) ────
+
+export const attachmentsApi = {
+  list: (accountId: string, paymentId: string) =>
+    client
+      .get<PaymentAttachment[]>(`/accounts/${accountId}/payments/${paymentId}/attachments`)
+      .then((r) => r.data),
+
+  upload: (accountId: string, paymentId: string, file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return client
+      .post<PaymentAttachment>(
+        `/accounts/${accountId}/payments/${paymentId}/attachments`,
+        form,
+        { headers: { "Content-Type": "multipart/form-data" } },
+      )
+      .then((r) => r.data);
+  },
+
+  delete: (accountId: string, paymentId: string, attachmentId: string) =>
+    client.delete(`/accounts/${accountId}/payments/${paymentId}/attachments/${attachmentId}`),
+
+  // Auth is a bearer header, not a cookie — a plain window.open() link would
+  // hit the endpoint with no Authorization header and get a 401. Fetch as a
+  // blob through the authenticated client instead, then hand the browser a
+  // throwaway object URL to open/save.
+  download: async (
+    accountId: string,
+    paymentId: string,
+    attachmentId: string,
+    filename: string,
+  ) => {
+    const res = await client.get(
+      `/accounts/${accountId}/payments/${paymentId}/attachments/${attachmentId}`,
+      { responseType: "blob" },
+    );
+    const url = URL.createObjectURL(res.data as Blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.rel = "noopener";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  },
+};
+
 // ── Webhooks (per-account) ────────────────────────────────────────────────────
 
 export const webhooksApi = {
@@ -160,4 +214,27 @@ export const loanRequestsApi = {
 
   review: (id: string, data: { status: "approved" | "rejected"; rejection_reason?: string }) =>
     client.patch<LoanRequest>(`/loan-requests/admin/${id}`, data).then((r) => r.data),
+};
+
+// ── Imports (ADR-004) ─────────────────────────────────────────────────────────
+
+export const importsApi = {
+  preview: (file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return client
+      .post<ImportPreview>("/admin/imports/preview", form, {
+        headers: { "Content-Type": "multipart/form-data" },
+      })
+      .then((r) => r.data);
+  },
+
+  commit: (batchId: string, mappings: AccountMapping[]) =>
+    client
+      .post<ImportCommitResult>(`/admin/imports/${batchId}/commit`, { mappings })
+      .then((r) => r.data),
+
+  list: () => client.get<ImportBatch[]>("/admin/imports").then((r) => r.data),
+
+  get: (batchId: string) => client.get<ImportBatch>(`/admin/imports/${batchId}`).then((r) => r.data),
 };

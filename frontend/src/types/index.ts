@@ -1,12 +1,13 @@
 export type UserRole = "admin" | "user";
 export type AccountStatus = "open" | "active" | "paid" | "closed";
-export type PaymentMethod = "auto" | "manual";
+export type PaymentMethod = "auto" | "manual" | "import";
 export type WebhookEventType =
   | "payment.added"
   | "status.changed"
   | "account.created"
   | "account.updated"
-  | "account.purged";
+  | "account.purged"
+  | "cycle.closed";
 
 export interface User {
   id: string;
@@ -46,6 +47,17 @@ export interface Payment {
   payment_date: string;
   next_due_date: string | null;
   method: PaymentMethod;
+  created_at: string;
+  attachment_count: number;
+}
+
+export interface PaymentAttachment {
+  id: string;
+  payment_id: string;
+  original_filename: string;
+  content_type: string;
+  size_bytes: number;
+  uploaded_by: string | null;
   created_at: string;
 }
 
@@ -119,4 +131,67 @@ export interface UserCreateFormData {
   password: string;
   full_name: string;
   role: UserRole;
+}
+
+// ── Imports (ADR-004) ────────────────────────────────────────────────────────
+
+export type ImportFormat = "legacy_ledger_csv" | "native_csv";
+export type ImportAction = "create" | "existing" | "skip";
+
+export interface ParsedAccountPreview {
+  source_ref: string;
+  suggested_account_name: string;
+  borrow_amount: string;
+  start_date: string;
+  rate: string | null;
+  borrower_name: string | null;
+  payment_count: number;
+  suggested_existing_account_id: string | null;
+}
+
+export interface ImportParseError {
+  row_number: number | null;
+  message: string;
+}
+
+export interface ImportPreview {
+  batch_id: string;
+  format: ImportFormat;
+  accounts: ParsedAccountPreview[];
+  unmatched_payment_refs: string[];
+  total_payments_parsed: number;
+  error_count: number;
+  errors: ImportParseError[];
+}
+
+export interface AccountMapping {
+  source_ref: string;
+  action: ImportAction;
+  existing_account_id?: string;
+  account_name?: string;
+  borrower_name?: string;
+  linked_user_id?: string;
+  rate?: number; // 0..1
+}
+
+export interface ImportRowResult {
+  row_number: number | null;
+  interpretation: string;
+  result: "ok" | "error" | "skipped";
+  error_message: string | null;
+}
+
+export interface ImportBatch {
+  id: string;
+  source_filename: string;
+  format: ImportFormat;
+  status: "previewed" | "committed" | "failed";
+  summary: Record<string, number>;
+  created_at: string;
+  committed_at: string | null;
+}
+
+export interface ImportCommitResult {
+  batch: ImportBatch;
+  rows: ImportRowResult[];
 }

@@ -25,11 +25,20 @@ RUN npm run build
 # ── Stage 2: serve with nginx ─────────────────────────────────────────────────
 FROM nginx:1.27-alpine AS runtime
 
-# Remove default nginx config
-RUN rm /etc/nginx/conf.d/default.conf
+# nginx:1.27 runs every *.template file in /etc/nginx/templates/ through
+# envsubst automatically at container start (before nginx itself starts),
+# writing the result to /etc/nginx/conf.d/<name without .template>. This is
+# what lets BACKEND_URL be a runtime env var instead of something baked into
+# the image at build time — same image works unchanged behind docker-compose
+# (BACKEND_URL defaults to the "backend" service name below) or split across
+# separate hosts/platforms (override BACKEND_URL with the backend's public URL,
+# no rebuild required). See nginx.conf.template for what gets proxied and why.
+COPY nginx.conf.template /etc/nginx/templates/default.conf.template
 
-# Copy our custom config
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Default for docker-compose, where "backend" resolves via Docker's embedded
+# DNS on the shared network. Override at `docker run`/compose/platform level
+# for any deployment where frontend and backend aren't on the same network.
+ENV BACKEND_URL=http://backend:8000
 
 # Copy built assets from builder
 COPY --from=builder /app/dist /usr/share/nginx/html

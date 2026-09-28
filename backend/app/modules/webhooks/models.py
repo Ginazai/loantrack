@@ -1,7 +1,7 @@
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import JSON, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -62,4 +62,33 @@ class WebhookEvent(Base):
 
     webhook: Mapped["WebhookConfig"] = relationship(
         "WebhookConfig", back_populates="events_log"
+    )
+
+
+class AccountCycleNotification(Base):
+    """Idempotency ledger for the `cycle.closed` webhook (ADR-006).
+
+    One row per (account_id, cycle_date) that has already been notified.
+    The scan loop inserts a row here in the same transaction as the
+    WebhookEvent it enqueues, so a re-run (or a backlog of several missed
+    cycles on a dormant account) never double-fires.
+    """
+
+    __tablename__ = "account_cycle_notifications"
+    __table_args__ = (
+        UniqueConstraint("account_id", "cycle_date", name="uq_account_cycle_notification"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    account_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("loan_accounts.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    cycle_date: Mapped[date] = mapped_column(Date, nullable=False)
+    notified_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
     )

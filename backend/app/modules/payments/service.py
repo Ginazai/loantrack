@@ -1,9 +1,10 @@
 from decimal import ROUND_HALF_UP, Decimal
 from uuid import UUID
 
-from fastapi import HTTPException, status
+from fastapi import HTTPException, UploadFile, status
 from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.modules.accounts.interest_engine import (
     advance_cycle,
@@ -14,8 +15,11 @@ from app.modules.accounts.interest_engine import (
 from app.core.repository import BaseRepository
 from app.modules.accounts.models import LoanAccount
 from app.modules.audit.service import AuditService
-from app.modules.payments.models import Payment
-from app.modules.payments.schemas import PaymentCreate
+from app.modules.payments.models import Payment, PaymentAttachment
+from app.modules.payments.schemas import (
+    PaymentCreate,
+    validate_attachment,
+)
 from app.modules.webhooks.models import WebhookConfig, WebhookEvent
 
 
@@ -29,26 +33,12 @@ class PaymentService:
         self.repo = BaseRepository(Payment, db)
         self.audit = AuditService(db)
 
-    async def get_for_account(self, account_id: UUID) -> list[Payment]:
-        result = await self.db.execute(
-            select(Payment)
-            .where(Payment.account_id == account_id)
-            .order_by(Payment.payment_date)
-        )
-        return list(result.scalars().all())
-
-    async def add_payment(
-        self,
-        account_id: UUID,
-        user_id: UUID,
-        data: PaymentCreate,
-        ip: str | None = None,
-        is_admin: bool = False,
-    ) -> Payment:
+    async def _get_account_or_404(
+        self, account_id: UUID, user_id: UUID, is_admin: bool = False
+    ) -> LoanAccount:
         if is_admin:
-            from sqlalchemy import select as sql_select
             result = await self.db.execute(
-                sql_select(LoanAccount).where(LoanAccount.id == account_id)
+                select(LoanAccount).where(LoanAccount.id == account_id)
             )
         else:
             result = await self.db.execute(
@@ -59,6 +49,40 @@ class PaymentService:
         account = result.scalar_one_or_none()
         if not account:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Account not found")
+        return account
+
+    async def _get_payment_or_404(self, account_id: UUID, payment_id: UUID) -> Payment:
+        result = await self.db.execute(
+            select(Payment)
+            .options(selectinload(Payment.attachments))
+            .where(and_(Payment.id == payment_id, Payment.account_id == account_id))
+        )
+        payment = result.scalar_one_or_none()
+        if not payment:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Payment not found")
+        return payment
+
+    async def get_for_account(self, account_id: UUID) -> list[Payment]:
+        result = await self.db.execute(
+            select(Payment)
+            .options(selectinload(Payment.attachments))
+            .where(Payment.account_id == account_id)
+            .order_by(Payment.payment_date)
+        )
+        payments = list(result.scalars().all())
+        for p in payments:
+            p.attachment_count = len(p.attachments)  # transient, not a mapped column
+        return payments
+
+    async def add_payment(
+        self,
+        account_id: UUID,
+        user_id: UUID,
+        data: PaymentCreate,
+        ip: str | None = None,
+        is_admin: bool = False,
+    ) -> Payment:
+        account = await self._get_account_or_404(account_id, user_id, is_admin)
         if account.status in ("paid", "closed"):
             raise HTTPException(
                 status.HTTP_409_CONFLICT,
@@ -120,6 +144,7 @@ class PaymentService:
             method=data.method,
         )
         payment = await self.repo.create(payment)
+        payment.attachment_count = 0
 
         # Status transitions
         new_status = account.status
@@ -138,7 +163,10 @@ class PaymentService:
             ip=ip,
         )
 
-        # Fire per-account and global webhooks for payment.added
+        # Fire per-account and global webhooks for payment.added.
+        # NOTE: payments created via bulk import (method="import") never reach
+        # this code path — the imports service inserts Payment rows directly
+        # and deliberately skips webhook notification (see ADR-004).
         wh_result = await self.db.execute(
             select(WebhookConfig).where(
                 and_(
@@ -173,18 +201,95 @@ class PaymentService:
         return payment
 
     async def list_payments(self, account_id: UUID, user_id: UUID, is_admin: bool = False) -> list[Payment]:
-        if is_admin:
-            from sqlalchemy import select as sql_select
-            result = await self.db.execute(
-                sql_select(LoanAccount).where(LoanAccount.id == account_id)
-            )
-        else:
-            result = await self.db.execute(
-                select(LoanAccount).where(
-                    and_(LoanAccount.id == account_id, LoanAccount.user_id == user_id)
+        await self._get_account_or_404(account_id, user_id, is_admin)
+        return await self.get_for_account(account_id)
+
+    # ── Attachments ──────────────────────────────────────────────────────────
+
+    async def add_attachment(
+        self,
+        account_id: UUID,
+        payment_id: UUID,
+        user_id: UUID,
+        file: UploadFile,
+        is_admin: bool = False,
+    ) -> PaymentAttachment:
+        await self._get_account_or_404(account_id, user_id, is_admin)
+        payment = await self._get_payment_or_404(account_id, payment_id)
+
+        content_type = file.content_type or "application/octet-stream"
+        data = await file.read()
+        try:
+            validate_attachment(content_type, len(data))
+        except ValueError as exc:
+            msg = str(exc)
+            if "not allowed" in msg:
+                raise HTTPException(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, msg)
+            if "Empty file" in msg:
+                raise HTTPException(status.HTTP_400_BAD_REQUEST, msg)
+            raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, msg)
+
+        attachment = PaymentAttachment(
+            payment_id=payment.id,
+            original_filename=file.filename or "attachment",
+            content_type=content_type,
+            size_bytes=len(data),
+            content=data,
+            uploaded_by=user_id,
+        )
+        self.db.add(attachment)
+        await self.db.flush()
+        await self.db.refresh(attachment)
+
+        await self.audit.log(
+            user_id, "payment_attachment", str(attachment.id), "create",
+            after={"payment_id": str(payment_id), "filename": attachment.original_filename},
+        )
+        return attachment
+
+    async def list_attachments(
+        self, account_id: UUID, payment_id: UUID, user_id: UUID, is_admin: bool = False
+    ) -> list[PaymentAttachment]:
+        await self._get_account_or_404(account_id, user_id, is_admin)
+        payment = await self._get_payment_or_404(account_id, payment_id)
+        return payment.attachments
+
+    async def get_attachment(
+        self,
+        account_id: UUID,
+        payment_id: UUID,
+        attachment_id: UUID,
+        user_id: UUID,
+        is_admin: bool = False,
+    ) -> PaymentAttachment:
+        await self._get_account_or_404(account_id, user_id, is_admin)
+        await self._get_payment_or_404(account_id, payment_id)
+        result = await self.db.execute(
+            select(PaymentAttachment).where(
+                and_(
+                    PaymentAttachment.id == attachment_id,
+                    PaymentAttachment.payment_id == payment_id,
                 )
             )
-        account = result.scalar_one_or_none()
-        if not account:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Account not found")
-        return await self.get_for_account(account_id)
+        )
+        attachment = result.scalar_one_or_none()
+        if not attachment:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Attachment not found")
+        return attachment
+
+    async def delete_attachment(
+        self,
+        account_id: UUID,
+        payment_id: UUID,
+        attachment_id: UUID,
+        user_id: UUID,
+    ) -> None:
+        """Admin-only — same policy as deleting a payment itself."""
+        attachment = await self.get_attachment(
+            account_id, payment_id, attachment_id, user_id, is_admin=True
+        )
+        await self.db.delete(attachment)
+        await self.db.flush()
+        await self.audit.log(
+            user_id, "payment_attachment", str(attachment_id), "delete",
+        )

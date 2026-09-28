@@ -8,6 +8,7 @@ import { AccountDetailPage } from "./features/accounts/AccountDetailPage";
 import UsersPage from "./features/admin/UsersPage";
 import WebhooksAdminPage from "./features/admin/WebhooksAdminPage";
 import RequestsPage from "./features/admin/RequestsPage";
+import ImportsPage from "./features/admin/ImportsPage";
 import UserPortalPage from "./features/user/UserPortalPage";
 import MyRequestsPage from "./features/user/MyRequestsPage";
 
@@ -40,6 +41,7 @@ export default function App() {
         <Route path="/admin/users" element={<RequireAdmin><UsersPage /></RequireAdmin>} />
         <Route path="/admin/requests" element={<RequireAdmin><RequestsPage /></RequireAdmin>} />
         <Route path="/admin/webhooks" element={<RequireAdmin><WebhooksAdminPage /></RequireAdmin>} />
+        <Route path="/admin/imports" element={<RequireAdmin><ImportsPage /></RequireAdmin>} />
 
         {/* User portal — all authenticated users */}
         <Route path="/my-loans" element={<UserPortalPage />} />

@@ -30,5 +30,45 @@ class PaymentOut(BaseModel):
     balance_after: Decimal
     payment_date: date
     next_due_date: date | None
-    method: str
+    method: Literal["auto", "manual", "import"]
+    created_at: datetime
+    attachment_count: int = 0
+
+
+# ── Attachments ──────────────────────────────────────────────────────────────
+
+ALLOWED_ATTACHMENT_CONTENT_TYPES = {
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "application/pdf",
+}
+MAX_ATTACHMENT_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB
+
+
+def validate_attachment(content_type: str, size_bytes: int) -> None:
+    """Pure validation (no DB, no I/O) — raises ValueError on a bad
+    attachment so it's testable in isolation from PaymentService."""
+    if content_type not in ALLOWED_ATTACHMENT_CONTENT_TYPES:
+        raise ValueError(
+            f"File type '{content_type}' not allowed. "
+            f"Allowed: {sorted(ALLOWED_ATTACHMENT_CONTENT_TYPES)}"
+        )
+    if size_bytes <= 0:
+        raise ValueError("Empty file")
+    if size_bytes > MAX_ATTACHMENT_SIZE_BYTES:
+        raise ValueError(
+            f"File exceeds the {MAX_ATTACHMENT_SIZE_BYTES // (1024 * 1024)} MB limit"
+        )
+
+
+class PaymentAttachmentOut(BaseModel):
+    model_config = {"from_attributes": True}
+
+    id: UUID
+    payment_id: UUID
+    original_filename: str
+    content_type: str
+    size_bytes: int
+    uploaded_by: UUID | None
     created_at: datetime
