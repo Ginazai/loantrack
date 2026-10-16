@@ -6,6 +6,7 @@ import type { LoanAccount, AccountFormData, User, UserCreateFormData } from "../
 import { upcomingCycleDates, formatDate } from "../../utils/dateUtils";
 import { adminApi } from "../../api";
 import { useAuthStore } from "../../stores/authStore";
+import { getApiErrorMessage } from "../../utils/apiError";
 import { ChevronDown, Loader2, UserPlus, CheckCircle2 } from "lucide-react";
 
 const schema = z.object({
@@ -102,7 +103,7 @@ export function AccountForm({ account, onSubmit, onCancel, isLoading }: Props) {
       setValue("linked_user_id", created.id);
       setShowNewUser(false);
     } catch (e: any) {
-      setUserError(e?.response?.data?.detail || "Failed to create user");
+      setUserError(getApiErrorMessage(e, "Failed to create user"));
     } finally {
       setCreatingUser(false);
     }
@@ -113,6 +114,11 @@ export function AccountForm({ account, onSubmit, onCancel, isLoading }: Props) {
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+      {/* Tracked as a real registered field so setValue() calls from the
+          "assign to borrower" UI below reliably reach the submitted payload —
+          setValue() on a path that's never register()'d is not guaranteed to
+          survive to handleSubmit's data in every react-hook-form version. */}
+      <input type="hidden" {...register("linked_user_id")} />
       {/* Admin: User assignment */}
       {isAdmin && !isEdit && (
         <div className="rounded-md border border-primary/20 bg-primary/5 p-4 space-y-3">

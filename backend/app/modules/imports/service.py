@@ -35,8 +35,8 @@ from app.modules.imports.schemas import (
     ImportCommitOut,
     ImportPreviewOut,
     ImportRowOut,
-    ParseErrorOut,
     ParsedAccountOut,
+    ParseErrorOut,
 )
 from app.modules.payments.models import Payment
 from app.modules.users.models import User
@@ -200,8 +200,12 @@ class ImportService:
         for parsed_account in parsed.accounts:
             mapping = mapping_by_ref.get(parsed_account.source_ref)
             if mapping is None:
-                _row(parsed_account.row_number, "account", "error",
-                     error=f"Referencia {parsed_account.source_ref} sin mapeo")
+                _row(
+                    parsed_account.row_number,
+                    "account",
+                    "error",
+                    error=f"Referencia {parsed_account.source_ref} sin mapeo",
+                )
                 continue
 
             if mapping.action == "skip":
@@ -211,13 +215,21 @@ class ImportService:
 
             if mapping.action == "existing":
                 if not mapping.existing_account_id:
-                    _row(parsed_account.row_number, "account", "error",
-                         error="action=existing requiere existing_account_id")
+                    _row(
+                        parsed_account.row_number,
+                        "account",
+                        "error",
+                        error="action=existing requiere existing_account_id",
+                    )
                     continue
                 existing = await account_repo.get_by_id(mapping.existing_account_id)
                 if not existing:
-                    _row(parsed_account.row_number, "account", "error",
-                         error=f"Cuenta {mapping.existing_account_id} no encontrada")
+                    _row(
+                        parsed_account.row_number,
+                        "account",
+                        "error",
+                        error=f"Cuenta {mapping.existing_account_id} no encontrada",
+                    )
                     continue
                 account_by_ref[parsed_account.source_ref] = existing
                 accounts_matched += 1
@@ -226,13 +238,21 @@ class ImportService:
 
             # action == "create"
             if not mapping.linked_user_id:
-                _row(parsed_account.row_number, "account", "error",
-                     error="action=create requiere linked_user_id")
+                _row(
+                    parsed_account.row_number,
+                    "account",
+                    "error",
+                    error="action=create requiere linked_user_id",
+                )
                 continue
             owner = await user_repo.get_by_id(mapping.linked_user_id)
             if not owner:
-                _row(parsed_account.row_number, "account", "error",
-                     error=f"Usuario {mapping.linked_user_id} no encontrado")
+                _row(
+                    parsed_account.row_number,
+                    "account",
+                    "error",
+                    error=f"Usuario {mapping.linked_user_id} no encontrado",
+                )
                 continue
 
             account = LoanAccount(
@@ -243,7 +263,8 @@ class ImportService:
                 ),
                 borrow_amount=parsed_account.borrow_amount,
                 rate=(
-                    mapping.rate if mapping.rate is not None
+                    mapping.rate
+                    if mapping.rate is not None
                     else (parsed_account.rate if parsed_account.rate is not None else Decimal("0"))
                 ),
                 cycle=15,
@@ -256,7 +277,10 @@ class ImportService:
             accounts_created += 1
             _row(parsed_account.row_number, "account_created", "ok", account_id=account.id)
             await self.audit.log(
-                user_id, "loan_account", str(account.id), "create",
+                user_id,
+                "loan_account",
+                str(account.id),
+                "create",
                 after={"source": "import", "batch_id": str(batch.id)},
             )
 
@@ -271,15 +295,20 @@ class ImportService:
             plist.sort(key=lambda p: p.payment_date)
             if account is None:
                 for p in plist:
-                    _row(p.row_numbers[0] if p.row_numbers else None, "payment", "error",
-                         error=f"Referencia {ref} sin cuenta mapeada")
+                    _row(
+                        p.row_numbers[0] if p.row_numbers else None,
+                        "payment",
+                        "error",
+                        error=f"Referencia {ref} sin cuenta mapeada",
+                    )
                     payments_errored += 1
                 continue
 
             mapping = mapping_by_ref.get(ref)
             if mapping and mapping.action == "existing":
                 existing_payments_result = await self.db.execute(
-                    select(Payment).where(Payment.account_id == account.id)
+                    select(Payment)
+                    .where(Payment.account_id == account.id)
                     .order_by(Payment.payment_date)
                 )
                 existing_payments = list(existing_payments_result.scalars().all())
@@ -299,9 +328,13 @@ class ImportService:
 
             for p in plist:
                 if p.payment_date < last_date:
-                    _row(p.row_numbers[0] if p.row_numbers else None, "payment", "error",
-                         error=f"Fecha {p.payment_date} anterior al historial ya registrado "
-                               f"({last_date}) — se omite, requiere revisión manual")
+                    _row(
+                        p.row_numbers[0] if p.row_numbers else None,
+                        "payment",
+                        "error",
+                        error=f"Fecha {p.payment_date} anterior al historial ya registrado "
+                        f"({last_date}) — se omite, requiere revisión manual",
+                    )
                     payments_errored += 1
                     continue
                 balance_before = running_balance
@@ -321,8 +354,13 @@ class ImportService:
                 running_balance = balance_after
                 last_date = p.payment_date
                 payments_created += 1
-                _row(p.row_numbers[0] if p.row_numbers else None, "payment_created", "ok",
-                     account_id=account.id, payment_id=payment.id)
+                _row(
+                    p.row_numbers[0] if p.row_numbers else None,
+                    "payment_created",
+                    "ok",
+                    account_id=account.id,
+                    payment_id=payment.id,
+                )
 
             if running_balance <= Decimal("0.00"):
                 account.status = "paid"
@@ -342,7 +380,11 @@ class ImportService:
         await self.db.flush()
 
         await self.audit.log(
-            user_id, "import_batch", str(batch.id), "commit", after=batch.summary,
+            user_id,
+            "import_batch",
+            str(batch.id),
+            "commit",
+            after=batch.summary,
         )
 
         return ImportCommitOut(

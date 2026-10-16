@@ -1,5 +1,7 @@
 """Global HTTP exception handlers and base error classes."""
+
 import logging
+
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
@@ -8,6 +10,7 @@ logger = logging.getLogger(__name__)
 
 class AppError(Exception):
     """Base application error — always maps to an HTTP response."""
+
     status_code: int = 500
     detail: str = "Internal server error"
 

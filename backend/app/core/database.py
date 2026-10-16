@@ -5,13 +5,14 @@ from app.core.config import get_settings
 
 settings = get_settings()
 
+
 # Railway (and many PaaS providers) inject DATABASE_URL as `postgresql://` or
 # `postgres://` — neither works with SQLAlchemy async which requires `+asyncpg`.
 # Normalise the scheme here so the app works regardless of what the platform provides.
 def _async_url(url: str) -> str:
     for prefix in ("postgresql://", "postgres://"):
         if url.startswith(prefix):
-            return "postgresql+asyncpg://" + url[len(prefix):]
+            return "postgresql+asyncpg://" + url[len(prefix) :]
     return url  # already correct (e.g. postgresql+asyncpg://)
 
 

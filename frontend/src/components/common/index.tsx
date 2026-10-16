@@ -1,3 +1,3 @@
 export { StatusBadge, StatCard } from "../ui";
-export { ConfirmDialog } from "../feedback";
+export { ConfirmDialog, Drawer } from "../feedback";
 export { PageHeader } from "../forms";

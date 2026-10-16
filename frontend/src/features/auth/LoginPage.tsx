@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { authApi } from "../../api";
 import { useAuthStore } from "../../stores/authStore";
+import { getApiErrorMessage } from "../../utils/apiError";
 import type { LoginFormData } from "../../types";
 
 const schema = z.object({
@@ -33,7 +34,7 @@ export function LoginPage() {
       setUser(user);
       navigate("/dashboard");
     } catch (e: any) {
-      setError(e?.response?.data?.detail ?? "Login failed. Check your credentials.");
+      setError(getApiErrorMessage(e, "Login failed. Check your credentials."));
     }
   };
 

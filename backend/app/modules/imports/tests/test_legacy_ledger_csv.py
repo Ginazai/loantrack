@@ -5,6 +5,7 @@ file (see docs/requirements/001-...): one disbursement per Referencia,
 interest always paired with a payment on the same date, and payments that
 occur with no interest (off-cycle).
 """
+
 from datetime import date
 from decimal import Decimal
 

@@ -11,9 +11,7 @@ from app.core.database import Base
 class Payment(Base):
     __tablename__ = "payments"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     account_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("loan_accounts.id", ondelete="CASCADE"),
@@ -43,7 +41,9 @@ class Payment(Base):
         "LoanAccount", back_populates="payments"
     )
     attachments: Mapped[list["PaymentAttachment"]] = relationship(
-        "PaymentAttachment", back_populates="payment", cascade="all, delete-orphan",
+        "PaymentAttachment",
+        back_populates="payment",
+        cascade="all, delete-orphan",
         order_by="PaymentAttachment.created_at",
     )
 
@@ -60,9 +60,7 @@ class PaymentAttachment(Base):
 
     __tablename__ = "payment_attachments"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     payment_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("payments.id", ondelete="CASCADE"),
@@ -81,4 +79,3 @@ class PaymentAttachment(Base):
     )
 
     payment: Mapped["Payment"] = relationship("Payment", back_populates="attachments")
-

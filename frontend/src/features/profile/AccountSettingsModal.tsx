@@ -1,7 +1,9 @@
 import { useState } from "react";
-import { X, Save, KeyRound, User } from "lucide-react";
+import { Save, KeyRound, User } from "lucide-react";
 import { authApi } from "../../api";
 import { useAuthStore } from "../../stores/authStore";
+import { getApiErrorMessage } from "../../utils/apiError";
+import { Drawer } from "../../components/common";
 
 interface Props { onClose: () => void; }
 
@@ -30,17 +32,12 @@ export function AccountSettingsModal({ onClose }: Props) {
       setPassword(""); setConfirm("");
       setTimeout(onClose, 900);
     } catch (e: any) {
-      setError(e?.response?.data?.detail ?? "Failed to save");
+      setError(getApiErrorMessage(e, "Failed to save"));
     } finally { setSaving(false); }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-      <div className="bg-base-100 rounded-xl shadow-xl w-full max-w-md p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="font-bold text-base">Account Settings</h2>
-          <button className="btn btn-ghost btn-sm btn-square" onClick={onClose}><X className="w-4 h-4" /></button>
-        </div>
+    <Drawer title="Account Settings" onClose={onClose}>
         {error && <div className="alert alert-error py-2 text-sm mb-4">{error}</div>}
         {success && <div className="alert alert-success py-2 text-sm mb-4">Saved!</div>}
         <div className="space-y-4">
@@ -82,7 +79,6 @@ export function AccountSettingsModal({ onClose }: Props) {
             Save Changes
           </button>
         </div>
-      </div>
-    </div>
+    </Drawer>
   );
 }

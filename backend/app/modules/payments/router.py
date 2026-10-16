@@ -3,13 +3,10 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from fastapi.responses import StreamingResponse
-from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
-from app.modules.accounts.models import LoanAccount
-from app.modules.payments.models import Payment
 from app.modules.payments.schemas import PaymentAttachmentOut, PaymentCreate, PaymentOut
 from app.modules.payments.service import PaymentService
 
@@ -23,7 +20,9 @@ async def list_payments(
     db: AsyncSession = Depends(get_db),
 ):
     svc = PaymentService(db)
-    return await svc.list_payments(account_id, current_user.id, is_admin=current_user.role == "admin")
+    return await svc.list_payments(
+        account_id, current_user.id, is_admin=current_user.role == "admin"
+    )
 
 
 @router.post("", response_model=PaymentOut, status_code=201)
@@ -50,29 +49,14 @@ async def delete_payment(
 ):
     if current_user.role != "admin":
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Admin only")
-
-    # Verify account exists and belongs to user's scope
-    acc_result = await db.execute(select(LoanAccount).where(LoanAccount.id == account_id))
-    account = acc_result.scalar_one_or_none()
-    if not account:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Account not found")
-
-    result = await db.execute(
-        select(Payment).where(
-            and_(Payment.id == payment_id, Payment.account_id == account_id)
-        )
-    )
-    payment = result.scalar_one_or_none()
-    if not payment:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Payment not found")
-
-    await db.delete(payment)
-    await db.flush()
+    svc = PaymentService(db)
+    await svc.delete_payment(account_id, payment_id, current_user.id)
 
 
 # ── Attachments ──────────────────────────────────────────────────────────────
 # Stored as bytea in Postgres (ADR-005) — no static file serving, every
 # download is streamed through this authenticated endpoint.
+
 
 @router.get("/{payment_id}/attachments", response_model=list[PaymentAttachmentOut])
 async def list_attachments(
@@ -111,15 +95,16 @@ async def download_attachment(
 ):
     svc = PaymentService(db)
     attachment = await svc.get_attachment(
-        account_id, payment_id, attachment_id, current_user.id,
+        account_id,
+        payment_id,
+        attachment_id,
+        current_user.id,
         is_admin=current_user.role == "admin",
     )
     return StreamingResponse(
         io.BytesIO(attachment.content),
         media_type=attachment.content_type,
-        headers={
-            "Content-Disposition": f'inline; filename="{attachment.original_filename}"'
-        },
+        headers={"Content-Disposition": f'inline; filename="{attachment.original_filename}"'},
     )
 
 

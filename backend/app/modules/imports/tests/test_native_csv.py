@@ -1,4 +1,5 @@
 """Unit tests — native (round-trip) CSV parser (no DB)."""
+
 from datetime import date
 from decimal import Decimal
 
@@ -42,9 +43,8 @@ class TestSniff:
 class TestParseAccountsOnly:
     def test_single_account_row(self):
         raw = (
-            ACCOUNTS_HEADER
-            + f"{ACCOUNT_ID},Loan A,Jane Doe,1000.00,0.05,15,open,"
-              f"1000.00,,2026-01-01,2026-01-01T00:00:00\n"
+            ACCOUNTS_HEADER + f"{ACCOUNT_ID},Loan A,Jane Doe,1000.00,0.05,15,open,"
+            f"1000.00,,2026-01-01,2026-01-01T00:00:00\n"
         ).encode()
         parsed = NativeCsvParser.parse(raw)
         assert len(parsed.accounts) == 1
@@ -60,9 +60,8 @@ class TestParseAccountsOnly:
 class TestParsePaymentsOnly:
     def test_single_payment_row(self):
         raw = (
-            PAYMENTS_HEADER
-            + f"p1,{ACCOUNT_ID},2026-01-15,50.00,1000.00,5.00,955.00,,manual,"
-              f"2026-01-15T00:00:00\n"
+            PAYMENTS_HEADER + f"p1,{ACCOUNT_ID},2026-01-15,50.00,1000.00,5.00,955.00,,manual,"
+            f"2026-01-15T00:00:00\n"
         ).encode()
         parsed = NativeCsvParser.parse(raw)
         assert parsed.accounts == []
@@ -77,11 +76,10 @@ class TestParsePaymentsOnly:
 class TestParseFullRoundTrip:
     def test_account_with_two_payments(self):
         raw = (
-            FULL_HEADER
+            FULL_HEADER + f"{ACCOUNT_ID},Loan A,Jane Doe,1000.00,0.05,15,active,2026-01-01,"
+            f"1,2026-01-15,50.00,1000.00,5.00,955.00,2026-01-31,manual\n"
             + f"{ACCOUNT_ID},Loan A,Jane Doe,1000.00,0.05,15,active,2026-01-01,"
-              f"1,2026-01-15,50.00,1000.00,5.00,955.00,2026-01-31,manual\n"
-            + f"{ACCOUNT_ID},Loan A,Jane Doe,1000.00,0.05,15,active,2026-01-01,"
-              f"2,2026-01-31,50.00,955.00,4.78,909.78,2026-02-15,manual\n"
+            f"2,2026-01-31,50.00,955.00,4.78,909.78,2026-02-15,manual\n"
         ).encode()
         parsed = NativeCsvParser.parse(raw)
         assert len(parsed.accounts) == 1  # deduplicated across the two rows
@@ -90,9 +88,7 @@ class TestParseFullRoundTrip:
 
     def test_account_with_no_payments_yet(self):
         raw = (
-            FULL_HEADER
-            + f"{ACCOUNT_ID},Loan A,Jane Doe,1000.00,0.05,15,open,2026-01-01,"
-              f",,,,,,,\n"
+            FULL_HEADER + f"{ACCOUNT_ID},Loan A,Jane Doe,1000.00,0.05,15,open,2026-01-01,,,,,,,,\n"
         ).encode()
         parsed = NativeCsvParser.parse(raw)
         assert len(parsed.accounts) == 1

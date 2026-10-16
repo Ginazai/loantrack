@@ -1,10 +1,9 @@
 """Unit tests — payment calculation logic (no DB)."""
+
 from datetime import date
 from decimal import Decimal
 
-import pytest
-
-from app.modules.accounts.interest_engine import project_ledger, CycleRow
+from app.modules.accounts.interest_engine import CycleRow, project_ledger
 
 
 class TestPaymentInterestAccuracy:

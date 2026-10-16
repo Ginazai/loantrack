@@ -1,8 +1,10 @@
-import { Download, Loader2, Paperclip, Trash2, Upload, X } from "lucide-react";
+import { Download, Loader2, Trash2, Upload } from "lucide-react";
 import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { attachmentsApi } from "../../api";
 import { formatDate } from "../../utils/dateUtils";
+import { getApiErrorMessage } from "../../utils/apiError";
+import { Drawer } from "../../components/common";
 
 // jpg/png/webp/pdf, 10 MB max — mirrors the backend limit (ADR-005 /
 // payments/schemas.py::validate_attachment). Enforced again server-side;
@@ -40,7 +42,7 @@ export function PaymentAttachmentsModal({ accountId, paymentId, isAdmin, onClose
       qc.invalidateQueries({ queryKey: ["payments", accountId] }); // refresh attachment_count badge
       setError(null);
     },
-    onError: (err: any) => setError(err?.response?.data?.detail ?? "Upload failed"),
+    onError: (err: any) => setError(getApiErrorMessage(err, "Upload failed")),
   });
 
   const remove = useMutation({
@@ -65,17 +67,7 @@ export function PaymentAttachmentsModal({ accountId, paymentId, isAdmin, onClose
   };
 
   return (
-    <div className="modal modal-open">
-      <div className="modal-box max-w-md">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-bold flex items-center gap-2">
-            <Paperclip className="w-4 h-4" /> Comprobantes
-          </h2>
-          <button className="btn btn-ghost btn-xs btn-circle" onClick={onClose}>
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
+    <Drawer title="Comprobantes" onClose={onClose}>
         {isLoading ? (
           <p className="text-sm text-base-content/50">Cargando…</p>
         ) : attachments.length === 0 ? (
@@ -139,8 +131,6 @@ export function PaymentAttachmentsModal({ accountId, paymentId, isAdmin, onClose
           )}
           Subir comprobante
         </button>
-      </div>
-      <div className="modal-backdrop" onClick={onClose} />
-    </div>
+    </Drawer>
   );
 }

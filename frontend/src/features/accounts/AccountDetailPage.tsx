@@ -12,7 +12,7 @@ import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { accountsApi, adminApi, paymentsApi, webhooksApi } from "../../api";
-import { ConfirmDialog, PageHeader, StatusBadge } from "../../components/common";
+import { ConfirmDialog, Drawer, PageHeader, StatusBadge } from "../../components/common";
 import {
   formatCurrency,
   formatDate,
@@ -26,6 +26,7 @@ import { PaymentForm } from "../payments/PaymentForm";
 import { PaymentAttachmentsModal } from "../payments/PaymentAttachments";
 import { WebhookForm } from "../webhooks/WebhookForm";
 import { useAuthStore } from "../../stores/authStore";
+import { getApiErrorMessage } from "../../utils/apiError";
 
 type Tab = "overview" | "payments" | "webhooks" | "settings";
 
@@ -224,10 +225,15 @@ export function AccountDetailPage() {
             warn: isOverdue(account.next_due_date),
           },
         ].map((m) => (
-          <div key={m.label} className="bg-base-100 rounded-2xl p-4 shadow-sm">
+          <div
+            key={m.label}
+            className={`bg-base-100 rounded-2xl p-4 shadow-sm ${
+              m.warn ? "card-ledger-warning" : m.highlight ? "card-ledger" : ""
+            }`}
+          >
             <p className="text-xs text-base-content/50 uppercase tracking-wide">{m.label}</p>
             <p
-              className={`font-bold text-lg mt-0.5 ${
+              className={`stat-value-mono text-lg mt-0.5 ${
                 m.warn ? "text-error" : m.highlight ? "text-primary" : ""
               }`}
             >
@@ -236,6 +242,8 @@ export function AccountDetailPage() {
           </div>
         ))}
       </div>
+
+      <hr className="receipt-divider" />
 
       {/* Repayment progress */}
       <div className="bg-base-100 rounded-2xl p-4 shadow-sm">
@@ -307,16 +315,16 @@ export function AccountDetailPage() {
                       <tr key={p.id} className="hover">
                         <td className="text-base-content/40">{i + 1}</td>
                         <td className="font-medium">{formatDate(p.payment_date)}</td>
-                        <td className="text-right font-mono text-sm">
+                        <td className="text-right tabular-nums text-sm">
                           {formatCurrency(p.balance_before)}
                         </td>
-                        <td className="text-right font-mono text-sm text-error">
+                        <td className="text-right tabular-nums text-sm text-error">
                           +{formatCurrency(p.interests_accrued)}
                         </td>
-                        <td className="text-right font-mono text-sm text-success font-semibold">
+                        <td className="text-right tabular-nums text-sm text-success font-semibold">
                           −{formatCurrency(p.amount)}
                         </td>
-                        <td className="text-right font-mono text-sm font-bold">
+                        <td className="text-right tabular-nums text-sm font-bold">
                           {formatCurrency(p.balance_after)}
                         </td>
                         <td className="text-sm text-base-content/60">
@@ -447,39 +455,32 @@ export function AccountDetailPage() {
       {/* ── Modals ──────────────────────────────────────────────────────── */}
 
       {showPayment && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="bg-base-100 rounded-2xl shadow-xl w-full max-w-md p-6">
-            <h2 className="text-lg font-bold mb-5">Record Payment</h2>
-            <PaymentForm
-              account={account}
-              onSubmit={async (data) => { await addPayment.mutateAsync(data); }}
-              onCancel={() => setShowPayment(false)}
-              isLoading={addPayment.isPending}
-            />
-            {addPayment.isError && (
-              <div className="alert alert-error mt-3 text-sm py-2">
-                <span>
-                  {(addPayment.error as any)?.response?.data?.detail ??
-                    "Failed to record payment"}
-                </span>
-              </div>
-            )}
-          </div>
-        </div>
+        <Drawer title="Record Payment" onClose={() => setShowPayment(false)}>
+          <PaymentForm
+            account={account}
+            onSubmit={async (data) => { await addPayment.mutateAsync(data); }}
+            onCancel={() => setShowPayment(false)}
+            isLoading={addPayment.isPending}
+          />
+          {addPayment.isError && (
+            <div className="alert alert-error mt-3 text-sm py-2">
+              <span>
+                {getApiErrorMessage(addPayment.error, "Failed to record payment")}
+              </span>
+            </div>
+          )}
+        </Drawer>
       )}
 
       {showEdit && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="bg-base-100 rounded-2xl shadow-xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
-            <h2 className="text-lg font-bold mb-5">Edit Account</h2>
-            <AccountForm
-              account={account}
-              onSubmit={async (data) => { await updateAccount.mutateAsync(data); }}
-              onCancel={() => setShowEdit(false)}
-              isLoading={updateAccount.isPending}
-            />
-          </div>
-        </div>
+        <Drawer title="Edit Account" onClose={() => setShowEdit(false)} width="lg">
+          <AccountForm
+            account={account}
+            onSubmit={async (data) => { await updateAccount.mutateAsync(data); }}
+            onCancel={() => setShowEdit(false)}
+            isLoading={updateAccount.isPending}
+          />
+        </Drawer>
       )}
 
       {showClose && (
@@ -550,16 +551,13 @@ export function AccountDetailPage() {
       )}
 
       {showWebhook && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="bg-base-100 rounded-2xl shadow-xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
-            <h2 className="text-lg font-bold mb-5">Add Webhook</h2>
-            <WebhookForm
-              onSubmit={async (data) => { await addWebhook.mutateAsync(data); }}
-              onCancel={() => setShowWebhook(false)}
-              isLoading={addWebhook.isPending}
-            />
-          </div>
-        </div>
+        <Drawer title="Add Webhook" onClose={() => setShowWebhook(false)}>
+          <WebhookForm
+            onSubmit={async (data) => { await addWebhook.mutateAsync(data); }}
+            onCancel={() => setShowWebhook(false)}
+            isLoading={addWebhook.isPending}
+          />
+        </Drawer>
       )}
     </div>
   );

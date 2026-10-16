@@ -27,8 +27,6 @@ class UserService:
 
     async def update_last_login(self, user_id: UUID) -> None:
         await self.db.execute(
-            update(User)
-            .where(User.id == user_id)
-            .values(last_login=datetime.now(timezone.utc))
+            update(User).where(User.id == user_id).values(last_login=datetime.now(timezone.utc))
         )
         await self.db.flush()

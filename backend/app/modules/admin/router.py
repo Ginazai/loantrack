@@ -6,11 +6,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
-from app.core.repository import BaseRepository
-from app.core.security import hash_password, generate_webhook_secret
+from app.core.security import generate_webhook_secret, hash_password
 from app.modules.accounts.models import LoanAccount
-from app.modules.accounts.service import LoanAccountService
 from app.modules.accounts.schemas import LoanAccountFilter
+from app.modules.accounts.service import LoanAccountService
 from app.modules.users.models import User
 from app.modules.users.schemas import UserCreate, UserOut
 from app.modules.webhooks.models import WebhookConfig
@@ -26,6 +25,7 @@ def require_admin(current_user=Depends(get_current_user)):
 
 
 # ── Users ─────────────────────────────────────────────────────────────────────
+
 
 @router.get("/users", response_model=list[UserOut])
 async def list_users(
@@ -92,14 +92,13 @@ async def get_user_accounts(
 
 # ── Global Webhooks ────────────────────────────────────────────────────────────
 
+
 @router.get("/webhooks", response_model=list[WebhookConfigOut])
 async def list_global_webhooks(
     current_user=Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(
-        select(WebhookConfig).where(WebhookConfig.account_id.is_(None))
-    )
+    result = await db.execute(select(WebhookConfig).where(WebhookConfig.account_id.is_(None)))
     return list(result.scalars().all())
 
 
@@ -165,6 +164,7 @@ async def toggle_global_webhook(
 
 # ── Delete user ────────────────────────────────────────────────────────────────
 
+
 @router.delete("/users/{user_id}", status_code=204)
 async def delete_user(
     user_id: UUID,
@@ -183,6 +183,7 @@ async def delete_user(
 
 # ── Delete loan request ────────────────────────────────────────────────────────
 
+
 @router.delete("/requests/{request_id}", status_code=204)
 async def delete_loan_request(
     request_id: UUID,
@@ -190,6 +191,7 @@ async def delete_loan_request(
     db: AsyncSession = Depends(get_db),
 ):
     from app.modules.loan_requests.models import LoanRequest
+
     result = await db.execute(select(LoanRequest).where(LoanRequest.id == request_id))
     req = result.scalar_one_or_none()
     if not req:
@@ -200,10 +202,13 @@ async def delete_loan_request(
 
 # ── CSV exports ────────────────────────────────────────────────────────────────
 
-import csv, io
+import csv
+import io
+
 from fastapi.responses import StreamingResponse
-from app.modules.payments.models import Payment as PaymentModel
 from sqlalchemy import select as sql_select
+
+from app.modules.payments.models import Payment as PaymentModel
 
 
 @router.get("/export/accounts.csv")
@@ -211,23 +216,51 @@ async def export_accounts_csv(
     _=Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    from app.modules.accounts.service import LoanAccountService
     from app.modules.accounts.schemas import LoanAccountFilter
+    from app.modules.accounts.service import LoanAccountService
+
     svc = LoanAccountService(db)
     accounts = await svc.list_all_accounts(LoanAccountFilter())
 
     out = io.StringIO()
     w = csv.writer(out)
-    w.writerow(["id", "account_name", "borrower_name", "borrow_amount", "rate",
-                "cycle", "status", "current_balance", "next_due_date", "start_date", "created_at"])
+    w.writerow(
+        [
+            "id",
+            "account_name",
+            "borrower_name",
+            "borrow_amount",
+            "rate",
+            "cycle",
+            "status",
+            "current_balance",
+            "next_due_date",
+            "start_date",
+            "created_at",
+        ]
+    )
     for a in accounts:
-        w.writerow([a["id"], a["account_name"], a["borrower_name"], a["borrow_amount"],
-                    a["rate"], a["cycle"], a["status"], a["current_balance"],
-                    a["next_due_date"], a["start_date"], a["created_at"]])
+        w.writerow(
+            [
+                a["id"],
+                a["account_name"],
+                a["borrower_name"],
+                a["borrow_amount"],
+                a["rate"],
+                a["cycle"],
+                a["status"],
+                a["current_balance"],
+                a["next_due_date"],
+                a["start_date"],
+                a["created_at"],
+            ]
+        )
     out.seek(0)
-    return StreamingResponse(iter([out.getvalue()]),
-                             media_type="text/csv",
-                             headers={"Content-Disposition": "attachment; filename=accounts.csv"})
+    return StreamingResponse(
+        iter([out.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=accounts.csv"},
+    )
 
 
 @router.get("/export/payments.csv")
@@ -235,22 +268,46 @@ async def export_payments_csv(
     _=Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(
-        sql_select(PaymentModel).order_by(PaymentModel.payment_date)
-    )
+    result = await db.execute(sql_select(PaymentModel).order_by(PaymentModel.payment_date))
     payments = list(result.scalars().all())
 
     out = io.StringIO()
     w = csv.writer(out)
-    w.writerow(["id", "account_id", "payment_date", "amount", "balance_before",
-                "interests_accrued", "balance_after", "next_due_date", "method", "created_at"])
+    w.writerow(
+        [
+            "id",
+            "account_id",
+            "payment_date",
+            "amount",
+            "balance_before",
+            "interests_accrued",
+            "balance_after",
+            "next_due_date",
+            "method",
+            "created_at",
+        ]
+    )
     for p in payments:
-        w.writerow([p.id, p.account_id, p.payment_date, p.amount, p.balance_before,
-                    p.interests_accrued, p.balance_after, p.next_due_date, p.method, p.created_at])
+        w.writerow(
+            [
+                p.id,
+                p.account_id,
+                p.payment_date,
+                p.amount,
+                p.balance_before,
+                p.interests_accrued,
+                p.balance_after,
+                p.next_due_date,
+                p.method,
+                p.created_at,
+            ]
+        )
     out.seek(0)
-    return StreamingResponse(iter([out.getvalue()]),
-                             media_type="text/csv",
-                             headers={"Content-Disposition": "attachment; filename=payments.csv"})
+    return StreamingResponse(
+        iter([out.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=payments.csv"},
+    )
 
 
 @router.get("/export/accounts/{account_id}/full.csv")
@@ -260,7 +317,6 @@ async def export_account_full_csv(
     db: AsyncSession = Depends(get_db),
 ):
     """Single account with all its payments as one flat CSV."""
-    from app.modules.accounts.models import LoanAccount
     acc_r = await db.execute(sql_select(LoanAccount).where(LoanAccount.id == account_id))
     account = acc_r.scalar_one_or_none()
     if not account:
@@ -275,24 +331,73 @@ async def export_account_full_csv(
 
     out = io.StringIO()
     w = csv.writer(out)
-    w.writerow(["account_id", "account_name", "borrower_name", "borrow_amount",
-                "rate", "cycle", "status", "start_date",
-                "payment_#", "payment_date", "amount", "balance_before",
-                "interests_accrued", "balance_after", "next_due_date", "method"])
+    w.writerow(
+        [
+            "account_id",
+            "account_name",
+            "borrower_name",
+            "borrow_amount",
+            "rate",
+            "cycle",
+            "status",
+            "start_date",
+            "payment_#",
+            "payment_date",
+            "amount",
+            "balance_before",
+            "interests_accrued",
+            "balance_after",
+            "next_due_date",
+            "method",
+        ]
+    )
     if payments:
         for i, p in enumerate(payments, 1):
-            w.writerow([account.id, account.account_name, account.borrower_name,
-                        account.borrow_amount, account.rate, account.cycle,
-                        account.status, account.start_date,
-                        i, p.payment_date, p.amount, p.balance_before,
-                        p.interests_accrued, p.balance_after, p.next_due_date, p.method])
+            w.writerow(
+                [
+                    account.id,
+                    account.account_name,
+                    account.borrower_name,
+                    account.borrow_amount,
+                    account.rate,
+                    account.cycle,
+                    account.status,
+                    account.start_date,
+                    i,
+                    p.payment_date,
+                    p.amount,
+                    p.balance_before,
+                    p.interests_accrued,
+                    p.balance_after,
+                    p.next_due_date,
+                    p.method,
+                ]
+            )
     else:
-        w.writerow([account.id, account.account_name, account.borrower_name,
-                    account.borrow_amount, account.rate, account.cycle,
-                    account.status, account.start_date,
-                    "", "", "", "", "", "", "", ""])
+        w.writerow(
+            [
+                account.id,
+                account.account_name,
+                account.borrower_name,
+                account.borrow_amount,
+                account.rate,
+                account.cycle,
+                account.status,
+                account.start_date,
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+                "",
+            ]
+        )
     out.seek(0)
     safe = account.account_name.replace(" ", "_")
-    return StreamingResponse(iter([out.getvalue()]),
-                             media_type="text/csv",
-                             headers={"Content-Disposition": f"attachment; filename={safe}.csv"})
+    return StreamingResponse(
+        iter([out.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={safe}.csv"},
+    )

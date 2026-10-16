@@ -2,11 +2,13 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { loanRequestsApi } from "../../api";
 import type { LoanRequest, LoanRequestFormData } from "../../types";
+import { getApiErrorMessage } from "../../utils/apiError";
 import {
   FileText, Plus, X, Clock, CheckCircle2, XCircle,
   ChevronDown, ChevronUp,
 } from "lucide-react";
 import { formatCurrency, formatDate } from "../../utils/dateUtils";
+import { Drawer } from "../../components/common";
 
 type Filter = "all" | "requested" | "under_review" | "approved" | "rejected";
 
@@ -27,7 +29,7 @@ function RequestBadge({ status }: { status: string }) {
 }
 
 function RequestLoanModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
-  const [form, setForm] = useState<LoanRequestFormData>({ account_name: "", borrow_amount: 0, rate: 5, cycle: 15 });
+  const [form, setForm] = useState<LoanRequestFormData>({ account_name: "", borrow_amount: 0 });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const lbl = "label-text text-xs font-semibold uppercase tracking-wide";
@@ -40,46 +42,28 @@ function RequestLoanModal({ onClose, onSuccess }: { onClose: () => void; onSucce
       onSuccess();
       onClose();
     } catch (e: any) {
-      setError(e?.response?.data?.detail ?? "Failed to submit");
+      setError(getApiErrorMessage(e, "Failed to submit"));
     } finally { setSaving(false); }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-      <div className="bg-base-100 rounded-xl shadow-xl w-full max-w-md p-6">
-        <div className="flex items-center justify-between mb-5">
-          <h3 className="font-bold">New Loan Request</h3>
-          <button className="btn btn-ghost btn-sm btn-square" onClick={onClose}><X className="w-4 h-4" /></button>
-        </div>
+    <Drawer title="New Loan Request" onClose={onClose}>
         {error && <div className="alert alert-error py-2 text-sm mb-4">{error}</div>}
         <div className="space-y-3">
           <div className="form-control">
             <label className="label py-1"><span className={lbl}>Loan Name / Purpose</span></label>
             <input className="input input-bordered input-sm" placeholder="e.g. Home renovation" value={form.account_name} onChange={(e) => setForm({ ...form, account_name: e.target.value })} />
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="form-control">
-              <label className="label py-1"><span className={lbl}>Amount</span></label>
-              <label className="input input-bordered input-sm flex items-center gap-1.5">
-                <span className="text-base-content/40 font-mono text-xs">$</span>
-                <input type="number" min="0" step="0.01" className="grow font-mono" value={form.borrow_amount || ""} onChange={(e) => setForm({ ...form, borrow_amount: Number(e.target.value) })} />
-              </label>
-            </div>
-            <div className="form-control">
-              <label className="label py-1"><span className={lbl}>Rate %</span></label>
-              <label className="input input-bordered input-sm flex items-center gap-1.5">
-                <input type="number" min="0.01" max="100" step="0.01" className="grow font-mono" value={form.rate} onChange={(e) => setForm({ ...form, rate: Number(e.target.value) })} />
-                <span className="text-base-content/40 font-mono text-xs">%</span>
-              </label>
-            </div>
-          </div>
           <div className="form-control">
-            <label className="label py-1"><span className={lbl}>Payment Frequency</span></label>
-            <select className="select select-bordered select-sm" value={form.cycle} onChange={(e) => setForm({ ...form, cycle: Number(e.target.value) as 15 | 30 })}>
-              <option value={15}>Bi-monthly (15 days)</option>
-              <option value={30}>Monthly (30 days)</option>
-            </select>
+            <label className="label py-1"><span className={lbl}>Amount</span></label>
+            <label className="input input-bordered input-sm flex items-center gap-1.5">
+              <span className="text-base-content/40 font-mono text-xs">$</span>
+              <input type="number" min="0" step="0.01" className="grow font-mono" value={form.borrow_amount || ""} onChange={(e) => setForm({ ...form, borrow_amount: Number(e.target.value) })} />
+            </label>
           </div>
+          <p className="text-xs text-base-content/40 -mt-1">
+            Interest rate and payment schedule are set by the lender when your request is approved.
+          </p>
           <div className="form-control">
             <label className="label py-1"><span className={lbl}>Reason <span className="text-base-content/30">(optional)</span></span></label>
             <textarea className="textarea textarea-bordered textarea-sm text-sm" rows={2} placeholder="Why do you need this loan?" value={form.reason ?? ""} onChange={(e) => setForm({ ...form, reason: e.target.value })} />
@@ -91,8 +75,7 @@ function RequestLoanModal({ onClose, onSuccess }: { onClose: () => void; onSucce
             {saving ? <span className="loading loading-spinner loading-xs" /> : "Submit Request"}
           </button>
         </div>
-      </div>
-    </div>
+    </Drawer>
   );
 }
 
@@ -116,8 +99,14 @@ function RequestCard({ req, onCancel }: { req: LoanRequest; onCancel: (id: strin
             </div>
             <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-base-content/50 font-mono">
               <span>{formatCurrency(Number(req.borrow_amount))}</span>
-              <span>{(Number(req.rate) * 100).toFixed(2)}%</span>
-              <span>{req.cycle === 15 ? "Bi-monthly" : "Monthly"}</span>
+              {req.rate !== null && req.cycle !== null ? (
+                <>
+                  <span>{(Number(req.rate) * 100).toFixed(2)}%</span>
+                  <span>{req.cycle === 15 ? "Bi-monthly" : "Monthly"}</span>
+                </>
+              ) : (
+                <span className="text-base-content/30">Terms set upon approval</span>
+              )}
               <span>Submitted {formatDate(req.created_at)}</span>
             </div>
           </div>

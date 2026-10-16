@@ -1,4 +1,5 @@
 """Unit tests — cycle-close detection logic (ADR-006), no DB."""
+
 from datetime import date
 
 from app.modules.webhooks.service import new_cycle_dates
@@ -10,9 +11,7 @@ class TestNewCycleDates:
         assert new_cycle_dates(date(2026, 6, 1), set(), date(2026, 6, 10)) == []
 
     def test_first_cycle_detected(self):
-        assert new_cycle_dates(date(2026, 6, 1), set(), date(2026, 6, 15)) == [
-            date(2026, 6, 15)
-        ]
+        assert new_cycle_dates(date(2026, 6, 1), set(), date(2026, 6, 15)) == [date(2026, 6, 15)]
 
     def test_already_notified_cycle_is_excluded(self):
         already = {date(2026, 6, 15)}
@@ -23,9 +22,12 @@ class TestNewCycleDates:
         cycle date, oldest first — not just the most recent one."""
         result = new_cycle_dates(date(2026, 1, 1), set(), date(2026, 3, 31))
         assert result == [
-            date(2026, 1, 15), date(2026, 1, 30),
-            date(2026, 2, 15), date(2026, 2, 28),
-            date(2026, 3, 15), date(2026, 3, 30),
+            date(2026, 1, 15),
+            date(2026, 1, 30),
+            date(2026, 2, 15),
+            date(2026, 2, 28),
+            date(2026, 3, 15),
+            date(2026, 3, 30),
         ]
 
     def test_partial_backlog_excludes_already_notified(self):

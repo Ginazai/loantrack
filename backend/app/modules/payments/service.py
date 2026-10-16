@@ -6,13 +6,13 @@ from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.core.repository import BaseRepository
 from app.modules.accounts.interest_engine import (
     advance_cycle,
     get_next_due_date,
     next_cycle_date,
     project_ledger,
 )
-from app.core.repository import BaseRepository
 from app.modules.accounts.models import LoanAccount
 from app.modules.audit.service import AuditService
 from app.modules.payments.models import Payment, PaymentAttachment
@@ -37,9 +37,7 @@ class PaymentService:
         self, account_id: UUID, user_id: UUID, is_admin: bool = False
     ) -> LoanAccount:
         if is_admin:
-            result = await self.db.execute(
-                select(LoanAccount).where(LoanAccount.id == account_id)
-            )
+            result = await self.db.execute(select(LoanAccount).where(LoanAccount.id == account_id))
         else:
             result = await self.db.execute(
                 select(LoanAccount).where(
@@ -111,14 +109,14 @@ class PaymentService:
             float(account.borrow_amount),
             float(account.rate),
             account.start_date,
-            payment_tuples,        # existing payments only (not this new one)
-            until=payment_date,    # include the payment's cycle
+            payment_tuples,  # existing payments only (not this new one)
+            until=payment_date,  # include the payment's cycle
         )
 
         if rows and rows[-1].cycle_date == payment_date:
             # Payment lands on a cycle date — standard case
             current_row = rows[-1]
-            balance_before = current_row.opening_balance   # before this cycle's interest
+            balance_before = current_row.opening_balance  # before this cycle's interest
             interests_accrued = current_row.interests_accrued
         elif rows:
             # Between cycles — no interest accrues until the next cycle date
@@ -158,7 +156,10 @@ class PaymentService:
             await self.repo.flush()
 
         await self.audit.log(
-            user_id, "payment", str(payment.id), "create",
+            user_id,
+            "payment",
+            str(payment.id),
+            "create",
             after={"amount": str(payment_amount), "balance_after": str(balance_after)},
             ip=ip,
         )
@@ -200,9 +201,111 @@ class PaymentService:
 
         return payment
 
-    async def list_payments(self, account_id: UUID, user_id: UUID, is_admin: bool = False) -> list[Payment]:
+    async def list_payments(
+        self, account_id: UUID, user_id: UUID, is_admin: bool = False
+    ) -> list[Payment]:
         await self._get_account_or_404(account_id, user_id, is_admin)
         return await self.get_for_account(account_id)
+
+    async def delete_payment(self, account_id: UUID, payment_id: UUID, user_id: UUID) -> None:
+        """Admin-only — see router.py. Deleting a payment changes the
+        historical sequence of events for this account, so every payment
+        after it (if any) needs its stored balance snapshot recomputed —
+        see recalculate_ledger() for why this doesn't contradict payments
+        being otherwise immutable.
+        """
+        payment = await self._get_payment_or_404(account_id, payment_id)
+        deleted_snapshot = {
+            "amount": str(payment.amount),
+            "payment_date": str(payment.payment_date),
+        }
+        await self.db.delete(payment)
+        await self.db.flush()
+
+        await self.recalculate_ledger(account_id)
+
+        await self.audit.log(
+            user_id,
+            "payment",
+            str(payment_id),
+            "delete",
+            before=deleted_snapshot,
+        )
+
+    async def recalculate_ledger(self, account_id: UUID) -> None:
+        """Re-derive balance_before/interests_accrued/balance_after/next_due_date
+        for every remaining payment of an account, in date order, and correct
+        the account's status to match.
+
+        Payment snapshots are immutable with respect to *future* changes —
+        e.g. today's rate changing doesn't retroactively rewrite old payments
+        (ADR-003). But they are NOT immutable with respect to a change in the
+        payment *history itself*. If a payment is deleted, every payment
+        recorded after it was computed against a "balance so far" that no
+        longer reflects what actually happened — those stored snapshots are
+        now provably wrong, not merely stale. This replays the remaining
+        history the same way add_payment() computes it live, and is the only
+        way to keep the ledger internally consistent after a deletion.
+
+        Call this inside the SAME transaction as whatever changed the
+        payment history, before commit — see delete_payment in router.py.
+        """
+        account_result = await self.db.execute(
+            select(LoanAccount).where(LoanAccount.id == account_id)
+        )
+        account = account_result.scalar_one_or_none()
+        if not account:
+            return
+
+        result = await self.db.execute(
+            select(Payment).where(Payment.account_id == account_id).order_by(Payment.payment_date)
+        )
+        payments = list(result.scalars().all())
+
+        if not payments:
+            # No history left at all — back to a fresh, unpaid account,
+            # unless it was manually closed (a manual close is never
+            # auto-reopened by a ledger recalculation).
+            if account.status != "closed":
+                account.status = "open"
+            await self.db.flush()
+            return
+
+        history: list[tuple] = []  # (payment_date, amount) replayed so far
+        final_balance = Decimal(str(account.borrow_amount))
+
+        for payment in payments:
+            rows = project_ledger(
+                float(account.borrow_amount),
+                float(account.rate),
+                account.start_date,
+                history,
+                until=payment.payment_date,
+            )
+            if rows and rows[-1].cycle_date == payment.payment_date:
+                balance_before = rows[-1].opening_balance
+                interests_accrued = rows[-1].interests_accrued
+            elif rows:
+                balance_before = rows[-1].closing_balance
+                interests_accrued = Decimal("0.00")
+            else:
+                balance_before = Decimal(str(account.borrow_amount))
+                interests_accrued = Decimal("0.00")
+
+            balance_after = _round2(balance_before + interests_accrued - payment.amount)
+
+            payment.balance_before = balance_before
+            payment.interests_accrued = interests_accrued
+            payment.balance_after = balance_after
+            payment.next_due_date = get_next_due_date(payment.payment_date)
+
+            history.append((payment.payment_date, float(payment.amount)))
+            final_balance = balance_after
+
+        if account.status != "closed":
+            account.status = "paid" if final_balance <= Decimal("0.00") else "active"
+
+        await self.db.flush()
 
     # ── Attachments ──────────────────────────────────────────────────────────
 
@@ -242,7 +345,10 @@ class PaymentService:
         await self.db.refresh(attachment)
 
         await self.audit.log(
-            user_id, "payment_attachment", str(attachment.id), "create",
+            user_id,
+            "payment_attachment",
+            str(attachment.id),
+            "create",
             after={"payment_id": str(payment_id), "filename": attachment.original_filename},
         )
         return attachment
@@ -291,5 +397,8 @@ class PaymentService:
         await self.db.delete(attachment)
         await self.db.flush()
         await self.audit.log(
-            user_id, "payment_attachment", str(attachment_id), "delete",
+            user_id,
+            "payment_attachment",
+            str(attachment_id),
+            "delete",
         )

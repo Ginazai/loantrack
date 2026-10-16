@@ -11,9 +11,7 @@ from app.core.database import Base
 class LoanAccount(Base):
     __tablename__ = "loan_accounts"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
@@ -44,8 +42,10 @@ class LoanAccount(Base):
     # Relationships
     user: Mapped["User"] = relationship("User", back_populates="loan_accounts")  # noqa: F821
     payments: Mapped[list["Payment"]] = relationship(  # noqa: F821
-        "Payment", back_populates="account", cascade="all, delete-orphan",
-        order_by="Payment.payment_date"
+        "Payment",
+        back_populates="account",
+        cascade="all, delete-orphan",
+        order_by="Payment.payment_date",
     )
     webhook_configs: Mapped[list["WebhookConfig"]] = relationship(  # noqa: F821
         "WebhookConfig", back_populates="account", cascade="all, delete-orphan"

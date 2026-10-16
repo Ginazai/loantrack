@@ -1,4 +1,5 @@
 """Unit tests — payment attachment validation logic (no DB)."""
+
 import pytest
 
 from app.modules.payments.schemas import (

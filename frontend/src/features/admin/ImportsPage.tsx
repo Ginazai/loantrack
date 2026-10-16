@@ -3,6 +3,7 @@ import { useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { accountsApi, adminApi, importsApi } from "../../api";
 import { PageHeader } from "../../components/common";
+import { getApiErrorMessage } from "../../utils/apiError";
 import type {
   AccountMapping,
   ImportAction,
@@ -65,7 +66,7 @@ export default function ImportsPage() {
       }
       setMappings(initial);
     } catch (e: any) {
-      setError(e?.response?.data?.detail ?? "No se pudo leer el archivo");
+      setError(getApiErrorMessage(e, "No se pudo leer el archivo"));
     } finally {
       setPreviewing(false);
     }
@@ -94,7 +95,7 @@ export default function ImportsPage() {
       const res = await importsApi.commit(preview.batch_id, payload);
       setResult(res);
     } catch (e: any) {
-      setError(e?.response?.data?.detail ?? "La importación falló");
+      setError(getApiErrorMessage(e, "La importación falló"));
     } finally {
       setCommitting(false);
     }
@@ -216,7 +217,7 @@ export default function ImportsPage() {
                     <tr key={acc.source_ref}>
                       <td className="font-mono text-xs">{acc.source_ref}</td>
                       <td className="text-xs">
-                        {acc.borrow_amount} · {acc.start_date}
+                        <span className="tabular-nums">{acc.borrow_amount}</span> · {acc.start_date}
                       </td>
                       <td className="text-xs">{acc.payment_count}</td>
                       <td>
@@ -314,7 +315,7 @@ export default function ImportsPage() {
       )}
 
       {result && (
-        <div className="bg-base-100 border border-base-300 rounded-xl p-6 space-y-3">
+        <div className="card-ledger-success bg-base-100 border border-base-300 rounded-xl p-6 space-y-3">
           <div className="flex items-center gap-2 text-success">
             <CheckCircle2 className="w-5 h-5" />
             <span className="font-semibold">Importación completada</span>
@@ -323,7 +324,7 @@ export default function ImportsPage() {
             {Object.entries(result.batch.summary).map(([k, v]) => (
               <div key={k} className="bg-base-200 rounded-lg px-3 py-2">
                 <p className="text-xs text-base-content/50">{k.replace(/_/g, " ")}</p>
-                <p className="font-bold">{v}</p>
+                <p className="stat-value-mono">{v}</p>
               </div>
             ))}
           </div>

@@ -8,6 +8,7 @@ import type {
   LoginFormData,
   LoanRequest,
   LoanRequestFormData,
+  LoanRequestReviewData,
   Payment,
   PaymentAttachment,
   PaymentFormData,
@@ -203,7 +204,7 @@ export const loanRequestsApi = {
   listMine: () => client.get<LoanRequest[]>("/loan-requests").then((r) => r.data),
 
   create: (data: LoanRequestFormData) =>
-    client.post<LoanRequest>("/loan-requests", { ...data, rate: data.rate / 100 }).then((r) => r.data),
+    client.post<LoanRequest>("/loan-requests", data).then((r) => r.data),
 
   cancel: (id: string) => client.delete(`/loan-requests/${id}`),
 
@@ -212,8 +213,15 @@ export const loanRequestsApi = {
 
   open: (id: string) => client.get<LoanRequest>(`/loan-requests/admin/${id}/open`).then((r) => r.data),
 
-  review: (id: string, data: { status: "approved" | "rejected"; rejection_reason?: string }) =>
-    client.patch<LoanRequest>(`/loan-requests/admin/${id}`, data).then((r) => r.data),
+  // rate/cycle are the lender's terms, set here at approval — required by
+  // the backend when status="approved", ignored otherwise.
+  review: (id: string, data: LoanRequestReviewData) =>
+    client
+      .patch<LoanRequest>(`/loan-requests/admin/${id}`, {
+        ...data,
+        rate: data.rate !== undefined ? data.rate / 100 : undefined,
+      })
+      .then((r) => r.data),
 };
 
 // ── Imports (ADR-004) ─────────────────────────────────────────────────────────

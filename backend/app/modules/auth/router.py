@@ -56,8 +56,9 @@ async def update_me(
     current_user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    from app.core.security import hash_password
     from sqlalchemy import select
+
+    from app.core.security import hash_password
     from app.modules.users.models import User
 
     result = await db.execute(select(User).where(User.id == current_user.id))

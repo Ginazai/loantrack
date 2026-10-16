@@ -7,7 +7,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
-from app.modules.accounts.models import LoanAccount
 from app.modules.accounts.schemas import LoanAccountCreate
 from app.modules.accounts.service import LoanAccountService
 from app.modules.loan_requests.models import LoanRequest
@@ -21,6 +20,7 @@ ACTIVE_STATUSES = {"requested", "under_review"}
 
 
 # ── User endpoints ─────────────────────────────────────────────────────────────
+
 
 @router.get("", response_model=list[LoanRequestOut])
 async def list_my_requests(
@@ -59,8 +59,6 @@ async def create_request(
         user_id=current_user.id,
         account_name=data.account_name,
         borrow_amount=data.borrow_amount,
-        rate=data.rate,
-        cycle=data.cycle,
         reason=data.reason,
         status="requested",
     )
@@ -93,6 +91,7 @@ async def cancel_request(
 
 # ── Admin endpoints ────────────────────────────────────────────────────────────
 
+
 @router.get("/admin/all", response_model=list[LoanRequestOut])
 async def list_all_requests(
     current_user=Depends(get_current_user),
@@ -100,9 +99,7 @@ async def list_all_requests(
 ):
     if current_user.role != "admin":
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Admin only")
-    result = await db.execute(
-        select(LoanRequest).order_by(LoanRequest.created_at.desc())
-    )
+    result = await db.execute(select(LoanRequest).order_by(LoanRequest.created_at.desc()))
     return list(result.scalars().all())
 
 
@@ -126,20 +123,32 @@ async def review_request(
     if data.status == "rejected":
         req.rejection_reason = data.rejection_reason
 
-    # Auto-create loan account when approved
+    # Auto-create loan account when approved. Rate and payment cycle are
+    # the lender's terms, not the borrower's — they're set here, by the
+    # admin, at approval time, never by whatever the original request
+    # asked for (the request no longer even carries those fields).
     if data.status == "approved":
+        if data.rate is None or data.cycle is None:
+            raise HTTPException(
+                status.HTTP_422_UNPROCESSABLE_CONTENT,
+                "rate and cycle are required to approve a loan request",
+            )
+        req.rate = data.rate
+        req.cycle = data.cycle
+
         # Fetch the user to get their full name for borrower_name
         user_result = await db.execute(select(User).where(User.id == req.user_id))
         user = user_result.scalar_one_or_none()
         borrower_name = user.full_name if user else req.account_name
 
         from datetime import date
+
         account_data = LoanAccountCreate(
             account_name=req.account_name,
             borrower_name=borrower_name,
             borrow_amount=req.borrow_amount,
-            rate=req.rate,
-            cycle=req.cycle,
+            rate=data.rate,
+            cycle=data.cycle,
             start_date=date.today(),
             linked_user_id=req.user_id,
         )

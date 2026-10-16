@@ -1,4 +1,5 @@
 """Unit tests — user schema validation."""
+
 import pytest
 from pydantic import ValidationError
 
@@ -38,6 +39,8 @@ class TestUserCreate:
     def test_invalid_role_rejected(self):
         with pytest.raises(ValidationError):
             UserCreate(
-                email="a@b.com", password="pass12345",
-                full_name="Bob", role="superuser",
+                email="a@b.com",
+                password="pass12345",
+                full_name="Bob",
+                role="superuser",
             )

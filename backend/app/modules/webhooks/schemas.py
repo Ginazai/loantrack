@@ -22,8 +22,11 @@ class WebhookConfigCreate(BaseModel):
     @classmethod
     def valid_events(cls, v: list[str]) -> list[str]:
         allowed = {
-            "payment.added", "status.changed",
-            "account.created", "account.updated", "account.purged",
+            "payment.added",
+            "status.changed",
+            "account.created",
+            "account.updated",
+            "account.purged",
             "cycle.closed",
         }
         bad = [e for e in v if e not in allowed]
