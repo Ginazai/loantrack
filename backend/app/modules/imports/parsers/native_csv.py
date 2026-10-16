@@ -22,24 +22,54 @@ from decimal import Decimal, InvalidOperation
 
 from app.modules.imports.parsers.base import (
     ImportParser,
-    ParseError,
     ParsedAccount,
     ParsedLedger,
     ParsedPayment,
+    ParseError,
 )
 
 ACCOUNTS_HEADER = {
-    "id", "account_name", "borrower_name", "borrow_amount", "rate",
-    "cycle", "status", "current_balance", "next_due_date", "start_date", "created_at",
+    "id",
+    "account_name",
+    "borrower_name",
+    "borrow_amount",
+    "rate",
+    "cycle",
+    "status",
+    "current_balance",
+    "next_due_date",
+    "start_date",
+    "created_at",
 }
 PAYMENTS_HEADER = {
-    "id", "account_id", "payment_date", "amount", "balance_before",
-    "interests_accrued", "balance_after", "next_due_date", "method", "created_at",
+    "id",
+    "account_id",
+    "payment_date",
+    "amount",
+    "balance_before",
+    "interests_accrued",
+    "balance_after",
+    "next_due_date",
+    "method",
+    "created_at",
 }
 FULL_HEADER = {
-    "account_id", "account_name", "borrower_name", "borrow_amount", "rate",
-    "cycle", "status", "start_date", "payment_#", "payment_date", "amount",
-    "balance_before", "interests_accrued", "balance_after", "next_due_date", "method",
+    "account_id",
+    "account_name",
+    "borrower_name",
+    "borrow_amount",
+    "rate",
+    "cycle",
+    "status",
+    "start_date",
+    "payment_#",
+    "payment_date",
+    "amount",
+    "balance_before",
+    "interests_accrued",
+    "balance_after",
+    "next_due_date",
+    "method",
 }
 
 
@@ -106,9 +136,7 @@ class NativeCsvParser(ImportParser):
                 rate = _dec(row.get("rate"))
                 start_date = _date(row.get("start_date"))
                 if not ref or borrow_amount is None or rate is None or start_date is None:
-                    errors.append(
-                        ParseError(row_number, "Fila de cuenta incompleta", dict(row))
-                    )
+                    errors.append(ParseError(row_number, "Fila de cuenta incompleta", dict(row)))
                 else:
                     # full.csv repeats the account row per payment — only the
                     # first occurrence per account creates a ParsedAccount.
@@ -132,9 +160,7 @@ class NativeCsvParser(ImportParser):
                 if shape == "full" and not (row.get("payment_date") or "").strip():
                     continue  # account-only row in a full.csv with zero payments
                 if not ref or amount is None or payment_date is None:
-                    errors.append(
-                        ParseError(row_number, "Fila de pago incompleta", dict(row))
-                    )
+                    errors.append(ParseError(row_number, "Fila de pago incompleta", dict(row)))
                     continue
                 payments.append(
                     ParsedPayment(

@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { adminApi } from "../../api";
 import type { WebhookConfig, WebhookFormData, WebhookEventType } from "../../types";
-import { Webhook, Plus, Trash2, ToggleLeft, ToggleRight, Info, X } from "lucide-react";
+import { getApiErrorMessage } from "../../utils/apiError";
+import { Webhook, Plus, Trash2, ToggleLeft, ToggleRight, Info } from "lucide-react";
+import { Drawer } from "../../components/common";
 
 const ALL_EVENTS: { value: WebhookEventType; label: string; desc: string }[] = [
   { value: "account.created", label: "Account Created", desc: "Fires when any new loan account is opened" },
@@ -46,19 +48,14 @@ function CreateWebhookModal({ onClose, onCreated }: { onClose: () => void; onCre
       onCreated(wh);
       onClose();
     } catch (e: any) {
-      setError(e?.response?.data?.detail || "Failed to create webhook");
+      setError(getApiErrorMessage(e, "Failed to create webhook"));
     } finally { setSaving(false); }
   };
 
   const lbl = "label-text text-xs font-semibold uppercase tracking-wide";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-      <div className="bg-base-100 rounded-xl shadow-xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between mb-5">
-          <h3 className="font-bold text-base">New Global Webhook</h3>
-          <button className="btn btn-ghost btn-sm btn-square" onClick={onClose}><X className="w-4 h-4" /></button>
-        </div>
+    <Drawer title="New Global Webhook" onClose={onClose}>
         {error && <div className="alert alert-error py-2 text-sm mb-4">{error}</div>}
         <div className="space-y-4">
           <div className="form-control">
@@ -101,8 +98,7 @@ function CreateWebhookModal({ onClose, onCreated }: { onClose: () => void; onCre
             {saving ? <span className="loading loading-spinner loading-xs" /> : "Create Webhook"}
           </button>
         </div>
-      </div>
-    </div>
+    </Drawer>
   );
 }
 

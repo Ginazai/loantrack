@@ -2,8 +2,9 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { adminApi } from "../../api";
 import type { User, UserCreateFormData } from "../../types";
-import { UserPlus, ToggleLeft, ToggleRight, ChevronDown, ChevronUp, Trash2, X, ExternalLink } from "lucide-react";
-import { ConfirmDialog } from "../../components/common";
+import { getApiErrorMessage } from "../../utils/apiError";
+import { UserPlus, ToggleLeft, ToggleRight, ChevronDown, ChevronUp, Trash2, ExternalLink } from "lucide-react";
+import { ConfirmDialog, Drawer } from "../../components/common";
 
 function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreated: (u: User) => void }) {
   const [form, setForm] = useState<UserCreateFormData>({ email: "", password: "", full_name: "", role: "user" });
@@ -19,17 +20,12 @@ function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreate
       onCreated(user);
       onClose();
     } catch (e: any) {
-      setError(e?.response?.data?.detail || "Failed to create user");
+      setError(getApiErrorMessage(e, "Failed to create user"));
     } finally { setSaving(false); }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-      <div className="bg-base-100 rounded-xl shadow-xl w-full max-w-md p-6">
-        <div className="flex items-center justify-between mb-5">
-          <h3 className="font-bold text-base">Create New User</h3>
-          <button className="btn btn-ghost btn-sm btn-square" onClick={onClose}><X className="w-4 h-4" /></button>
-        </div>
+    <Drawer title="Create New User" onClose={onClose}>
         {error && <div className="alert alert-error py-2 text-sm mb-4">{error}</div>}
         <div className="space-y-3">
           <div className="form-control">
@@ -58,8 +54,7 @@ function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreate
             {saving ? <span className="loading loading-spinner loading-xs" /> : "Create User"}
           </button>
         </div>
-      </div>
-    </div>
+    </Drawer>
   );
 }
 

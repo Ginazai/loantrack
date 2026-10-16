@@ -5,8 +5,12 @@ from fastapi import HTTPException, status
 from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.accounts.interest_engine import compute_current_balance, next_cycle_date, upcoming_cycle_dates
 from app.core.repository import BaseRepository
+from app.modules.accounts.interest_engine import (
+    compute_current_balance,
+    next_cycle_date,
+    upcoming_cycle_dates,
+)
 from app.modules.accounts.models import LoanAccount
 from app.modules.accounts.schemas import (
     LoanAccountClose,
@@ -52,7 +56,9 @@ class LoanAccountService:
     ) -> dict:
         # Auto-fill borrower name from the linked user's full_name
         from sqlalchemy import select as sql_select
+
         from app.modules.users.models import User
+
         user_result = await self.db.execute(sql_select(User).where(User.id == user_id))
         user = user_result.scalar_one_or_none()
         borrower_name = user.full_name if user else str(user_id)
@@ -70,7 +76,10 @@ class LoanAccountService:
         account = await self.repo.create(account)
         await self.db.refresh(account)
         await self.audit.log(
-            user_id, "loan_account", str(account.id), "create",
+            user_id,
+            "loan_account",
+            str(account.id),
+            "create",
             after={"name": data.account_name, "amount": str(data.borrow_amount)},
             ip=ip,
         )
@@ -79,8 +88,12 @@ class LoanAccountService:
         return enriched
 
     async def update_account(
-        self, account_id: UUID, user_id: UUID, data: LoanAccountUpdate,
-        ip: str | None = None, is_admin: bool = False
+        self,
+        account_id: UUID,
+        user_id: UUID,
+        data: LoanAccountUpdate,
+        ip: str | None = None,
+        is_admin: bool = False,
     ) -> dict:
         account = await self._get_or_404(account_id, user_id, is_admin)
         before = {"name": account.account_name, "rate": str(account.rate)}
@@ -93,8 +106,12 @@ class LoanAccountService:
         await self.repo.flush()
         await self.db.refresh(account)
         await self.audit.log(
-            user_id, "loan_account", str(account_id), "update",
-            before=before, after={"name": account.account_name, "rate": str(account.rate)},
+            user_id,
+            "loan_account",
+            str(account_id),
+            "update",
+            before=before,
+            after={"name": account.account_name, "rate": str(account.rate)},
             ip=ip,
         )
         enriched = await self._enrich(account)
@@ -102,8 +119,12 @@ class LoanAccountService:
         return enriched
 
     async def close_account(
-        self, account_id: UUID, user_id: UUID, data: LoanAccountClose,
-        ip: str | None = None, is_admin: bool = False
+        self,
+        account_id: UUID,
+        user_id: UUID,
+        data: LoanAccountClose,
+        ip: str | None = None,
+        is_admin: bool = False,
     ) -> dict:
         account = await self._get_or_404(account_id, user_id, is_admin)
         if account.status == "closed":
@@ -114,31 +135,47 @@ class LoanAccountService:
         await self.repo.flush()
         await self.db.refresh(account)
         await self.audit.log(
-            user_id, "loan_account", str(account_id), "update",
-            before=before, after={"status": "closed", "reason": data.close_reason}, ip=ip,
+            user_id,
+            "loan_account",
+            str(account_id),
+            "update",
+            before=before,
+            after={"status": "closed", "reason": data.close_reason},
+            ip=ip,
         )
         enriched = await self._enrich(account)
         await self._fire_webhook(account, "status.changed", enriched)
         return enriched
 
     async def purge_account(
-        self, account_id: UUID, user_id: UUID,
-        ip: str | None = None, force: bool = False, is_admin: bool = False
+        self,
+        account_id: UUID,
+        user_id: UUID,
+        ip: str | None = None,
+        force: bool = False,
+        is_admin: bool = False,
     ) -> None:
         account = await self._get_or_404(account_id, user_id, is_admin or force)
         if not force and account.status != "closed":
             raise HTTPException(
-                status.HTTP_409_CONFLICT, "Only closed accounts can be purged (use force=true as admin)"
+                status.HTTP_409_CONFLICT,
+                "Only closed accounts can be purged (use force=true as admin)",
             )
         enriched = await self._enrich(account)
         await self._fire_webhook(account, "account.purged", enriched)
         await self.audit.log(
-            user_id, "loan_account", str(account_id), "delete",
-            before={"name": account.account_name, "status": account.status}, ip=ip,
+            user_id,
+            "loan_account",
+            str(account_id),
+            "delete",
+            before={"name": account.account_name, "status": account.status},
+            ip=ip,
         )
         await self.repo.delete(account)
 
-    async def get_cycle_preview(self, account_id: UUID, user_id: UUID, is_admin: bool = False) -> list[date]:
+    async def get_cycle_preview(
+        self, account_id: UUID, user_id: UUID, is_admin: bool = False
+    ) -> list[date]:
         await self._get_or_404(account_id, user_id, is_admin)
         return upcoming_cycle_dates(date.today(), count=6)
 
@@ -147,9 +184,8 @@ class LoanAccountService:
     async def get_account_any(self, account_id: UUID) -> dict:
         """Admin: get any account regardless of owner."""
         from sqlalchemy import select as sql_select
-        result = await self.db.execute(
-            sql_select(LoanAccount).where(LoanAccount.id == account_id)
-        )
+
+        result = await self.db.execute(sql_select(LoanAccount).where(LoanAccount.id == account_id))
         account = result.scalar_one_or_none()
         if not account:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Account not found")
@@ -160,9 +196,8 @@ class LoanAccountService:
     ) -> dict:
         """Admin: update any account regardless of owner, including status."""
         from sqlalchemy import select as sql_select
-        result = await self.db.execute(
-            sql_select(LoanAccount).where(LoanAccount.id == account_id)
-        )
+
+        result = await self.db.execute(sql_select(LoanAccount).where(LoanAccount.id == account_id))
         account = result.scalar_one_or_none()
         if not account:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Account not found")
@@ -176,9 +211,16 @@ class LoanAccountService:
         await self.repo.flush()
         await self.db.refresh(account)
         await self.audit.log(
-            admin_id, "loan_account", str(account_id), "update",
+            admin_id,
+            "loan_account",
+            str(account_id),
+            "update",
             before=before,
-            after={"name": account.account_name, "rate": str(account.rate), "status": account.status},
+            after={
+                "name": account.account_name,
+                "rate": str(account.rate),
+                "status": account.status,
+            },
             ip=ip,
         )
         enriched = await self._enrich(account)
@@ -209,6 +251,7 @@ class LoanAccountService:
         self, account_id: UUID, user_id: UUID, is_admin: bool = False
     ) -> LoanAccount:
         from sqlalchemy import select as sql_select
+
         if is_admin:
             result = await self.db.execute(
                 sql_select(LoanAccount).where(LoanAccount.id == account_id)
@@ -249,6 +292,7 @@ class LoanAccountService:
     async def _fire_webhook(self, account: LoanAccount, event: str, payload: dict) -> None:
         """Fire both per-account webhooks and global webhooks that match the event."""
         from sqlalchemy import or_ as sql_or
+
         result = await self.db.execute(
             select(WebhookConfig).where(
                 and_(
@@ -265,7 +309,7 @@ class LoanAccountService:
         # Build rich payload with full account + event info
         serializable_payload = {}
         for k, v in payload.items():
-            if hasattr(v, '__str__') and not isinstance(v, (str, int, float, bool, type(None))):
+            if hasattr(v, "__str__") and not isinstance(v, (str, int, float, bool, type(None))):
                 serializable_payload[k] = str(v)
             else:
                 serializable_payload[k] = v
@@ -281,9 +325,23 @@ class LoanAccountService:
             "rate": str(account.rate),
             "cycle": account.cycle,
             "start_date": str(account.start_date),
-            **{k: v for k, v in serializable_payload.items()
-               if k not in ("event", "account_id", "account_name", "borrower_name",
-                            "user_id", "status", "borrow_amount", "rate", "cycle", "start_date")},
+            **{
+                k: v
+                for k, v in serializable_payload.items()
+                if k
+                not in (
+                    "event",
+                    "account_id",
+                    "account_name",
+                    "borrower_name",
+                    "user_id",
+                    "status",
+                    "borrow_amount",
+                    "rate",
+                    "cycle",
+                    "start_date",
+                )
+            },
         }
 
         for config in configs:

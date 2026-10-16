@@ -57,9 +57,7 @@ def validate_attachment(content_type: str, size_bytes: int) -> None:
     if size_bytes <= 0:
         raise ValueError("Empty file")
     if size_bytes > MAX_ATTACHMENT_SIZE_BYTES:
-        raise ValueError(
-            f"File exceeds the {MAX_ATTACHMENT_SIZE_BYTES // (1024 * 1024)} MB limit"
-        )
+        raise ValueError(f"File exceeds the {MAX_ATTACHMENT_SIZE_BYTES // (1024 * 1024)} MB limit")
 
 
 class PaymentAttachmentOut(BaseModel):

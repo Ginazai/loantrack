@@ -20,8 +20,8 @@ from dataclasses import dataclass
 from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
 
-
 # ── Cycle date primitives ───────────────────────────────────────────────────
+
 
 def _month_thirtieth(year: int, month: int) -> date:
     """Return the 30th of a month, or its last day if the month is shorter."""
@@ -108,6 +108,7 @@ def upcoming_cycle_dates(from_date: date, count: int = 6) -> list[date]:
 
 # ── Ledger calculation ──────────────────────────────────────────────────────
 
+
 @dataclass
 class CycleRow:
     cycle_date: date
@@ -158,11 +159,7 @@ def project_ledger(
         prev = prev_boundaries[i]
 
         period_payments = _dec(
-            sum(
-                amt
-                for pdate, amt in sorted_payments
-                if prev < pdate <= cycle_date
-            )
+            sum(amt for pdate, amt in sorted_payments if prev < pdate <= cycle_date)
         )
 
         interest = _round2(balance * _dec(rate))

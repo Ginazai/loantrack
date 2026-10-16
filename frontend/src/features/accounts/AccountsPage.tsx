@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { accountsApi, adminApi } from "../../api";
-import { ConfirmDialog, PageHeader } from "../../components/common";
+import { ConfirmDialog, Drawer, PageHeader } from "../../components/common";
 import type { AccountFormData, AccountStatus } from "../../types";
 import { AccountForm } from "./AccountForm";
 import { AccountSpreadsheet } from "./AccountSpreadsheet";
 import { Download } from "lucide-react";
+import { getApiErrorMessage } from "../../utils/apiError";
 
 const STATUS_FILTERS: { value: AccountStatus | "all"; label: string }[] = [
   { value: "all", label: "All" },
@@ -131,26 +132,21 @@ export function AccountsPage() {
         <AccountSpreadsheet accounts={accounts} />
       )}
 
-      {/* Create modal */}
       {showCreate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="bg-base-100 rounded-2xl shadow-xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
-            <h2 className="text-lg font-bold mb-5">New Loan Account</h2>
-            <AccountForm
-              onSubmit={async (data) => { await createMutation.mutateAsync(data); }}
-              onCancel={() => setShowCreate(false)}
-              isLoading={createMutation.isPending}
-            />
-            {createMutation.isError && (
-              <div className="alert alert-error mt-3 text-sm py-2">
-                <span>
-                  {(createMutation.error as any)?.response?.data?.detail ??
-                    "Failed to create account"}
-                </span>
-              </div>
-            )}
-          </div>
-        </div>
+        <Drawer title="New Loan Account" onClose={() => setShowCreate(false)} width="lg">
+          <AccountForm
+            onSubmit={async (data) => { await createMutation.mutateAsync(data); }}
+            onCancel={() => setShowCreate(false)}
+            isLoading={createMutation.isPending}
+          />
+          {createMutation.isError && (
+            <div className="alert alert-error mt-3 text-sm py-2">
+              <span>
+                {getApiErrorMessage(createMutation.error, "Failed to create account")}
+              </span>
+            </div>
+          )}
+        </Drawer>
       )}
     </div>
   );

@@ -13,9 +13,7 @@ class ImportBatch(Base):
 
     __tablename__ = "import_batches"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     source_filename: Mapped[str] = mapped_column(String(255), nullable=False)
     format: Mapped[str] = mapped_column(String(50), nullable=False)
     # Raw upload, kept so `commit()` re-parses from the source of truth
@@ -45,12 +43,12 @@ class ImportRow(Base):
 
     __tablename__ = "import_rows"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     batch_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("import_batches.id", ondelete="CASCADE"),
-        nullable=False, index=True,
+        UUID(as_uuid=True),
+        ForeignKey("import_batches.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
     row_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
     interpretation: Mapped[str] = mapped_column(String(50), nullable=False)

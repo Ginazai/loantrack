@@ -4,16 +4,13 @@ Full DB-backed integration tests require a running PostgreSQL instance
 (available in CI via the service container defined in .github/workflows/ci.yml).
 These tests cover the computation pipeline without DB I/O.
 """
+
 from datetime import date
 from decimal import Decimal
 
-import pytest
-
 from app.modules.accounts.interest_engine import (
-    advance_cycle,
     compute_current_balance,
     get_cycle_dates,
-    next_cycle_date,
     project_ledger,
     upcoming_cycle_dates,
 )
@@ -44,9 +41,14 @@ class TestFullLedgerScenarios:
         assert rows[-1].closing_balance <= Decimal("0")
 
     def test_compute_current_balance_matches_last_row(self):
+        # compute_current_balance has no `until` param — it always projects
+        # to *today* internally. The project_ledger call here must use the
+        # same real "today" explicitly, not a hardcoded date, or the two
+        # diverge the moment real time moves past whatever date was
+        # hardcoded (which is exactly what made this test go stale).
         start = date(2026, 6, 1)
         payments = [(date(2026, 6, 15), 50.0)]
-        rows = project_ledger(500.0, 0.05, start, payments, until=date(2026, 6, 30))
+        rows = project_ledger(500.0, 0.05, start, payments, until=date.today())
         bal = compute_current_balance(500.0, 0.05, start, payments)
         assert bal == rows[-1].closing_balance
 
@@ -64,7 +66,8 @@ class TestFullLedgerScenarios:
     def test_interest_is_not_applied_before_first_cycle(self):
         """Start June 14 — first cycle June 15. Balance on June 14 = principal."""
         bal = compute_current_balance(
-            1000.0, 0.05,
+            1000.0,
+            0.05,
             date(2026, 6, 14),
             [],
         )

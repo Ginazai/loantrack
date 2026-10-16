@@ -40,6 +40,7 @@ export function AccountSpreadsheet({ accounts }: Props) {
         minWidth: 110,
         valueFormatter: (p) => formatCurrency(p.value),
         type: "numericColumn",
+        cellClass: "tabular-nums",
       },
       {
         field: "current_balance",
@@ -48,6 +49,7 @@ export function AccountSpreadsheet({ accounts }: Props) {
         minWidth: 110,
         valueFormatter: (p) => (p.value ? formatCurrency(p.value) : "—"),
         type: "numericColumn",
+        cellClass: "tabular-nums font-semibold",
         cellStyle: (p) => {
           if (parseFloat(p.value) <= 0) return { color: "var(--su)" };
           if (parseFloat(p.value) > parseFloat(p.data?.borrow_amount ?? "0"))

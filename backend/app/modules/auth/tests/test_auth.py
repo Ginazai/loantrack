@@ -1,6 +1,4 @@
 """Unit tests — auth service (password hashing, JWT creation)."""
-import pytest
-from datetime import date, timedelta
 
 from app.core.security import (
     create_access_token,
@@ -33,7 +31,7 @@ class TestPasswordHashing:
 
 class TestTokenCreation:
     def test_access_token_is_string(self):
-        token = create_access_token({"sub": "user-id-123"})
+        token = create_access_token("user-id-123", "user")
         assert isinstance(token, str)
         assert len(token) > 20
 

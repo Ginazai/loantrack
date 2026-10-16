@@ -32,10 +32,10 @@ from decimal import Decimal, InvalidOperation
 
 from app.modules.imports.parsers.base import (
     ImportParser,
-    ParseError,
     ParsedAccount,
     ParsedLedger,
     ParsedPayment,
+    ParseError,
 )
 
 EXPECTED_HEADER = ["referencia", "fecha", "descripcion", "debito", "credito"]
@@ -48,8 +48,11 @@ _PAYMENT_RE = re.compile(r"pago.*realizad", re.IGNORECASE)
 def _strip_accents(s: str) -> str:
     return (
         s.lower()
-        .replace("ó", "o").replace("í", "i").replace("á", "a")
-        .replace("é", "e").replace("ú", "u")
+        .replace("ó", "o")
+        .replace("í", "i")
+        .replace("á", "a")
+        .replace("é", "e")
+        .replace("ú", "u")
     )
 
 
@@ -113,9 +116,7 @@ class LegacyLedgerCsvParser(ImportParser):
                 continue
             fecha = _parse_date(fecha_raw)
             if fecha is None:
-                errors.append(
-                    ParseError(row_number, f"Fecha inválida: '{fecha_raw}'", dict(row))
-                )
+                errors.append(ParseError(row_number, f"Fecha inválida: '{fecha_raw}'", dict(row)))
                 continue
 
             key = (ref, fecha.isoformat())
@@ -149,17 +150,13 @@ class LegacyLedgerCsvParser(ImportParser):
 
             elif _INTEREST_RE.search(desc):
                 if debito is None:
-                    errors.append(
-                        ParseError(row_number, "Interés sin monto en Debito", dict(row))
-                    )
+                    errors.append(ParseError(row_number, "Interés sin monto en Debito", dict(row)))
                     continue
                 groups[key]["interest"] = debito
 
             elif _PAYMENT_RE.search(desc):
                 if credito is None:
-                    errors.append(
-                        ParseError(row_number, "Pago sin monto en Credito", dict(row))
-                    )
+                    errors.append(ParseError(row_number, "Pago sin monto en Credito", dict(row)))
                     continue
                 groups[key]["payment"] = credito
 

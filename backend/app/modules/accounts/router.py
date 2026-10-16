@@ -100,8 +100,11 @@ async def purge_account(
     ip = request.client.host if request.client else None
     is_admin = current_user.role == "admin"
     await svc.purge_account(
-        account_id, current_user.id, ip=ip,
-        force=is_admin and force, is_admin=is_admin,
+        account_id,
+        current_user.id,
+        ip=ip,
+        force=is_admin and force,
+        is_admin=is_admin,
     )
 
 

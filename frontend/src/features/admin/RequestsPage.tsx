@@ -24,6 +24,9 @@ export default function RequestsPage() {
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState<Record<string, string>>({});
+  // Lender terms — set by the admin here, at approval time, never by the
+  // borrower's original request (see docs: loan request scope change).
+  const [approvalTerms, setApprovalTerms] = useState<Record<string, { rate: number; cycle: 15 | 30 }>>({});
   const [acting, setActing] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "requested" | "under_review" | "approved" | "rejected">("all");
   const [deleteRequestId, setDeleteRequestId] = useState<string | null>(null);
@@ -53,11 +56,18 @@ export default function RequestsPage() {
       alert("Please provide a rejection reason");
       return;
     }
+    const terms = approvalTerms[req.id];
+    if (status === "approved" && (!terms?.rate || !terms?.cycle)) {
+      alert("Set an interest rate and payment frequency before approving");
+      return;
+    }
     setActing(req.id);
     try {
       const updated = await loanRequestsApi.review(req.id, {
         status,
         rejection_reason: status === "rejected" ? rejectionReason[req.id] : undefined,
+        rate: status === "approved" ? terms.rate : undefined,
+        cycle: status === "approved" ? terms.cycle : undefined,
       });
       setRequests((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
       setExpanded(null);
@@ -117,8 +127,14 @@ export default function RequestsPage() {
                     </div>
                     <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-base-content/50 font-mono">
                       <span>{formatCurrency(Number(req.borrow_amount))}</span>
-                      <span>{(Number(req.rate) * 100).toFixed(2)}%</span>
-                      <span>{req.cycle === 15 ? "Bi-monthly" : "Monthly"}</span>
+                      {req.rate !== null && req.cycle !== null ? (
+                        <>
+                          <span>{(Number(req.rate) * 100).toFixed(2)}%</span>
+                          <span>{req.cycle === 15 ? "Bi-monthly" : "Monthly"}</span>
+                        </>
+                      ) : (
+                        <span className="text-base-content/30">Terms not yet set</span>
+                      )}
                       <span>Submitted {formatDate(req.created_at)}</span>
                     </div>
                   </div>
@@ -156,6 +172,41 @@ export default function RequestsPage() {
 
                     {(req.status === "under_review") && (
                       <div className="space-y-3">
+                        <div className="bg-base-200 rounded-md p-3">
+                          <p className="text-xs font-semibold uppercase tracking-wider text-base-content/40 mb-2">
+                            Set Lender Terms <span className="text-base-content/30 normal-case">(required to approve)</span>
+                          </p>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="form-control">
+                              <label className="label py-1"><span className="label-text text-xs">Interest Rate %</span></label>
+                              <label className="input input-bordered input-sm flex items-center gap-1.5">
+                                <input
+                                  type="number" min="0.01" max="100" step="0.01" className="grow font-mono"
+                                  value={approvalTerms[req.id]?.rate ?? ""}
+                                  onChange={(e) => setApprovalTerms({
+                                    ...approvalTerms,
+                                    [req.id]: { cycle: approvalTerms[req.id]?.cycle ?? 15, rate: Number(e.target.value) },
+                                  })}
+                                />
+                                <span className="text-base-content/40 font-mono text-xs">%</span>
+                              </label>
+                            </div>
+                            <div className="form-control">
+                              <label className="label py-1"><span className="label-text text-xs">Payment Frequency</span></label>
+                              <select
+                                className="select select-bordered select-sm"
+                                value={approvalTerms[req.id]?.cycle ?? 15}
+                                onChange={(e) => setApprovalTerms({
+                                  ...approvalTerms,
+                                  [req.id]: { rate: approvalTerms[req.id]?.rate ?? 0, cycle: Number(e.target.value) as 15 | 30 },
+                                })}
+                              >
+                                <option value={15}>Bi-monthly (15 days)</option>
+                                <option value={30}>Monthly (30 days)</option>
+                              </select>
+                            </div>
+                          </div>
+                        </div>
                         <div className="form-control">
                           <label className="label py-1">
                             <span className="label-text text-xs font-semibold uppercase tracking-wide">

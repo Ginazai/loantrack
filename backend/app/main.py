@@ -1,5 +1,4 @@
 import asyncio
-import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -11,7 +10,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 
 from app.core.config import get_settings
-from app.core.database import AsyncSessionLocal, engine
+from app.core.database import AsyncSessionLocal
 from app.core.exceptions import register_exception_handlers
 from app.core.logging import configure_logging, get_logger
 from app.core.models_registry import *  # noqa: F401, F403
@@ -28,11 +27,14 @@ settings = get_settings()
 configure_logging(settings.LOG_LEVEL if hasattr(settings, "LOG_LEVEL") else "INFO")
 logger = get_logger(__name__)
 
-limiter = Limiter(key_func=get_remote_address, default_limits=[f"{settings.RATE_LIMIT_PER_MINUTE}/minute"])
+limiter = Limiter(
+    key_func=get_remote_address, default_limits=[f"{settings.RATE_LIMIT_PER_MINUTE}/minute"]
+)
 
 
 class _SecurityHeadersMiddleware(BaseHTTPMiddleware):
     """Adds CSP and other security headers to every response."""
+
     async def dispatch(self, request: Request, call_next):
         response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"

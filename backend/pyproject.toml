@@ -62,6 +62,16 @@ build-backend = "poetry.core.masonry.api"
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 
+[tool.coverage.run]
+# SQLAlchemy's async engine bridges sync DBAPI calls into async context via
+# greenlet internally. Without telling coverage.py about that, its tracer
+# doesn't follow execution across greenlet switches, so lines that run
+# "inside" a DB call show up as falsely uncovered even when the test that
+# exercises them passes. (Confirmed empirically: payments/service.py
+# showed 25% coverage with 10 passing integration tests that clearly
+# exercise add_payment/delete_payment/recalculate_ledger end-to-end.)
+concurrency = ["greenlet", "thread"]
+
 [tool.ruff]
 line-length = 100
 select = ["E", "F", "I"]

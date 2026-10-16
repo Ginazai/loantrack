@@ -1,7 +1,17 @@
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import (
+    Boolean,
+    Date,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.dialects.postgresql import JSON, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -11,9 +21,7 @@ from app.core.database import Base
 class WebhookConfig(Base):
     __tablename__ = "webhook_configs"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     # Nullable: NULL = global webhook (admin-level, fires for all accounts)
     account_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
@@ -40,9 +48,7 @@ class WebhookConfig(Base):
 class WebhookEvent(Base):
     __tablename__ = "webhook_events"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     webhook_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("webhook_configs.id", ondelete="CASCADE"),
@@ -53,16 +59,12 @@ class WebhookEvent(Base):
     payload: Mapped[dict] = mapped_column(JSON, nullable=False)
     attempt_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     status: Mapped[str] = mapped_column(String(20), default="pending", nullable=False, index=True)
-    last_attempt_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    last_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
-    webhook: Mapped["WebhookConfig"] = relationship(
-        "WebhookConfig", back_populates="events_log"
-    )
+    webhook: Mapped["WebhookConfig"] = relationship("WebhookConfig", back_populates="events_log")
 
 
 class AccountCycleNotification(Base):
@@ -79,9 +81,7 @@ class AccountCycleNotification(Base):
         UniqueConstraint("account_id", "cycle_date", name="uq_account_cycle_notification"),
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     account_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
         ForeignKey("loan_accounts.id", ondelete="CASCADE"),

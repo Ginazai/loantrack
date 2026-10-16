@@ -75,8 +75,10 @@ export interface LoanRequest {
   user_id: string;
   account_name: string;
   borrow_amount: string;
-  rate: string;
-  cycle: 15 | 30;
+  // Lender terms — null until an admin approves the request and sets them
+  // (see LoanRequestReviewData). Never set by the borrower.
+  rate: string | null;
+  cycle: (15 | 30) | null;
   reason: string | null;
   status: "requested" | "under_review" | "approved" | "rejected";
   rejection_reason: string | null;
@@ -88,9 +90,16 @@ export interface LoanRequest {
 export interface LoanRequestFormData {
   account_name: string;
   borrow_amount: number;
-  rate: number; // UI % → /100 before send
-  cycle: 15 | 30;
   reason?: string;
+}
+
+/** What an admin submits to approve (or reject) a request — rate/cycle are
+ * the lender's terms, decided here, never by the borrower. */
+export interface LoanRequestReviewData {
+  status: "approved" | "rejected" | "under_review";
+  rejection_reason?: string;
+  rate?: number; // UI % → /100 before send — required when status="approved"
+  cycle?: 15 | 30; // required when status="approved"
 }
 
 export interface TokenResponse {

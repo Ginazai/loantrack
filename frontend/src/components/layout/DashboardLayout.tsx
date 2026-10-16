@@ -30,7 +30,7 @@ export function DashboardLayout() {
     }`;
 
   return (
-    <div className="flex h-screen overflow-hidden bg-base-200">
+    <div className="flex h-screen overflow-hidden ledger-bg bg-base-200">
       {/* ── Sidebar ───────────────────────────────────────────────────────── */}
       <aside className={`flex flex-col bg-neutral shadow-xl transition-all duration-300 ${sidebarOpen ? "w-60" : "w-14"}`}>
         {/* Logo */}

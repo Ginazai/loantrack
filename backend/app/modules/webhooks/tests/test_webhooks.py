@@ -1,5 +1,4 @@
 """Unit tests — webhook config schema validation."""
-from decimal import Decimal
 
 import pytest
 from pydantic import ValidationError

@@ -22,7 +22,9 @@ class WebhookConfigService:
         self.db = db
         self.repo = BaseRepository(WebhookConfig, db)
 
-    async def create(self, account_id: UUID, user_id: UUID, data: WebhookConfigCreate, is_admin: bool = False) -> WebhookConfig:
+    async def create(
+        self, account_id: UUID, user_id: UUID, data: WebhookConfigCreate, is_admin: bool = False
+    ) -> WebhookConfig:
         account = await self._get_account_or_404(account_id, user_id, is_admin)
         config = WebhookConfig(
             account_id=account.id,
@@ -32,7 +34,9 @@ class WebhookConfigService:
         )
         return await self.repo.create(config)
 
-    async def list_for_account(self, account_id: UUID, user_id: UUID, is_admin: bool = False) -> list[WebhookConfig]:
+    async def list_for_account(
+        self, account_id: UUID, user_id: UUID, is_admin: bool = False
+    ) -> list[WebhookConfig]:
         await self._get_account_or_404(account_id, user_id, is_admin)
         result = await self.db.execute(
             select(WebhookConfig).where(WebhookConfig.account_id == account_id)
@@ -46,11 +50,11 @@ class WebhookConfigService:
         await self._get_account_or_404(config.account_id, user_id, is_admin)
         await self.repo.delete(config)
 
-    async def _get_account_or_404(self, account_id: UUID, user_id: UUID, is_admin: bool = False) -> LoanAccount:
+    async def _get_account_or_404(
+        self, account_id: UUID, user_id: UUID, is_admin: bool = False
+    ) -> LoanAccount:
         if is_admin:
-            result = await self.db.execute(
-                select(LoanAccount).where(LoanAccount.id == account_id)
-            )
+            result = await self.db.execute(select(LoanAccount).where(LoanAccount.id == account_id))
         else:
             result = await self.db.execute(
                 select(LoanAccount).where(
@@ -114,9 +118,7 @@ class WebhookDeliveryService:
         await self.db.flush()
 
 
-def new_cycle_dates(
-    start_date: date, already_notified: set[date], until: date
-) -> list[date]:
+def new_cycle_dates(start_date: date, already_notified: set[date], until: date) -> list[date]:
     """Pure function (no DB, no I/O) — which cycle dates for an account,
     up to *until*, have not yet been notified. Reuses the same
     `get_cycle_dates` the rest of the ledger engine relies on, so a
@@ -177,9 +179,7 @@ class CycleCloseScanService:
                 )
             )
         )
-        configs = [
-            c for c in configs_result.scalars().all() if "cycle.closed" in (c.events or [])
-        ]
+        configs = [c for c in configs_result.scalars().all() if "cycle.closed" in (c.events or [])]
 
         # Historical payments feed project_ledger so the payload carries a
         # real balance snapshot, not just "a cycle date passed".
@@ -191,9 +191,7 @@ class CycleCloseScanService:
         payment_tuples = [(row.payment_date, float(row.amount)) for row in payments_rows.all()]
 
         for cycle_date in pending_dates:
-            self.db.add(
-                AccountCycleNotification(account_id=account.id, cycle_date=cycle_date)
-            )
+            self.db.add(AccountCycleNotification(account_id=account.id, cycle_date=cycle_date))
 
             rows = project_ledger(
                 float(account.borrow_amount),

@@ -1,4 +1,5 @@
 """Structured JSON logging — stdout only. No file sinks for internal tools."""
+
 import logging
 import sys
 from datetime import UTC, datetime
@@ -19,12 +20,33 @@ class _JsonFormatter(logging.Formatter):
         if extras := {
             k: v
             for k, v in record.__dict__.items()
-            if k not in logging.LogRecord.__dict__ and not k.startswith("_")
-            and k not in ("msg", "args", "exc_info", "exc_text", "stack_info",
-                          "lineno", "funcName", "created", "msecs", "relativeCreated",
-                          "thread", "threadName", "processName", "process",
-                          "name", "levelname", "levelno", "pathname", "filename",
-                          "module", "message", "taskName")
+            if k not in logging.LogRecord.__dict__
+            and not k.startswith("_")
+            and k
+            not in (
+                "msg",
+                "args",
+                "exc_info",
+                "exc_text",
+                "stack_info",
+                "lineno",
+                "funcName",
+                "created",
+                "msecs",
+                "relativeCreated",
+                "thread",
+                "threadName",
+                "processName",
+                "process",
+                "name",
+                "levelname",
+                "levelno",
+                "pathname",
+                "filename",
+                "module",
+                "message",
+                "taskName",
+            )
         }:
             payload["extra"] = extras
         return json.dumps(payload, default=str)

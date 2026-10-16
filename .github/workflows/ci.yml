@@ -59,7 +59,7 @@ jobs:
         run: |
           pytest tests/ app/modules/*/tests/ \
             --cov=app --cov-report=term-missing \
-            --cov-fail-under=60 -q
+            --cov-fail-under=80 -q
 
   frontend:
     name: Frontend — lint / type-check / build
