@@ -20,7 +20,10 @@ export default defineConfig({
         "src/vite-env.d.ts",
         "src/**/*.d.ts",
         "src/test/**",
+        // Tests themselves are not application code; counting them inflates the %.
+        "src/**/*.test.{ts,tsx}",
       ],
+      thresholds: { statements: 80, lines: 80, functions: 80, branches: 80 },
     },
   },
 });

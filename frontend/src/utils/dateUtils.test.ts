@@ -94,6 +94,10 @@ describe("formatDate", () => {
   it("formats an ISO date string", () => {
     expect(formatDate("2026-01-15")).toBe("Jan 15, 2026");
   });
+
+  it("preserves the UTC calendar date in ISO timestamps", () => {
+    expect(formatDate("2026-01-02T00:00:00Z")).toBe("Jan 2, 2026");
+  });
 });
 
 describe("formatCurrency", () => {

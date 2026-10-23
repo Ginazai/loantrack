@@ -62,7 +62,11 @@ export function upcomingCycleDates(count = 6, from?: Date): Date[] {
 }
 
 export function formatDate(d: Date | string): string {
-  const date = typeof d === "string" ? parseISO(d) : d;
+  const date = typeof d === "string" && /^\d{4}-\d{2}-\d{2}T/.test(d)
+    ? parseISO(d.slice(0, 10))
+    : typeof d === "string"
+      ? parseISO(d)
+      : d;
   return format(date, "MMM d, yyyy");
 }
 
