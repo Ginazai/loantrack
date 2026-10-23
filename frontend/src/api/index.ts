@@ -15,6 +15,7 @@ import type {
   TokenResponse,
   User,
   UserCreateFormData,
+  UserUpdateData,
   WebhookConfig,
   WebhookFormData,
   AccountFormData,
@@ -169,7 +170,7 @@ export const adminApi = {
   createUser: (data: UserCreateFormData) =>
     client.post<User>("/admin/users", data).then((r) => r.data),
 
-  updateUser: (id: string, data: Partial<{ is_active: boolean; role: string; full_name: string }>) =>
+  updateUser: (id: string, data: UserUpdateData) =>
     client.patch<User>(`/admin/users/${id}`, data).then((r) => r.data),
 
   deleteUser: (id: string) => client.delete(`/admin/users/${id}`),

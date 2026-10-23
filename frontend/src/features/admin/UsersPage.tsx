@@ -1,4 +1,4 @@
-import { Add, TrashCan, UserMultiple } from "@carbon/icons-react";
+import { Add, Edit, TrashCan, UserMultiple } from "@carbon/icons-react";
 import {
   Button,
   DataTableSkeleton,
@@ -22,9 +22,103 @@ import {
 import { Fragment, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { adminApi } from "../../api";
-import type { User, UserCreateFormData } from "../../types";
+import type { User, UserCreateFormData, UserRole, UserUpdateData } from "../../types";
+import { useAuthStore } from "../../stores/authStore";
 import { getApiErrorMessage } from "../../utils/apiError";
 import { ConfirmDialog, Drawer, EmptyState, Notice, PageHeader } from "../../components/common";
+
+function EditUserDrawer({
+  user,
+  isSelf,
+  onClose,
+  onSaved,
+}: {
+  user: User;
+  isSelf: boolean;
+  onClose: () => void;
+  onSaved: (u: User) => void;
+}) {
+  const [form, setForm] = useState({ full_name: user.full_name, email: user.email, role: user.role, password: "" });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSave = async () => {
+    const full_name = form.full_name.trim();
+    const email = form.email.trim();
+    if (!full_name || !email) { setError("Name and email are required"); return; }
+    const changes: UserUpdateData = {};
+    if (full_name !== user.full_name) changes.full_name = full_name;
+    if (email !== user.email) changes.email = email;
+    if (form.role !== user.role) changes.role = form.role;
+    if (form.password) {
+      if (form.password.length < 8) { setError("New password must be at least 8 characters"); return; }
+      changes.password = form.password;
+    }
+    if (Object.keys(changes).length === 0) { onClose(); return; }
+    setSaving(true); setError(null);
+    try {
+      onSaved(await adminApi.updateUser(user.id, changes));
+      onClose();
+    } catch (e: any) {
+      setError(getApiErrorMessage(e, "Failed to update user"));
+    } finally { setSaving(false); }
+  };
+
+  return (
+    <Drawer title="Edit User" onClose={onClose}>
+      <form
+        className="lt-form"
+        noValidate
+        onSubmit={(e) => {
+          e.preventDefault();
+          handleSave();
+        }}
+      >
+        {error && <Notice kind="error">{error}</Notice>}
+        <TextInput
+          id="edit-user-name"
+          labelText="Full Name"
+          value={form.full_name}
+          onChange={(e) => setForm({ ...form, full_name: e.target.value })}
+        />
+        <TextInput
+          id="edit-user-email"
+          type="email"
+          labelText="Email"
+          helperText="Changing this changes the address the user signs in with."
+          value={form.email}
+          onChange={(e) => setForm({ ...form, email: e.target.value })}
+        />
+        <PasswordInput
+          id="edit-user-password"
+          labelText="Reset Password"
+          helperText="Leave blank to keep the current password. Resetting signs the user out of other sessions."
+          placeholder="Min. 8 characters"
+          autoComplete="new-password"
+          value={form.password}
+          onChange={(e) => setForm({ ...form, password: e.target.value })}
+        />
+        <Select
+          id="edit-user-role"
+          labelText="Role"
+          helperText={isSelf ? "You can't remove your own admin role." : undefined}
+          disabled={isSelf}
+          value={form.role}
+          onChange={(e) => setForm({ ...form, role: e.target.value as UserRole })}
+        >
+          <SelectItem value="user" text="User (borrower)" />
+          <SelectItem value="admin" text="Admin" />
+        </Select>
+        <div className="lt-form__actions lt-form__actions--bleed">
+          <Button type="button" kind="secondary" size="xl" onClick={onClose}>Cancel</Button>
+          <Button type="submit" size="xl" disabled={saving}>
+            {saving ? <InlineLoading description="Saving…" /> : "Save Changes"}
+          </Button>
+        </div>
+      </form>
+    </Drawer>
+  );
+}
 
 function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreated: (u: User) => void }) {
   const [form, setForm] = useState<UserCreateFormData>({ email: "", password: "", full_name: "", role: "user" });
@@ -104,6 +198,9 @@ export default function UsersPage() {
   const [expandedUser, setExpandedUser] = useState<string | null>(null);
   const [userAccounts, setUserAccounts] = useState<Record<string, any[]>>({});
   const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
+  const [editUser, setEditUser] = useState<User | null>(null);
+  const currentUserId = useAuthStore((s) => s.user?.id);
+  const setAuthUser = useAuthStore((s) => s.setUser);
 
   useEffect(() => {
     adminApi.listUsers().then(setUsers).finally(() => setLoading(false));
@@ -201,6 +298,15 @@ export default function UsersPage() {
                             onToggle={() => toggleActive(user)}
                           />
                           <Button
+                            kind="ghost"
+                            size="sm"
+                            hasIconOnly
+                            renderIcon={Edit}
+                            iconDescription="Edit user"
+                            tooltipPosition="left"
+                            onClick={() => setEditUser(user)}
+                          />
+                          <Button
                             kind="danger--ghost"
                             size="sm"
                             hasIconOnly
@@ -249,6 +355,18 @@ export default function UsersPage() {
         <CreateUserModal
           onClose={() => setShowCreate(false)}
           onCreated={(u) => setUsers((prev) => [u, ...prev])}
+        />
+      )}
+
+      {editUser && (
+        <EditUserDrawer
+          user={editUser}
+          isSelf={editUser.id === currentUserId}
+          onClose={() => setEditUser(null)}
+          onSaved={(u) => {
+            setUsers((prev) => prev.map((x) => (x.id === u.id ? u : x)));
+            if (u.id === currentUserId) setAuthUser(u);
+          }}
         />
       )}
 

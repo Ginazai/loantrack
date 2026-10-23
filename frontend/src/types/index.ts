@@ -135,6 +135,14 @@ export interface WebhookFormData {
   events: WebhookEventType[];
 }
 
+export interface UserUpdateData {
+  full_name?: string;
+  email?: string;
+  role?: UserRole;
+  is_active?: boolean;
+  password?: string;
+}
+
 export interface UserCreateFormData {
   email: string;
   password: string;

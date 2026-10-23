@@ -1,7 +1,7 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -10,8 +10,8 @@ from app.core.security import generate_webhook_secret, hash_password
 from app.modules.accounts.models import LoanAccount
 from app.modules.accounts.schemas import LoanAccountFilter
 from app.modules.accounts.service import LoanAccountService
-from app.modules.users.models import User
-from app.modules.users.schemas import UserCreate, UserOut
+from app.modules.users.models import RefreshToken, User
+from app.modules.users.schemas import AdminUserUpdate, UserCreate, UserOut
 from app.modules.webhooks.models import WebhookConfig
 from app.modules.webhooks.schemas import WebhookConfigCreate, WebhookConfigOut
 
@@ -61,20 +61,39 @@ async def create_user(
 @router.patch("/users/{user_id}", response_model=UserOut)
 async def update_user(
     user_id: UUID,
-    data: dict,
-    _=Depends(require_admin),
+    data: AdminUserUpdate,
+    current_user=Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "User not found")
-    if "is_active" in data:
-        user.is_active = data["is_active"]
-    if "role" in data:
-        user.role = data["role"]
-    if "full_name" in data:
-        user.full_name = data["full_name"]
+
+    changes = data.model_dump(exclude_unset=True, exclude_none=True)
+
+    if "email" in changes and changes["email"] != user.email:
+        taken = await db.execute(
+            select(User.id).where(User.email == changes["email"], User.id != user.id)
+        )
+        if taken.scalar_one_or_none():
+            raise HTTPException(status.HTTP_409_CONFLICT, "Email already registered")
+
+    # Guard against locking the last admin session out by editing yourself.
+    if user.id == current_user.id and changes.get("role", user.role) != "admin":
+        raise HTTPException(status.HTTP_409_CONFLICT, "Cannot remove your own admin role")
+
+    new_password = changes.pop("password", None)
+    for field, value in changes.items():
+        setattr(user, field, value)
+    if new_password:
+        user.password_hash = hash_password(new_password)
+        # Invalidate existing sessions: they must sign in again with the new password.
+        await db.execute(
+            update(RefreshToken)
+            .where(RefreshToken.user_id == user.id, RefreshToken.revoked.is_(False))
+            .values(revoked=True)
+        )
     await db.flush()
     await db.refresh(user)
     return user
