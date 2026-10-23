@@ -111,7 +111,7 @@ function RequestLoanModal({ onClose, onSuccess }: { onClose: () => void; onSucce
         <div className="lt-form__actions lt-form__actions--bleed">
           <Button type="button" kind="secondary" size="xl" onClick={onClose}>Cancel</Button>
           <Button type="submit" size="xl" disabled={saving}>
-            {saving ? <InlineLoading description="Submitting…" /> : "Submit Request"}
+            {saving ? <InlineLoading description="Submitting…" /> : "Submit request"}
           </Button>
         </div>
       </form>
@@ -240,7 +240,7 @@ export default function MyRequestsPage() {
         subtitle={`${active.length} active · ${3 - active.length} slot${3 - active.length !== 1 ? "s" : ""} remaining`}
         action={
           <Button size="md" renderIcon={Add} onClick={() => setShowModal(true)} disabled={!canRequest}>
-            New Request
+            New request
           </Button>
         }
       />

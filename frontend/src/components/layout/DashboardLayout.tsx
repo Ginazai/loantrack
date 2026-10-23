@@ -176,7 +176,7 @@ export function DashboardLayout() {
                     setShowSettings(true);
                   }}
                 >
-                  Account Settings
+                  Account settings
                 </Button>
                 <Button kind="ghost" size="lg" className="lt-fit" renderIcon={Logout} onClick={handleLogout}>
                   Sign out

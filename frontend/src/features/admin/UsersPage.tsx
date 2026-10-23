@@ -112,7 +112,7 @@ function EditUserDrawer({
         <div className="lt-form__actions lt-form__actions--bleed">
           <Button type="button" kind="secondary" size="xl" onClick={onClose}>Cancel</Button>
           <Button type="submit" size="xl" disabled={saving}>
-            {saving ? <InlineLoading description="Saving…" /> : "Save Changes"}
+            {saving ? <InlineLoading description="Saving…" /> : "Save changes"}
           </Button>
         </div>
       </form>
@@ -183,7 +183,7 @@ function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreate
         <div className="lt-form__actions lt-form__actions--bleed">
           <Button type="button" kind="secondary" size="xl" onClick={onClose}>Cancel</Button>
           <Button type="submit" size="xl" disabled={saving}>
-            {saving ? <InlineLoading description="Creating…" /> : "Create User"}
+            {saving ? <InlineLoading description="Creating…" /> : "Create user"}
           </Button>
         </div>
       </form>
@@ -233,7 +233,7 @@ export default function UsersPage() {
         subtitle="Manage borrower accounts and access"
         action={
           <Button size="md" renderIcon={Add} onClick={() => setShowCreate(true)}>
-            New User
+            New user
           </Button>
         }
       />
@@ -246,7 +246,7 @@ export default function UsersPage() {
             Icon={UserMultiple}
             title="No users yet."
             description="Create a borrower login to link loan accounts and let them track balances."
-            action={<Button renderIcon={Add} onClick={() => setShowCreate(true)}>New User</Button>}
+            action={<Button renderIcon={Add} onClick={() => setShowCreate(true)}>New user</Button>}
           />
         ) : (
           <div className="lt-table-wrap">
@@ -374,7 +374,7 @@ export default function UsersPage() {
         <ConfirmDialog
           title="Delete User"
           message="This will permanently delete the user and all their loan accounts and payment history."
-          confirmLabel="Delete User"
+          confirmLabel="Delete user"
           confirmWord={users.find((u) => u.id === deleteUserId)?.full_name}
           dangerous
           onConfirm={() => handleDeleteUser(deleteUserId)}

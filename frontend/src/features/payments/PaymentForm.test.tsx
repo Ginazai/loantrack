@@ -46,7 +46,7 @@ describe("PaymentForm", () => {
     render(<PaymentForm account={account} onSubmit={onSubmit} onCancel={vi.fn()} />);
 
     await user.type(screen.getByPlaceholderText("0.00"), "100");
-    await user.click(screen.getByText("Record Payment"));
+    await user.click(screen.getByText("Record payment"));
 
     await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
     const submitted = onSubmit.mock.calls[0][0];
@@ -65,7 +65,7 @@ describe("PaymentForm", () => {
     const dateInput = document.querySelector('input[type="date"]') as HTMLInputElement;
     fireEvent.change(dateInput, { target: { value: "2026-01-20" } });
 
-    await user.click(screen.getByText("Record Payment"));
+    await user.click(screen.getByText("Record payment"));
 
     await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
     const submitted = onSubmit.mock.calls[0][0];
@@ -79,7 +79,7 @@ describe("PaymentForm", () => {
     render(<PaymentForm account={account} onSubmit={onSubmit} onCancel={vi.fn()} />);
 
     await user.type(screen.getByPlaceholderText("0.00"), "0");
-    await user.click(screen.getByText("Record Payment"));
+    await user.click(screen.getByText("Record payment"));
 
     expect(await screen.findByText("Must be greater than 0")).toBeInTheDocument();
     expect(onSubmit).not.toHaveBeenCalled();

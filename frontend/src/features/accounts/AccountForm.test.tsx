@@ -59,7 +59,7 @@ describe("AccountForm", () => {
   it("renders the base fields for a non-admin user creating an account", () => {
     render(<AccountForm onSubmit={vi.fn()} onCancel={vi.fn()} />);
     expect(screen.getByPlaceholderText("e.g. Personal Loan – June")).toBeInTheDocument();
-    expect(screen.getByText("Create Account")).toBeInTheDocument();
+    expect(screen.getByText("Create account")).toBeInTheDocument();
     // No admin-only "Assign to Borrower" section for a regular user.
     expect(screen.queryByText("Assign to Borrower")).not.toBeInTheDocument();
   });
@@ -77,7 +77,7 @@ describe("AccountForm", () => {
     const onSubmit = vi.fn();
     render(<AccountForm onSubmit={onSubmit} onCancel={vi.fn()} />);
 
-    await user.click(screen.getByText("Create Account"));
+    await user.click(screen.getByText("Create account"));
 
     expect(await screen.findAllByText("Required")).not.toHaveLength(0);
     expect(onSubmit).not.toHaveBeenCalled();
@@ -94,7 +94,7 @@ describe("AccountForm", () => {
     const dateInput = document.querySelector('input[type="date"]') as HTMLInputElement;
     fireEvent.change(dateInput, { target: { value: "2026-01-01" } });
 
-    await user.click(screen.getByText("Create Account"));
+    await user.click(screen.getByText("Create account"));
 
     await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
     const submitted = onSubmit.mock.calls[0][0];
@@ -154,7 +154,7 @@ describe("AccountForm", () => {
       await user.type(screen.getByPlaceholderText("5.00"), "5");
       const dateInput = document.querySelector('input[type="date"]') as HTMLInputElement;
       fireEvent.change(dateInput, { target: { value: "2026-01-01" } });
-      await user.click(screen.getByText("Create Account"));
+      await user.click(screen.getByText("Create account"));
 
       await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
       const submitted = onSubmit.mock.calls[0][0];
@@ -166,7 +166,7 @@ describe("AccountForm", () => {
     it("pre-fills fields and locks the principal amount", () => {
       render(<AccountForm account={sampleAccount} onSubmit={vi.fn()} onCancel={vi.fn()} />);
       expect(screen.getByDisplayValue("Existing Loan")).toBeInTheDocument();
-      expect(screen.getByText("Save Changes")).toBeInTheDocument();
+      expect(screen.getByText("Save changes")).toBeInTheDocument();
       expect(screen.getByText("Principal is locked after creation")).toBeInTheDocument();
 
       const principalInput = screen.getByPlaceholderText("0.00") as HTMLInputElement;

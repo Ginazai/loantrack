@@ -206,7 +206,7 @@ export function AccountDetailPage() {
           <>
             {canAddPayment && (
               <Button size="md" renderIcon={Add} onClick={() => setShowPayment(true)}>
-                Record Payment
+                Record payment
               </Button>
             )}
             <Button size="md" kind="tertiary" onClick={() => setShowEdit(true)}>
@@ -288,7 +288,7 @@ export function AccountDetailPage() {
                   <h2 className="lt-panel__title">Payment Ledger</h2>
                   {canAddPayment && (
                     <Button size="sm" renderIcon={Add} onClick={() => setShowPayment(true)}>
-                      Record Payment
+                      Record payment
                     </Button>
                   )}
                 </div>
@@ -405,7 +405,7 @@ export function AccountDetailPage() {
                 <div className="lt-row" style={{ justifyContent: "space-between" }}>
                   <p className="lt-muted">Post real-time events to n8n, Pipedream, or any HTTP endpoint.</p>
                   <Button size="md" renderIcon={Add} onClick={() => setShowWebhook(true)}>
-                    Add Webhook
+                    Add webhook
                   </Button>
                 </div>
 
@@ -519,7 +519,7 @@ export function AccountDetailPage() {
           open
           size="sm"
           modalHeading="Close Account"
-          primaryButtonText={closeAccount.isPending ? "Closing…" : "Close Account"}
+          primaryButtonText={closeAccount.isPending ? "Closing…" : "Close account"}
           secondaryButtonText="Cancel"
           primaryButtonDisabled={closeAccount.isPending}
           onRequestSubmit={() => closeAccount.mutate()}
@@ -547,7 +547,7 @@ export function AccountDetailPage() {
               ? "This account is still active. Force-deleting will remove it and ALL payment history permanently."
               : "This will hard-delete the account and all its payment history. This action cannot be undone."
           }
-          confirmLabel="Delete Forever"
+          confirmLabel="Delete forever"
           confirmWord={account.account_name}
           dangerous
           onConfirm={() => purgeAccount.mutate()}
@@ -568,7 +568,7 @@ export function AccountDetailPage() {
         <ConfirmDialog
           title="Delete Payment"
           message="This will permanently remove this payment record. The account balance will be recalculated on next load."
-          confirmLabel="Delete Payment"
+          confirmLabel="Delete payment"
           dangerous
           onConfirm={() => deletePayment.mutate(deletePaymentId)}
           onCancel={() => setDeletePaymentId(null)}

@@ -103,7 +103,7 @@ export function WebhookForm({ onSubmit, onCancel, isLoading }: Props) {
           Cancel
         </Button>
         <Button type="submit" size="xl" disabled={isLoading}>
-          {isLoading ? <InlineLoading description="Saving…" /> : "Save Webhook"}
+          {isLoading ? <InlineLoading description="Saving…" /> : "Save webhook"}
         </Button>
       </div>
     </form>

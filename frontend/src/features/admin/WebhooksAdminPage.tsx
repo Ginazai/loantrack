@@ -95,7 +95,7 @@ function CreateWebhookModal({ onClose, onCreated }: { onClose: () => void; onCre
         <div className="lt-form__actions lt-form__actions--bleed">
           <Button type="button" kind="secondary" size="xl" onClick={onClose}>Cancel</Button>
           <Button type="submit" size="xl" disabled={saving}>
-            {saving ? <InlineLoading description="Creating…" /> : "Create Webhook"}
+            {saving ? <InlineLoading description="Creating…" /> : "Create webhook"}
           </Button>
         </div>
       </form>
@@ -141,7 +141,7 @@ export default function WebhooksAdminPage() {
               {showPayload ? "Hide payload" : "Payload"}
             </Button>
             <Button size="md" renderIcon={Add} onClick={() => setShowCreate(true)}>
-              Add Webhook
+              Add webhook
             </Button>
           </>
         }
@@ -171,7 +171,7 @@ export default function WebhooksAdminPage() {
             Icon={Webhook}
             title="No global webhooks configured."
             description="Add an endpoint to receive events from every account."
-            action={<Button renderIcon={Add} onClick={() => setShowCreate(true)}>Add Webhook</Button>}
+            action={<Button renderIcon={Add} onClick={() => setShowCreate(true)}>Add webhook</Button>}
           />
         </div>
       ) : (
@@ -235,7 +235,7 @@ export default function WebhooksAdminPage() {
         <ConfirmDialog
           title="Delete Global Webhook"
           message="This will stop delivering events to this endpoint. This can't be undone."
-          confirmLabel="Delete Webhook"
+          confirmLabel="Delete webhook"
           dangerous
           onConfirm={() => handleDelete(deleteId)}
           onCancel={() => setDeleteId(null)}
