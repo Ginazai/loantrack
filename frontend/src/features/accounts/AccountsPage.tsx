@@ -1,11 +1,12 @@
+import { Add, Download, Receipt, SearchLocate } from "@carbon/icons-react";
+import { Button, DataTableSkeleton, MenuButton, MenuItem, Search, SelectableTag } from "@carbon/react";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { accountsApi, adminApi } from "../../api";
-import { ConfirmDialog, Drawer, PageHeader } from "../../components/common";
+import { Drawer, EmptyState, Notice, PageHeader } from "../../components/common";
 import type { AccountFormData, AccountStatus } from "../../types";
 import { AccountForm } from "./AccountForm";
-import { AccountSpreadsheet } from "./AccountSpreadsheet";
-import { Download } from "lucide-react";
+import { AccountsTable } from "./AccountsTable";
 import { getApiErrorMessage } from "../../utils/apiError";
 
 const STATUS_FILTERS: { value: AccountStatus | "all"; label: string }[] = [
@@ -45,105 +46,114 @@ export function AccountsPage() {
     );
   };
 
+  const filtered = selectedStatuses.length > 0 || search !== "";
+
   return (
-    <div className="space-y-5">
+    <div className="lt-page lt-stack lt-stack--loose">
       <PageHeader
         title="Loan Accounts"
         subtitle="Manage and track all borrower accounts."
         action={
-          <div className="flex items-center gap-2">
-            <div className="dropdown dropdown-end">
-              <div tabIndex={0} role="button" className="btn btn-ghost btn-sm gap-1.5">
-                <Download className="w-4 h-4" />
-                Export
-              </div>
-              <ul tabIndex={0} className="dropdown-content z-50 menu menu-sm bg-base-100 rounded-box shadow-lg border border-base-300 w-52 p-1.5 mt-1">
-                <li><button onClick={() => adminApi.exportAccountsCsv()}>Accounts only (.csv)</button></li>
-                <li><button onClick={() => adminApi.exportPaymentsCsv()}>All payments (.csv)</button></li>
-              </ul>
-            </div>
-            <button className="btn btn-primary btn-sm" onClick={() => setShowCreate(true)}>
-              + New Account
-            </button>
-          </div>
+          <>
+            <MenuButton label="Export" kind="tertiary" size="md" menuAlignment="bottom-end">
+              <MenuItem label="Accounts only (.csv)" onClick={() => adminApi.exportAccountsCsv()} />
+              <MenuItem label="All payments (.csv)" onClick={() => adminApi.exportPaymentsCsv()} />
+            </MenuButton>
+            <Button size="md" renderIcon={Add} onClick={() => setShowCreate(true)}>
+              New Account
+            </Button>
+          </>
         }
       />
 
-      {/* Filters */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="flex gap-1.5 flex-wrap">
+      <section className="lt-panel" aria-label="Accounts">
+        <div className="lt-toolbar-chips" role="group" aria-label="Filter by status">
           {STATUS_FILTERS.map((f) => {
             const isAll = f.value === "all";
-            const active = isAll
-              ? selectedStatuses.length === 0
-              : selectedStatuses.includes(f.value as AccountStatus);
+            const on = isAll ? selectedStatuses.length === 0 : selectedStatuses.includes(f.value as AccountStatus);
             return (
-              <button
+              <SelectableTag
                 key={f.value}
-                className={`btn btn-xs rounded-full ${
-                  active ? "btn-primary" : "btn-ghost border border-base-300"
-                }`}
-                onClick={() => {
-                  if (isAll) setSelectedStatuses([]);
-                  else toggleStatus(f.value as AccountStatus);
-                }}
-              >
-                {f.label}
-              </button>
+                text={f.label}
+                size="md"
+                selected={on}
+                onChange={() => (isAll ? setSelectedStatuses([]) : toggleStatus(f.value as AccountStatus))}
+              />
             );
           })}
-        </div>
-
-        <div className="ml-auto">
-          <label className="input input-bordered input-sm flex items-center gap-2">
-            <svg
-              className="w-3.5 h-3.5 opacity-50"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z"
-              />
-            </svg>
-            <input
-              type="text"
-              className="grow w-48"
+          <div className="lt-spacer lt-toolbar-search">
+            <Search
+              size="md"
+              labelText="Search accounts"
               placeholder="Search accounts..."
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearch(e.target.value)}
+              onClear={() => setSearch("")}
             />
-          </label>
+          </div>
         </div>
-      </div>
 
-      <p className="text-sm text-base-content/50">
-        {accounts.length} account{accounts.length !== 1 ? "s" : ""} found
-      </p>
+        <p className="lt-field-note lt-count" role="status" aria-live="polite">
+          {isLoading ? "Loading accounts…" : `${accounts.length} account${accounts.length !== 1 ? "s" : ""} found`}
+        </p>
 
-      {isLoading ? (
-        <div className="flex justify-center py-16">
-          <span className="loading loading-spinner loading-lg" />
-        </div>
-      ) : (
-        <AccountSpreadsheet accounts={accounts} />
-      )}
+        {isLoading ? (
+          <DataTableSkeleton
+            columnCount={8}
+            rowCount={8}
+            showHeader={false}
+            showToolbar={false}
+            aria-label="Loading accounts"
+          />
+        ) : accounts.length === 0 ? (
+          filtered ? (
+            <EmptyState
+              Icon={SearchLocate}
+              title="No matching accounts"
+              description="Nothing matches the current search and status filters."
+              action={
+                <Button
+                  kind="tertiary"
+                  onClick={() => {
+                    setSelectedStatuses([]);
+                    setSearch("");
+                  }}
+                >
+                  Clear filters
+                </Button>
+              }
+            />
+          ) : (
+            <EmptyState
+              Icon={Receipt}
+              title="No accounts yet"
+              description="Create a loan account to start tracking balances, interest and payments."
+              action={
+                <Button renderIcon={Add} onClick={() => setShowCreate(true)}>
+                  New Account
+                </Button>
+              }
+            />
+          )
+        ) : (
+          <AccountsTable accounts={accounts} variant="full" />
+        )}
+      </section>
 
       {showCreate && (
         <Drawer title="New Loan Account" onClose={() => setShowCreate(false)} width="lg">
           <AccountForm
-            onSubmit={async (data) => { await createMutation.mutateAsync(data); }}
+            onSubmit={async (data) => {
+              await createMutation.mutateAsync(data);
+            }}
             onCancel={() => setShowCreate(false)}
             isLoading={createMutation.isPending}
           />
           {createMutation.isError && (
-            <div className="alert alert-error mt-3 text-sm py-2">
-              <span>
+            <div style={{ marginBlockStart: "1rem" }}>
+              <Notice kind="error" title="Couldn’t create account">
                 {getApiErrorMessage(createMutation.error, "Failed to create account")}
-              </span>
+              </Notice>
             </div>
           )}
         </Drawer>

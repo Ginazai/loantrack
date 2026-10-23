@@ -12,6 +12,7 @@ RUN python -m pip install --upgrade pip setuptools wheel poetry-core
 COPY pyproject.toml ./
 COPY alembic/ ./alembic/
 COPY app/ ./app/
+COPY seed.py ./
 
 # Install production dependencies into /app/.venv
 RUN pip install --no-cache-dir .

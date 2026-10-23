@@ -1,16 +1,35 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Add, TrashCan, UserMultiple } from "@carbon/icons-react";
+import {
+  Button,
+  DataTableSkeleton,
+  InlineLoading,
+  PasswordInput,
+  Select,
+  SelectItem,
+  Table,
+  TableBody,
+  TableCell,
+  TableExpandHeader,
+  TableExpandRow,
+  TableExpandedRow,
+  TableHead,
+  TableHeader,
+  TableRow,
+  Tag,
+  TextInput,
+  Toggle,
+} from "@carbon/react";
+import { Fragment, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { adminApi } from "../../api";
 import type { User, UserCreateFormData } from "../../types";
 import { getApiErrorMessage } from "../../utils/apiError";
-import { UserPlus, ToggleLeft, ToggleRight, ChevronDown, ChevronUp, Trash2, ExternalLink } from "lucide-react";
-import { ConfirmDialog, Drawer } from "../../components/common";
+import { ConfirmDialog, Drawer, EmptyState, Notice, PageHeader } from "../../components/common";
 
 function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreated: (u: User) => void }) {
   const [form, setForm] = useState<UserCreateFormData>({ email: "", password: "", full_name: "", role: "user" });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const lbl = "label-text text-xs font-semibold uppercase tracking-wide";
 
   const handleCreate = async () => {
     if (!form.email || !form.password || !form.full_name) { setError("All fields required"); return; }
@@ -26,40 +45,59 @@ function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreate
 
   return (
     <Drawer title="Create New User" onClose={onClose}>
-        {error && <div className="alert alert-error py-2 text-sm mb-4">{error}</div>}
-        <div className="space-y-3">
-          <div className="form-control">
-            <label className="label py-1"><span className={lbl}>Full Name</span></label>
-            <input className="input input-bordered input-sm" placeholder="Jane Smith" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} />
-          </div>
-          <div className="form-control">
-            <label className="label py-1"><span className={lbl}>Email</span></label>
-            <input className="input input-bordered input-sm" type="email" placeholder="jane@example.com" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-          </div>
-          <div className="form-control">
-            <label className="label py-1"><span className={lbl}>Temporary Password</span></label>
-            <input className="input input-bordered input-sm" type="password" placeholder="Min. 8 characters" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
-          </div>
-          <div className="form-control">
-            <label className="label py-1"><span className={lbl}>Role</span></label>
-            <select className="select select-bordered select-sm" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as "admin" | "user" })}>
-              <option value="user">User (borrower)</option>
-              <option value="admin">Admin</option>
-            </select>
-          </div>
+      <form
+        className="lt-form"
+        noValidate
+        onSubmit={(e) => {
+          e.preventDefault();
+          handleCreate();
+        }}
+      >
+        {error && <Notice kind="error">{error}</Notice>}
+        <TextInput
+          id="user-name"
+          labelText="Full Name"
+          placeholder="Jane Smith"
+          value={form.full_name}
+          onChange={(e) => setForm({ ...form, full_name: e.target.value })}
+        />
+        <TextInput
+          id="user-email"
+          type="email"
+          labelText="Email"
+          placeholder="jane@example.com"
+          value={form.email}
+          onChange={(e) => setForm({ ...form, email: e.target.value })}
+        />
+        <PasswordInput
+          id="user-password"
+          labelText="Temporary Password"
+          placeholder="Min. 8 characters"
+          autoComplete="new-password"
+          value={form.password}
+          onChange={(e) => setForm({ ...form, password: e.target.value })}
+        />
+        <Select
+          id="user-role"
+          labelText="Role"
+          value={form.role}
+          onChange={(e) => setForm({ ...form, role: e.target.value as "admin" | "user" })}
+        >
+          <SelectItem value="user" text="User (borrower)" />
+          <SelectItem value="admin" text="Admin" />
+        </Select>
+        <div className="lt-form__actions lt-form__actions--bleed">
+          <Button type="button" kind="secondary" size="xl" onClick={onClose}>Cancel</Button>
+          <Button type="submit" size="xl" disabled={saving}>
+            {saving ? <InlineLoading description="Creating…" /> : "Create User"}
+          </Button>
         </div>
-        <div className="flex justify-end gap-2 mt-5">
-          <button className="btn btn-ghost btn-sm" onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary btn-sm" onClick={handleCreate} disabled={saving}>
-            {saving ? <span className="loading loading-spinner loading-xs" /> : "Create User"}
-          </button>
-        </div>
+      </form>
     </Drawer>
   );
 }
 
 export default function UsersPage() {
-  const navigate = useNavigate();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
@@ -92,118 +130,120 @@ export default function UsersPage() {
   };
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Users</h1>
-          <p className="text-sm text-base-content/50 mt-0.5">Manage borrower accounts and access</p>
-        </div>
-        <button className="btn btn-primary btn-sm gap-2" onClick={() => setShowCreate(true)}>
-          <UserPlus className="w-4 h-4" /> New User
-        </button>
-      </div>
+    <div className="lt-page lt-page--medium lt-stack lt-stack--loose">
+      <PageHeader
+        title="Users"
+        subtitle="Manage borrower accounts and access"
+        action={
+          <Button size="md" renderIcon={Add} onClick={() => setShowCreate(true)}>
+            New User
+          </Button>
+        }
+      />
 
-      <div className="card bg-base-100 shadow border border-base-300 overflow-hidden">
+      <section className="lt-panel" aria-label="Users">
         {loading ? (
-          <div className="p-8 text-center"><span className="loading loading-spinner loading-md text-primary" /></div>
+          <DataTableSkeleton columnCount={5} rowCount={5} showHeader={false} showToolbar={false} aria-label="Loading users" />
         ) : users.length === 0 ? (
-          <div className="p-10 text-center text-base-content/40 text-sm">No users yet.</div>
+          <EmptyState
+            Icon={UserMultiple}
+            title="No users yet."
+            description="Create a borrower login to link loan accounts and let them track balances."
+            action={<Button renderIcon={Add} onClick={() => setShowCreate(true)}>New User</Button>}
+          />
         ) : (
-          <table className="table table-sm">
-            <thead>
-              <tr className="bg-base-200 text-xs uppercase tracking-wider text-base-content/50">
-                <th className="pl-5">User</th>
-                <th>Role</th>
-                <th>Status</th>
-                <th>Joined</th>
-                <th className="text-right pr-5">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.map((user) => (
-                <>
-                  <tr key={user.id} className="hover border-t border-base-200">
-                    <td className="pl-5">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-md bg-primary/10 flex items-center justify-center">
-                          <span className="text-xs font-bold text-primary">{user.full_name?.[0]?.toUpperCase()}</span>
+          <div className="lt-table-wrap">
+            <Table size="lg" aria-label="Users">
+              <TableHead>
+                <TableRow>
+                  <TableExpandHeader aria-label="Expand to show loans" />
+                  <TableHeader>User</TableHeader>
+                  <TableHeader>Role</TableHeader>
+                  <TableHeader>Status</TableHeader>
+                  <TableHeader>Joined</TableHeader>
+                  <TableHeader>
+                    <span className="lt-visually-hidden">Actions</span>
+                  </TableHeader>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {users.map((user) => (
+                  <Fragment key={user.id}>
+                    <TableExpandRow
+                      isExpanded={expandedUser === user.id}
+                      onExpand={() => toggleExpand(user.id)}
+                      aria-label={`Show loans for ${user.full_name}`}
+                    >
+                      <TableCell>
+                        <div className="lt-link-list__name">{user.full_name}</div>
+                        <div className="lt-link-list__sub lt-mono">{user.email}</div>
+                      </TableCell>
+                      <TableCell>
+                        <Tag size="sm" type={user.role === "admin" ? "blue" : "gray"}>
+                          {user.role}
+                        </Tag>
+                      </TableCell>
+                      <TableCell>
+                        <Tag size="sm" type={user.is_active ? "green" : "red"}>
+                          {user.is_active ? "Active" : "Inactive"}
+                        </Tag>
+                      </TableCell>
+                      <TableCell className="lt-tnum">{new Date(user.created_at).toLocaleDateString()}</TableCell>
+                      <TableCell>
+                        <div className="lt-table-actions">
+                          <Toggle
+                            id={`active-${user.id}`}
+                            size="sm"
+                            hideLabel
+                            labelText=""
+                            aria-label={`${user.full_name} is ${user.is_active ? "active" : "inactive"}`}
+                            toggled={user.is_active}
+                            onToggle={() => toggleActive(user)}
+                          />
+                          <Button
+                            kind="danger--ghost"
+                            size="sm"
+                            hasIconOnly
+                            renderIcon={TrashCan}
+                            iconDescription="Delete user"
+                            tooltipPosition="left"
+                            onClick={() => setDeleteUserId(user.id)}
+                          />
                         </div>
-                        <div>
-                          <p className="font-medium text-sm">{user.full_name}</p>
-                          <p className="text-xs text-base-content/40 font-mono">{user.email}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td>
-                      <span className={`badge badge-sm font-mono uppercase tracking-wider ${user.role === "admin" ? "badge-secondary" : "badge-ghost"}`}>
-                        {user.role}
-                      </span>
-                    </td>
-                    <td>
-                      <span className={`badge badge-sm ${user.is_active ? "badge-success" : "badge-error"} badge-outline`}>
-                        {user.is_active ? "Active" : "Inactive"}
-                      </span>
-                    </td>
-                    <td className="text-xs text-base-content/40 font-mono">
-                      {new Date(user.created_at).toLocaleDateString()}
-                    </td>
-                    <td className="text-right pr-5">
-                      <div className="flex items-center justify-end gap-1">
-                        <button className="btn btn-ghost btn-xs gap-1" onClick={() => toggleExpand(user.id)} title="View loans">
-                          {expandedUser === user.id ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                          Loans
-                        </button>
-                        <button
-                          className={`btn btn-ghost btn-xs ${user.is_active ? "text-warning" : "text-success"}`}
-                          onClick={() => toggleActive(user)}
-                          title={user.is_active ? "Deactivate" : "Activate"}
-                        >
-                          {user.is_active ? <ToggleRight className="w-4 h-4" /> : <ToggleLeft className="w-4 h-4" />}
-                        </button>
-                        <button className="btn btn-ghost btn-xs text-error" onClick={() => setDeleteUserId(user.id)} title="Delete user">
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                  {expandedUser === user.id && (
-                    <tr key={`${user.id}-accounts`} className="bg-base-200/60">
-                      <td colSpan={5} className="px-5 py-3">
+                      </TableCell>
+                    </TableExpandRow>
+                    {expandedUser === user.id && (
+                      <TableExpandedRow colSpan={6}>
                         {!userAccounts[user.id] ? (
-                          <span className="loading loading-dots loading-xs" />
+                          <InlineLoading description="Loading loans…" />
                         ) : userAccounts[user.id].length === 0 ? (
-                          <p className="text-xs text-base-content/40 italic">No loan accounts</p>
+                          <p className="lt-muted">No loan accounts</p>
                         ) : (
-                          <div className="flex flex-wrap gap-2">
+                          <ul className="lt-chip-links">
                             {userAccounts[user.id].map((acc: any) => (
-                              <button
-                                key={acc.id}
-                                className="bg-base-100 border border-base-300 rounded-md px-3 py-2 text-xs text-left hover:border-primary/40 hover:shadow-sm transition-all group"
-                                onClick={() => navigate(`/accounts/${acc.id}`)}
-                              >
-                                <div className="flex items-center gap-1.5 mb-0.5">
-                                  <p className="font-semibold">{acc.account_name}</p>
-                                  <ExternalLink className="w-3 h-3 text-base-content/30 group-hover:text-primary transition-colors" />
-                                </div>
-                                <p className="text-base-content/50 font-mono">
-                                  ${Number(acc.borrow_amount).toLocaleString()} ·{" "}
-                                  <span className={acc.status === "open" || acc.status === "active" ? "text-success" : "text-error"}>
-                                    {acc.status}
+                              <li key={acc.id}>
+                                <Link to={`/accounts/${acc.id}`} className="lt-chip-link">
+                                  <span className="lt-link-list__name">{acc.account_name}</span>
+                                  <span className="lt-link-list__sub lt-num">
+                                    ${Number(acc.borrow_amount).toLocaleString()} ·{" "}
+                                    <span className={acc.status === "open" || acc.status === "active" ? "" : "lt-danger-text"}>
+                                      {acc.status}
+                                    </span>
                                   </span>
-                                </p>
-                              </button>
+                                </Link>
+                              </li>
                             ))}
-                          </div>
+                          </ul>
                         )}
-                      </td>
-                    </tr>
-                  )}
-                </>
-              ))}
-            </tbody>
-          </table>
+                      </TableExpandedRow>
+                    )}
+                  </Fragment>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         )}
-      </div>
+      </section>
 
       {showCreate && (
         <CreateUserModal

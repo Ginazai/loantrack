@@ -1,5 +1,6 @@
-import { X } from "lucide-react";
-import { useEffect } from "react";
+import { Close } from "@carbon/icons-react";
+import { Button } from "@carbon/react";
+import { useEffect, useRef } from "react";
 
 interface Props {
   title: string;
@@ -9,57 +10,88 @@ interface Props {
   width?: "md" | "lg";
 }
 
+const FOCUSABLE =
+  'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
 /**
- * Slide-over panel for create/edit forms — the replacement for stacking a
- * modal dialog on top of every CRUD action. A centered modal interrupts the
- * whole screen and implies "stop and decide something small"; a drawer
- * reads as "step into the workspace for a moment," which is the more
- * honest framing for a multi-field form that isn't a yes/no decision.
+ * Right-hand side panel for create/edit forms — a multi-field form is "step into the
+ * workspace for a moment", not a yes/no interruption, so it doesn't use a centered modal.
+ * Confirmations (delete, close account) stay as ConfirmDialog.
  *
- * Confirmations (delete, close account) stay as ConfirmDialog — those
- * genuinely are brief binary decisions, where a centered modal is the
- * right pattern, not a misuse of it.
+ * Behaves like a modal dialog: Escape closes, Tab is trapped inside, and focus returns to
+ * whatever opened it.
  */
 export function Drawer({ title, subtitle, onClose, children, width = "md" }: Props) {
+  const panelRef = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
   useEffect(() => {
+    const opener = document.activeElement as HTMLElement | null;
+    const panel = panelRef.current;
+    // Land on the first field, not the close button, so a form can be typed into immediately.
+    const first = panel?.querySelector<HTMLElement>(
+      ".lt-drawer__body input, .lt-drawer__body select, .lt-drawer__body textarea"
+    );
+    (first ?? panel)?.focus();
+
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") {
+        onCloseRef.current();
+        return;
+      }
+      if (e.key !== "Tab" || !panel) return;
+      const items = Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE));
+      if (items.length === 0) return;
+      const firstEl = items[0];
+      const lastEl = items[items.length - 1];
+      if (e.shiftKey && document.activeElement === firstEl) {
+        e.preventDefault();
+        lastEl.focus();
+      } else if (!e.shiftKey && document.activeElement === lastEl) {
+        e.preventDefault();
+        firstEl.focus();
+      }
     };
+
     document.addEventListener("keydown", onKey);
+    const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
       document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
+      document.body.style.overflow = prevOverflow;
+      opener?.focus?.();
     };
-  }, [onClose]);
+  }, []);
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end">
+    <div className="lt-drawer">
+      <div className="lt-drawer__scrim" onClick={onClose} aria-hidden="true" />
       <div
-        className="absolute inset-0 bg-black/40 animate-[fadeIn_0.15s_ease-out]"
-        onClick={onClose}
-        aria-hidden="true"
-      />
-      <div
+        ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className={`relative h-full w-full ${width === "lg" ? "max-w-xl" : "max-w-md"} bg-base-100 shadow-2xl flex flex-col animate-[slideIn_0.2s_ease-out]`}
+        data-width={width}
+        tabIndex={-1}
+        className="lt-drawer__panel"
       >
-        <div className="flex items-start justify-between gap-4 px-6 py-5 border-b border-base-300">
-          <div className="min-w-0">
-            <h2 className="text-lg font-bold truncate">{title}</h2>
-            {subtitle && <p className="text-sm text-base-content/50 mt-0.5">{subtitle}</p>}
+        <div className="lt-drawer__header">
+          <div>
+            <h2 className="lt-drawer__title">{title}</h2>
+            {subtitle && <p className="lt-drawer__subtitle">{subtitle}</p>}
           </div>
-          <button
-            className="btn btn-ghost btn-sm btn-circle shrink-0"
+          <Button
+            kind="ghost"
+            size="lg"
+            hasIconOnly
+            renderIcon={Close}
+            iconDescription="Close"
+            tooltipPosition="left"
             onClick={onClose}
-            aria-label="Close"
-          >
-            <X className="w-4 h-4" />
-          </button>
+          />
         </div>
-        <div className="flex-1 overflow-y-auto px-6 py-5">{children}</div>
+        <div className="lt-drawer__body">{children}</div>
       </div>
     </div>
   );

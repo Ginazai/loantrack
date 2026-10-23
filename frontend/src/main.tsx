@@ -2,11 +2,17 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import "@fontsource/ibm-plex-sans/300.css";
+import "@fontsource/ibm-plex-sans/400.css";
+import "@fontsource/ibm-plex-sans/400-italic.css";
+import "@fontsource/ibm-plex-sans/600.css";
+import "@fontsource/ibm-plex-mono/400.css";
+import "@fontsource/ibm-plex-mono/600.css";
 import App from "./App";
-import "./index.css";
+import { applyTheme, normalizeTheme } from "./stores/uiStore";
+import "./styles/index.scss";
 
-// Apply DaisyUI theme before first render so there's no flash of unstyled content.
-// uiStore persists the user's choice; on the very first visit we fall back to "light".
+// Apply the Carbon theme before first render so there's no flash of the wrong theme.
 const stored = (() => {
   try {
     return JSON.parse(localStorage.getItem("ui") || "{}");
@@ -14,8 +20,7 @@ const stored = (() => {
     return {};
   }
 })();
-const theme = stored?.state?.theme ?? "light";
-document.documentElement.setAttribute("data-theme", theme);
+applyTheme(normalizeTheme(stored?.state?.theme));
 
 const queryClient = new QueryClient({
   defaultOptions: {

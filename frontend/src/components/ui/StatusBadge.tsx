@@ -1,11 +1,21 @@
+import { Tag } from "@carbon/react";
 import type { AccountStatus } from "../../types";
-const cfg: Record<AccountStatus, { label: string; cls: string }> = {
-  open:   { label: "Open",   cls: "badge-info"    },
-  active: { label: "Active", cls: "badge-success"  },
-  paid:   { label: "Paid",   cls: "badge-neutral"  },
-  closed: { label: "Closed", cls: "badge-error"    },
+
+type TagType = "blue" | "green" | "gray" | "red";
+
+// Carbon status tags always pair color with a text label, so state is never color-only.
+const cfg: Record<AccountStatus, { label: string; type: TagType }> = {
+  open:   { label: "Open",   type: "blue"  },
+  active: { label: "Active", type: "green" },
+  paid:   { label: "Paid",   type: "gray"  },
+  closed: { label: "Closed", type: "red"   },
 };
+
 export function StatusBadge({ status }: { status: AccountStatus }) {
-  const c = cfg[status] ?? { label: status, cls: "badge-ghost" };
-  return <span className={`badge badge-sm ${c.cls}`}>{c.label}</span>;
+  const c = cfg[status] ?? { label: status, type: "gray" as TagType };
+  return (
+    <Tag size="sm" type={c.type}>
+      {c.label}
+    </Tag>
+  );
 }

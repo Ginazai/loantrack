@@ -1,14 +1,20 @@
+import {
+  Book,
+  Calendar,
+  ChevronDown,
+  ChevronUp,
+  Currency,
+  WarningAltFilled,
+  Catalog,
+} from "@carbon/icons-react";
+import { Button, ProgressBar, SkeletonText, Tag } from "@carbon/react";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { accountsApi, paymentsApi } from "../../api";
 import { useAuthStore } from "../../stores/authStore";
 import { formatCurrency, formatDate, formatRate, isOverdue } from "../../utils/dateUtils";
 import type { LoanAccount, Payment } from "../../types";
-import {
-  AlertCircle, BookOpen, CalendarDays,
-  ChevronDown, ChevronUp, CircleDollarSign, TrendingDown,
-} from "lucide-react";
-import { StatusBadge } from "../../components/common";
+import { EmptyState, PageHeader, StatCard, StatusBadge } from "../../components/common";
 import { BalanceChart } from "../accounts/Charts";
 
 function LoanCard({ account }: { account: LoanAccount }) {
@@ -24,79 +30,83 @@ function LoanCard({ account }: { account: LoanAccount }) {
   const principal = Number(account.borrow_amount);
   const balance = Number(account.current_balance ?? principal);
   const pct = Math.min(100, Math.max(0, ((principal - balance) / principal) * 100));
+  const detailId = `loan-detail-${account.id}`;
 
   return (
-    <div className={`card bg-base-100 shadow border ${overdue ? "border-warning/40 card-ledger-warning" : "border-base-300 card-ledger"}`}>
-      <div className="card-body p-5">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="font-bold text-base">{account.account_name}</h2>
-              <StatusBadge status={account.status} />
-              {overdue && (
-                <span className="badge badge-warning badge-sm gap-1">
-                  <AlertCircle className="w-3 h-3" />Overdue
-                </span>
-              )}
-            </div>
-            <p className="text-xs text-base-content/40 mt-0.5">
-              Since {formatDate(account.start_date)} · {formatRate(account.rate)} / {account.cycle} days
-            </p>
+    <article className={`lt-loan${overdue ? " lt-loan--overdue" : ""}`}>
+      <div className="lt-loan__top">
+        <div>
+          <div className="lt-row">
+            <h2 className="lt-loan__name">{account.account_name}</h2>
+            <StatusBadge status={account.status} />
+            {overdue && (
+              <Tag size="sm" type="magenta" renderIcon={WarningAltFilled}>
+                Overdue
+              </Tag>
+            )}
           </div>
-          <button className="btn btn-ghost btn-sm btn-square" onClick={() => setExpanded(!expanded)}>
-            {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-          </button>
+          <p className="lt-loan__meta">
+            Since {formatDate(account.start_date)} · {formatRate(account.rate)} / {account.cycle} days
+          </p>
         </div>
+        <Button
+          kind="ghost"
+          size="md"
+          hasIconOnly
+          renderIcon={expanded ? ChevronUp : ChevronDown}
+          iconDescription={expanded ? "Hide details" : "Show details"}
+          tooltipPosition="left"
+          aria-expanded={expanded}
+          aria-controls={detailId}
+          onClick={() => setExpanded(!expanded)}
+        />
+      </div>
 
-        <div className="grid grid-cols-3 gap-3 mt-4">
-          {[
-            { label: "Balance",   value: formatCurrency(balance),   cls: "text-base-content" },
-            { label: "Original",  value: formatCurrency(principal),  cls: "text-base-content/70" },
-            { label: "Next Due",  value: account.next_due_date ? formatDate(account.next_due_date) : "—", cls: overdue ? "text-warning" : "text-base-content" },
-          ].map(({ label, value, cls }) => (
-            <div key={label} className="bg-base-200 rounded-md px-3 py-2.5">
-              <p className="text-xs text-base-content/50 uppercase tracking-wide font-semibold">{label}</p>
-              <p className={`stat-value-mono text-sm font-bold mt-0.5 ${cls}`}>{value}</p>
-            </div>
-          ))}
-        </div>
+      <div className="lt-loan__figures">
+        {[
+          { label: "Balance", value: formatCurrency(balance), danger: false },
+          { label: "Original", value: formatCurrency(principal), danger: false },
+          { label: "Next Due", value: account.next_due_date ? formatDate(account.next_due_date) : "—", danger: overdue },
+        ].map(({ label, value, danger }) => (
+          <div key={label} className="lt-figure">
+            <p className="lt-figure__label">{label}</p>
+            <p className={`lt-figure__value${danger ? " lt-danger-text" : ""}`}>{value}</p>
+          </div>
+        ))}
+      </div>
 
-        <div className="mt-4">
-          <div className="flex justify-between text-xs text-base-content/40 mb-1">
-            <span>Paid off</span>
-            <span className="font-mono font-semibold text-success">{pct.toFixed(1)}%</span>
-          </div>
-          <div className="w-full bg-base-300 rounded-full h-1.5">
-            <div className="bg-success h-1.5 rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
-          </div>
-        </div>
+      <div className="lt-loan__progress">
+        <ProgressBar
+          size="small"
+          label="Paid off"
+          value={pct}
+          max={100}
+          helperText={`${pct.toFixed(1)}%`}
+        />
       </div>
 
       {expanded && (
-        <div className="border-t border-base-200">
+        <div className="lt-loan__detail lt-stack" id={detailId}>
           {payments.length > 0 && (
-            <div className="p-5 pb-2">
-              <p className="text-xs font-semibold uppercase tracking-wider text-base-content/40 mb-3">Balance Over Time</p>
-              <BalanceChart payments={payments} borrowAmount={account.borrow_amount} />
-            </div>
+            <BalanceChart payments={payments} borrowAmount={account.borrow_amount} />
           )}
-          <div className="p-5">
-            <p className="text-xs font-semibold uppercase tracking-wider text-base-content/40 mb-3">Payment History</p>
+          <div>
+            <h3 className="lt-eyebrow" style={{ marginBlockEnd: "0.5rem" }}>Payment History</h3>
             {payments.length === 0 ? (
-              <p className="text-sm text-base-content/40 text-center py-4 italic">No payments yet.</p>
+              <p className="lt-muted">No payments yet.</p>
             ) : (
-              <div className="space-y-2">
+              <div>
                 {[...payments].reverse().map((p: Payment) => (
-                  <div key={p.id} className="flex items-center justify-between text-sm bg-base-200 rounded-md px-3 py-2">
+                  <div key={p.id} className="lt-ledger-row">
                     <div>
-                      <p className="font-mono font-semibold text-success">+{formatCurrency(Number(p.amount))}</p>
-                      <p className="text-xs text-base-content/40">
+                      <p className="lt-ledger-row__amount">+{formatCurrency(Number(p.amount))}</p>
+                      <p className="lt-link-list__sub">
                         {formatDate(p.payment_date)} · Interest: {formatCurrency(Number(p.interests_accrued))}
                       </p>
                     </div>
-                    <div className="text-right">
-                      <p className="text-xs text-base-content/50">Balance after</p>
-                      <p className="font-mono text-sm font-semibold">{formatCurrency(Number(p.balance_after))}</p>
+                    <div style={{ textAlign: "end" }}>
+                      <p className="lt-link-list__sub">Balance after</p>
+                      <p className="lt-link-list__name">{formatCurrency(Number(p.balance_after))}</p>
                     </div>
                   </div>
                 ))}
@@ -105,7 +115,7 @@ function LoanCard({ account }: { account: LoanAccount }) {
           </div>
         </div>
       )}
-    </div>
+    </article>
   );
 }
 
@@ -125,67 +135,48 @@ export default function UserPortalPage() {
     .sort((a, b) => (a.next_due_date ?? "").localeCompare(b.next_due_date ?? ""))[0];
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">
-          {user?.full_name?.split(" ")[0]}'s Loans
-        </h1>
-        <p className="text-xs text-base-content/40 font-mono mt-0.5">
-          {new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
-        </p>
-      </div>
+    <div className="lt-page lt-page--narrow lt-stack lt-stack--loose">
+      <PageHeader
+        title={`${user?.full_name?.split(" ")[0]}'s Loans`}
+        subtitle={new Date().toLocaleDateString("en-US", {
+          weekday: "long",
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        })}
+      />
 
       {!isLoading && open.length > 0 && (
-        <div className="grid grid-cols-3 gap-3">
-          <div className="card bg-base-100 border border-base-300 shadow-sm">
-            <div className="card-body p-4">
-              <div className="flex items-center gap-2 text-base-content/50 mb-1">
-                <CircleDollarSign className="w-3.5 h-3.5" />
-                <span className="text-xs font-semibold uppercase tracking-wide">Total Balance</span>
-              </div>
-              <p className="stat-value-mono text-xl font-bold">{formatCurrency(totalBalance)}</p>
-            </div>
-          </div>
-          <div className="card bg-base-100 border border-base-300 shadow-sm">
-            <div className="card-body p-4">
-              <div className="flex items-center gap-2 text-base-content/50 mb-1">
-                <TrendingDown className="w-3.5 h-3.5" />
-                <span className="text-xs font-semibold uppercase tracking-wide">Active Loans</span>
-              </div>
-              <p className="stat-value-mono text-xl font-bold text-primary">{open.length}</p>
-            </div>
-          </div>
-          <div className="card bg-base-100 border border-base-300 shadow-sm">
-            <div className="card-body p-4">
-              <div className="flex items-center gap-2 text-base-content/50 mb-1">
-                <CalendarDays className="w-3.5 h-3.5" />
-                <span className="text-xs font-semibold uppercase tracking-wide">Next Due</span>
-              </div>
-              <p className="stat-value-mono text-sm font-bold">
-                {earliest ? formatDate(earliest.next_due_date!) : "—"}
-              </p>
-            </div>
-          </div>
-        </div>
+        <section className="lt-kpis lt-kpis--3" aria-label="Loan summary">
+          <StatCard title="Total Balance" value={formatCurrency(totalBalance)} Icon={Currency} />
+          <StatCard title="Active Loans" value={String(open.length)} Icon={Catalog} />
+          <StatCard
+            title="Next Due"
+            value={earliest ? formatDate(earliest.next_due_date!) : "—"}
+            Icon={Calendar}
+          />
+        </section>
       )}
 
       {isLoading ? (
-        <div className="p-10 text-center"><span className="loading loading-spinner loading-md text-primary" /></div>
+        <div aria-busy="true" aria-label="Loading loans">
+          <SkeletonText heading width="40%" />
+          <SkeletonText paragraph lineCount={4} />
+        </div>
       ) : accounts.length === 0 ? (
-        <div className="card bg-base-100 border border-base-300">
-          <div className="card-body p-12 text-center">
-            <BookOpen className="w-10 h-10 mx-auto text-base-content/20 mb-3" />
-            <p className="text-sm text-base-content/40">No loans yet.</p>
-            <p className="text-xs text-base-content/25 mt-1">Submit a loan request to get started.</p>
-          </div>
+        <div className="lt-panel">
+          <EmptyState
+            Icon={Book}
+            title="No loans yet."
+            description="Submit a loan request to get started."
+          />
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="lt-stack lt-stack--tight">
           {open.map((a) => <LoanCard key={a.id} account={a} />)}
           {closed.length > 0 && (
             <>
-              <hr className="border-dashed border-base-300 my-2" />
-              <p className="text-xs font-semibold uppercase tracking-wider text-base-content/30 px-1">Closed / Paid</p>
+              <h2 className="lt-eyebrow" style={{ marginBlockStart: "1.5rem" }}>Closed / Paid</h2>
               {closed.map((a) => <LoanCard key={a.id} account={a} />)}
             </>
           )}

@@ -1,5 +1,5 @@
+import { InlineLoading, Button, ContentSwitcher, OperationalTag, Switch, Tag, TextInput } from "@carbon/react";
 import { useEffect } from "react";
-import { Loader2 } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -65,127 +65,92 @@ export function PaymentForm({ account, onSubmit, onCancel, isLoading }: Props) {
   };
 
   return (
-    <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
+    <form onSubmit={handleSubmit(handleFormSubmit)} noValidate className="lt-form">
       {/* Balance summary */}
-      <div className="bg-base-200 rounded-xl p-4 grid grid-cols-2 gap-3 text-sm">
-        <div>
-          <p className="text-base-content/50 text-xs uppercase tracking-wide">Current Balance</p>
-          <p className="font-bold text-lg">{formatCurrency(currentBalance)}</p>
+      <div className="lt-kpis" style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}>
+        <div className="lt-kpi" style={{ minBlockSize: 0, gap: "0.5rem" }}>
+          <span className="lt-kpi__label">Current Balance</span>
+          <p className="lt-kpi__value">{formatCurrency(currentBalance)}</p>
         </div>
-        <div>
-          <p className="text-base-content/50 text-xs uppercase tracking-wide">Next Due</p>
-          <p className="font-semibold">{formatDate(nextDue)}</p>
+        <div className="lt-kpi" style={{ minBlockSize: 0, gap: "0.5rem" }}>
+          <span className="lt-kpi__label">Next Due</span>
+          <p className="lt-kpi__value">{formatDate(nextDue)}</p>
         </div>
       </div>
 
       {/* Amount */}
-      <div className="form-control">
-        <label className="label">
-          <span className="label-text font-medium">Payment Amount</span>
-        </label>
-        <label className="input input-bordered flex items-center gap-2">
-          <span className="text-base-content/50 font-medium">$</span>
-          <input
-            type="number"
-            step="0.01"
-            min="0.01"
-            className="grow"
-            placeholder="0.00"
-            {...register("amount")}
-          />
-        </label>
-        {errors.amount && (
-          <label className="label">
-            <span className="label-text-alt text-error">{errors.amount.message}</span>
-          </label>
-        )}
-      </div>
+      <TextInput
+        id="payment-amount"
+        type="number"
+        step="0.01"
+        min="0.01"
+        inputMode="decimal"
+        labelText="Payment Amount (USD)"
+        placeholder="0.00"
+        invalid={!!errors.amount}
+        invalidText={errors.amount?.message}
+        {...register("amount")}
+      />
 
       {/* Method toggle */}
-      <div className="form-control">
-        <label className="label">
-          <span className="label-text font-medium">Payment Mode</span>
-        </label>
-        <div className="join">
-          <button
-            type="button"
-            className={`join-item btn btn-sm flex-1 ${
-              method === "auto" ? "btn-primary" : "btn-ghost border border-base-300"
-            }`}
-            onClick={() => setValue("method", "auto")}
-          >
-            Auto
-          </button>
-          <button
-            type="button"
-            className={`join-item btn btn-sm flex-1 ${
-              method === "manual" ? "btn-primary" : "btn-ghost border border-base-300"
-            }`}
-            onClick={() => setValue("method", "manual")}
-          >
-            Manual
-          </button>
-        </div>
-        <label className="label">
-          <span className="label-text-alt text-base-content/50">
-            {method === "auto"
-              ? "Date is automatically set to the next cycle date."
-              : "Pick any date — interest still applies per the cycle schedule."}
-          </span>
-        </label>
-      </div>
+      <fieldset className="lt-fieldset">
+        <legend className="cds--label">Payment Mode</legend>
+        <ContentSwitcher
+          size="md"
+          selectedIndex={method === "manual" ? 1 : 0}
+          onChange={({ name }) => setValue("method", name as "auto" | "manual")}
+        >
+          <Switch name="auto" text="Auto" />
+          <Switch name="manual" text="Manual" />
+        </ContentSwitcher>
+        <p className="lt-field-note" style={{ marginBlockStart: "0.5rem" }}>
+          {method === "auto"
+            ? "Date is automatically set to the next cycle date."
+            : "Pick any date — interest still applies per the cycle schedule."}
+        </p>
+      </fieldset>
 
       {/* Date picker (manual only) */}
       {method === "manual" && (
-        <div className="form-control">
-          <label className="label">
-            <span className="label-text font-medium">Payment Date</span>
-          </label>
-          <input
-            type="date"
-            className="input input-bordered input-sm"
-            max={new Date().toISOString().split("T")[0]}
-            {...register("payment_date")}
-          />
-        </div>
+        <TextInput
+          id="payment-date"
+          type="date"
+          labelText="Payment Date"
+          max={new Date().toISOString().split("T")[0]}
+          {...register("payment_date")}
+        />
       )}
 
       {/* Upcoming cycle preview */}
       <div>
-        <p className="text-xs font-semibold text-base-content/50 uppercase tracking-wider mb-2">
+        <p className="lt-eyebrow" style={{ marginBlockEnd: "0.5rem" }}>
           Upcoming Cycles
         </p>
-        <div className="flex flex-wrap gap-2">
-          {upcoming.map((d) => (
-            <span
-              key={d.toISOString()}
-              className={`badge badge-sm cursor-pointer ${
-                method === "manual" ? "badge-outline hover:badge-primary" : "badge-outline"
-              }`}
-              onClick={() => {
-                if (method === "manual") {
-                  setValue("payment_date", d.toISOString().split("T")[0]);
-                }
-              }}
-            >
-              {formatDate(d)}
-            </span>
-          ))}
+        <div className="lt-row">
+          {upcoming.map((d) =>
+            method === "manual" ? (
+              <OperationalTag
+                key={d.toISOString()}
+                text={formatDate(d)}
+                size="md"
+                onClick={() => setValue("payment_date", d.toISOString().split("T")[0])}
+              />
+            ) : (
+              <Tag key={d.toISOString()} type="outline" size="md">
+                {formatDate(d)}
+              </Tag>
+            )
+          )}
         </div>
       </div>
 
-      <div className="flex gap-2 justify-end pt-2">
-        <button type="button" className="btn btn-ghost btn-sm" onClick={onCancel}>
+      <div className="lt-form__actions lt-form__actions--bleed">
+        <Button type="button" kind="secondary" size="xl" onClick={onCancel}>
           Cancel
-        </button>
-        <button
-          type="submit"
-          className="btn btn-primary btn-sm gap-2"
-          disabled={isLoading}
-        >
-          {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
-          Record Payment
-        </button>
+        </Button>
+        <Button type="submit" size="xl" disabled={isLoading}>
+          {isLoading ? <InlineLoading description="Recording…" /> : "Record Payment"}
+        </Button>
       </div>
     </form>
   );

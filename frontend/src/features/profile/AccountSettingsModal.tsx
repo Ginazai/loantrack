@@ -1,9 +1,9 @@
+import { Button, FormGroup, InlineLoading, PasswordInput, TextInput } from "@carbon/react";
 import { useState } from "react";
-import { Save, KeyRound, User } from "lucide-react";
 import { authApi } from "../../api";
 import { useAuthStore } from "../../stores/authStore";
 import { getApiErrorMessage } from "../../utils/apiError";
-import { Drawer } from "../../components/common";
+import { Drawer, Notice } from "../../components/common";
 
 interface Props { onClose: () => void; }
 
@@ -38,47 +38,63 @@ export function AccountSettingsModal({ onClose }: Props) {
 
   return (
     <Drawer title="Account Settings" onClose={onClose}>
-        {error && <div className="alert alert-error py-2 text-sm mb-4">{error}</div>}
-        {success && <div className="alert alert-success py-2 text-sm mb-4">Saved!</div>}
-        <div className="space-y-4">
-          <div>
-            <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-base-content/40 mb-3">
-              <User className="w-3.5 h-3.5" /> Profile
-            </p>
-            <div className="form-control">
-              <label className="label py-1"><span className="label-text text-xs font-semibold uppercase tracking-wide">Display Name</span></label>
-              <input className="input input-bordered input-sm" value={name} onChange={(e) => setName(e.target.value)} />
-            </div>
-            <div className="form-control mt-3">
-              <label className="label py-1"><span className="label-text text-xs font-semibold uppercase tracking-wide">Email</span></label>
-              <input className="input input-bordered input-sm bg-base-200 cursor-not-allowed" value={user?.email ?? ""} disabled />
-              <span className="text-xs text-base-content/30 mt-1">Contact admin to change email</span>
-            </div>
+      <form
+        className="lt-form"
+        noValidate
+        onSubmit={(e) => {
+          e.preventDefault();
+          handleSave();
+        }}
+      >
+        {error && <Notice kind="error">{error}</Notice>}
+        {success && <Notice kind="success">Changes saved.</Notice>}
+
+        <FormGroup legendText="Profile">
+          <div className="lt-form">
+            <TextInput
+              id="settings-name"
+              labelText="Display Name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+            <TextInput
+              id="settings-email"
+              labelText="Email"
+              value={user?.email ?? ""}
+              disabled
+              helperText="Contact admin to change email"
+            />
           </div>
-          <hr className="border-dashed border-base-300" />
-          <div>
-            <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-base-content/40 mb-3">
-              <KeyRound className="w-3.5 h-3.5" /> Change Password
-            </p>
-            <div className="space-y-3">
-              <div className="form-control">
-                <label className="label py-1"><span className="label-text text-xs font-semibold uppercase tracking-wide">New Password</span></label>
-                <input type="password" className="input input-bordered input-sm" placeholder="Leave blank to keep current" value={password} onChange={(e) => setPassword(e.target.value)} />
-              </div>
-              <div className="form-control">
-                <label className="label py-1"><span className="label-text text-xs font-semibold uppercase tracking-wide">Confirm Password</span></label>
-                <input type="password" className="input input-bordered input-sm" placeholder="Repeat new password" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
-              </div>
-            </div>
+        </FormGroup>
+
+        <FormGroup legendText="Change Password">
+          <div className="lt-form">
+            <PasswordInput
+              id="settings-password"
+              labelText="New Password"
+              placeholder="Leave blank to keep current"
+              autoComplete="new-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+            <PasswordInput
+              id="settings-confirm"
+              labelText="Confirm Password"
+              placeholder="Repeat new password"
+              autoComplete="new-password"
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+            />
           </div>
+        </FormGroup>
+
+        <div className="lt-form__actions lt-form__actions--bleed">
+          <Button type="button" kind="secondary" size="xl" onClick={onClose}>Cancel</Button>
+          <Button type="submit" size="xl" disabled={saving}>
+            {saving ? <InlineLoading description="Saving…" /> : "Save Changes"}
+          </Button>
         </div>
-        <div className="flex justify-end gap-2 mt-6">
-          <button className="btn btn-ghost btn-sm" onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary btn-sm gap-1.5" onClick={handleSave} disabled={saving}>
-            {saving ? <span className="loading loading-spinner loading-xs" /> : <Save className="w-3.5 h-3.5" />}
-            Save Changes
-          </button>
-        </div>
+      </form>
     </Drawer>
   );
 }

@@ -1,3 +1,15 @@
+import { CheckmarkFilled, UserFollow } from "@carbon/icons-react";
+import {
+  Button,
+  FormGroup,
+  InlineLoading,
+  Layer,
+  PasswordInput,
+  Select,
+  SelectItem,
+  Tag,
+  TextInput,
+} from "@carbon/react";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -5,9 +17,9 @@ import { z } from "zod";
 import type { LoanAccount, AccountFormData, User, UserCreateFormData } from "../../types";
 import { upcomingCycleDates, formatDate } from "../../utils/dateUtils";
 import { adminApi } from "../../api";
+import { Notice } from "../../components/feedback";
 import { useAuthStore } from "../../stores/authStore";
 import { getApiErrorMessage } from "../../utils/apiError";
-import { ChevronDown, Loader2, UserPlus, CheckCircle2 } from "lucide-react";
 
 const schema = z.object({
   account_name: z.string().min(1, "Required"),
@@ -56,7 +68,6 @@ export function AccountForm({ account, onSubmit, onCancel, isLoading }: Props) {
     register,
     handleSubmit,
     setValue,
-    watch,
     formState: { errors },
   } = useForm<AccountFormData>({
     resolver: zodResolver(schema),
@@ -109,209 +120,195 @@ export function AccountForm({ account, onSubmit, onCancel, isLoading }: Props) {
     }
   };
 
-  const lbl = "label-text text-xs font-semibold uppercase tracking-wide";
-  const inp = (err?: any) => `input input-bordered input-sm w-full ${err ? "input-error" : ""}`;
-
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+    <form onSubmit={handleSubmit(onSubmit)} noValidate className="lt-form">
       {/* Tracked as a real registered field so setValue() calls from the
           "assign to borrower" UI below reliably reach the submitted payload —
           setValue() on a path that's never register()'d is not guaranteed to
           survive to handleSubmit's data in every react-hook-form version. */}
       <input type="hidden" {...register("linked_user_id")} />
+
       {/* Admin: User assignment */}
       {isAdmin && !isEdit && (
-        <div className="rounded-md border border-primary/20 bg-primary/5 p-4 space-y-3">
-          <p className="text-xs font-bold uppercase tracking-widest text-primary/60">
-            Assign to Borrower
-          </p>
-
-          {/* Existing user dropdown */}
-          <div className="form-control">
-            <label className="label py-1">
-              <span className={lbl}>Select User Account</span>
-            </label>
-            <div className="relative">
-              <select
-                className="select select-bordered select-sm w-full appearance-none pr-8"
-                value={selectedUserId}
-                onChange={handleUserSelect}
-                disabled={loadingUsers}
-              >
-                <option value="">— Assign to myself (admin) —</option>
-                {users.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.full_name} · {u.email}
-                  </option>
-                ))}
-                <option value="__new__">＋ Create a new user…</option>
-              </select>
-              <ChevronDown className="w-3.5 h-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-base-content/40" />
-            </div>
-          </div>
-
-          {/* Created user confirmation */}
-          {createdUser && (
-            <div className="flex items-center gap-2 text-success text-sm bg-success/10 border border-success/20 rounded-md px-3 py-2">
-              <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
-              <span>
-                <strong>{createdUser.full_name}</strong> created and linked · invite email can be sent via webhook
-              </span>
-            </div>
-          )}
-
-          {/* Inline new user form */}
-          {showNewUser && (
-            <div className="border border-base-300 rounded-md bg-base-100 p-4 space-y-3">
-              <div className="flex items-center gap-2 mb-1">
-                <UserPlus className="w-3.5 h-3.5 text-base-content/40" />
-                <span className="text-xs font-bold uppercase tracking-widest text-base-content/40">
-                  New User Details
-                </span>
-              </div>
-
-              {userError && (
-                <div className="alert alert-error py-2 text-xs">{userError}</div>
-              )}
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="form-control">
-                  <label className="label py-1">
-                    <span className={lbl}>Full Name</span>
-                  </label>
-                  <input
-                    className="input input-bordered input-sm"
-                    placeholder="Jane Smith"
-                    value={newUser.full_name}
-                    onChange={(e) => setNewUser({ ...newUser, full_name: e.target.value })}
-                  />
-                </div>
-                <div className="form-control">
-                  <label className="label py-1">
-                    <span className={lbl}>Email</span>
-                  </label>
-                  <input
-                    className="input input-bordered input-sm"
-                    type="email"
-                    placeholder="jane@example.com"
-                    value={newUser.email}
-                    onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
-                  />
-                </div>
-                <div className="form-control sm:col-span-2">
-                  <label className="label py-1">
-                    <span className={lbl}>Temporary Password</span>
-                  </label>
-                  <input
-                    className="input input-bordered input-sm"
-                    type="password"
-                    placeholder="Min. 8 characters"
-                    value={newUser.password}
-                    onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-1">
-                <button
-                  type="button"
-                  className="btn btn-ghost btn-xs"
-                  onClick={() => { setShowNewUser(false); setSelectedUserId(""); }}
+        <div className="lt-form__section">
+          <FormGroup legendText="Assign to Borrower">
+            <Layer>
+              <div className="lt-form">
+                <Select
+                  id="assign-user"
+                  labelText="Select User Account"
+                  value={selectedUserId}
+                  onChange={handleUserSelect}
+                  disabled={loadingUsers}
                 >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-primary btn-xs gap-1.5"
-                  onClick={handleCreateUser}
-                  disabled={creatingUser}
-                >
-                  {creatingUser
-                    ? <Loader2 className="w-3 h-3 animate-spin" />
-                    : <UserPlus className="w-3 h-3" />}
-                  Create & Link
-                </button>
+                  <SelectItem value="" text="— Assign to myself (admin) —" />
+                  {users.map((u) => (
+                    <SelectItem key={u.id} value={u.id} text={`${u.full_name} · ${u.email}`} />
+                  ))}
+                  <SelectItem value="__new__" text="＋ Create a new user…" />
+                </Select>
+
+                {createdUser && (
+                  <Notice kind="success">
+                    <strong>{createdUser.full_name}</strong> created and linked · invite email can be sent via webhook
+                  </Notice>
+                )}
+
+                {showNewUser && (
+                  <div className="lt-form">
+                    <p className="lt-eyebrow">
+                      <UserFollow size={16} style={{ verticalAlign: "-3px", marginInlineEnd: "0.5rem" }} aria-hidden="true" />
+                      New User Details
+                    </p>
+
+                    {userError && <Notice kind="error">{userError}</Notice>}
+
+                    <div className="lt-form__grid">
+                      <TextInput
+                        id="new-user-name"
+                        labelText="Full Name"
+                        placeholder="Jane Smith"
+                        value={newUser.full_name}
+                        onChange={(e) => setNewUser({ ...newUser, full_name: e.target.value })}
+                      />
+                      <TextInput
+                        id="new-user-email"
+                        type="email"
+                        labelText="Email"
+                        placeholder="jane@example.com"
+                        value={newUser.email}
+                        onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+                      />
+                      <div className="lt-span-2">
+                        <PasswordInput
+                          id="new-user-password"
+                          labelText="Temporary Password"
+                          placeholder="Min. 8 characters"
+                          value={newUser.password}
+                          autoComplete="new-password"
+                          onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="lt-row" style={{ justifyContent: "flex-end" }}>
+                      <Button
+                        type="button"
+                        kind="ghost"
+                        size="sm"
+                        onClick={() => { setShowNewUser(false); setSelectedUserId(""); }}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        renderIcon={creatingUser ? undefined : UserFollow}
+                        onClick={handleCreateUser}
+                        disabled={creatingUser}
+                      >
+                        {creatingUser ? <InlineLoading description="Creating…" /> : "Create & Link"}
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
-          )}
+            </Layer>
+          </FormGroup>
         </div>
       )}
 
       {/* Main loan fields */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className="form-control">
-          <label className="label py-1"><span className={lbl}>Account Name</span></label>
-          <input className={inp(errors.account_name)} placeholder="e.g. Personal Loan – June" {...register("account_name")} />
-          {errors.account_name && <span className="label-text-alt text-error text-xs mt-0.5">{errors.account_name.message}</span>}
-        </div>
+      <div className="lt-form__grid">
+        <TextInput
+          id="account-name"
+          labelText="Account Name"
+          placeholder="e.g. Personal Loan – June"
+          invalid={!!errors.account_name}
+          invalidText={errors.account_name?.message}
+          {...register("account_name")}
+        />
 
-        <div className="form-control">
-          <label className="label py-1"><span className={lbl}>Principal Amount</span></label>
-          <label className="input input-bordered input-sm flex items-center gap-2">
-            <span className="text-base-content/40 font-mono">$</span>
-            <input type="number" step="0.01" min="0" className="grow font-mono" placeholder="0.00" disabled={isEdit} {...register("borrow_amount")} />
-          </label>
-          {errors.borrow_amount && <span className="label-text-alt text-error text-xs mt-0.5">{errors.borrow_amount.message}</span>}
-          {isEdit && <span className="text-xs text-warning mt-0.5">Principal is locked after creation</span>}
-        </div>
+        <TextInput
+          id="account-principal"
+          type="number"
+          step="0.01"
+          min="0"
+          inputMode="decimal"
+          labelText="Principal Amount (USD)"
+          placeholder="0.00"
+          disabled={isEdit}
+          helperText={isEdit ? "Principal is locked after creation" : undefined}
+          invalid={!!errors.borrow_amount}
+          invalidText={errors.borrow_amount?.message}
+          {...register("borrow_amount")}
+        />
 
-        <div className="form-control">
-          <label className="label py-1"><span className={lbl}>Interest Rate</span></label>
-          <label className="input input-bordered input-sm flex items-center gap-2">
-            <input type="number" step="0.01" min="0.01" max="100" className="grow font-mono" placeholder="5.00" {...register("rate")} />
-            <span className="text-base-content/40 font-mono">%</span>
-          </label>
-          {errors.rate && <span className="label-text-alt text-error text-xs mt-0.5">{errors.rate.message}</span>}
-        </div>
+        <TextInput
+          id="account-rate"
+          type="number"
+          step="0.01"
+          min="0.01"
+          max="100"
+          inputMode="decimal"
+          labelText="Interest Rate (%)"
+          placeholder="5.00"
+          invalid={!!errors.rate}
+          invalidText={errors.rate?.message}
+          {...register("rate")}
+        />
 
-        <div className="form-control">
-          <label className="label py-1"><span className={lbl}>Payment Frequency</span></label>
-          <select className="select select-bordered select-sm" disabled={isEdit} {...register("cycle")}>
-            <option value={15}>Bi-monthly (15 days)</option>
-            <option value={30}>Monthly (30 days)</option>
-          </select>
-        </div>
+        <Select id="account-cycle" labelText="Payment Frequency" disabled={isEdit} {...register("cycle")}>
+          <SelectItem value={15} text="Bi-monthly (15 days)" />
+          <SelectItem value={30} text="Monthly (30 days)" />
+        </Select>
 
-        <div className="form-control">
-          <label className="label py-1"><span className={lbl}>Start Date</span></label>
-          <input type="date" className={inp(errors.start_date)} disabled={isEdit} {...register("start_date")} />
-          {errors.start_date && <span className="label-text-alt text-error text-xs mt-0.5">{errors.start_date.message}</span>}
-        </div>
+        <TextInput
+          id="account-start"
+          type="date"
+          labelText="Start Date"
+          disabled={isEdit}
+          invalid={!!errors.start_date}
+          invalidText={errors.start_date?.message}
+          {...register("start_date")}
+        />
 
         {isEdit && (
-          <div className="form-control sm:col-span-2">
-            <label className="label py-1"><span className={lbl}>Status</span></label>
-            <select className="select select-bordered select-sm" {...register("status")}>
-              <option value="open">Open</option>
-              <option value="active">Active</option>
-              <option value="paid">Paid</option>
-              <option value="closed">Closed</option>
-            </select>
-          </div>
+          <Select id="account-status" labelText="Status" {...register("status")}>
+            <SelectItem value="open" text="Open" />
+            <SelectItem value="active" text="Active" />
+            <SelectItem value="paid" text="Paid" />
+            <SelectItem value="closed" text="Closed" />
+          </Select>
         )}
       </div>
 
       {!isEdit && (
-        <div className="bg-base-200 rounded-md p-4">
-          <p className="text-xs font-semibold text-base-content/40 uppercase tracking-wider mb-2">
+        <div className="lt-form__section">
+          <p className="lt-eyebrow" style={{ marginBlockEnd: "0.75rem" }}>
             Upcoming Cycle Dates
           </p>
-          <div className="flex flex-wrap gap-2">
+          <div className="lt-row">
             {preview.map((d) => (
-              <span key={d.toISOString()} className="badge badge-outline badge-sm font-mono">
+              <Tag key={d.toISOString()} type="outline" size="md">
                 {formatDate(d)}
-              </span>
+              </Tag>
             ))}
           </div>
         </div>
       )}
 
-      <div className="flex gap-2 justify-end pt-1">
-        <button type="button" className="btn btn-ghost btn-sm" onClick={onCancel}>Cancel</button>
-        <button type="submit" className="btn btn-primary btn-sm gap-2" disabled={isLoading}>
-          {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
-          {isEdit ? "Save Changes" : "Create Account"}
-        </button>
+      <div className="lt-form__actions lt-form__actions--bleed">
+        <Button type="button" kind="secondary" size="xl" onClick={onCancel}>Cancel</Button>
+        <Button type="submit" size="xl" disabled={isLoading}>
+          {isLoading ? (
+            <InlineLoading description={isEdit ? "Saving…" : "Creating…"} />
+          ) : isEdit ? (
+            "Save Changes"
+          ) : (
+            "Create Account"
+          )}
+        </Button>
       </div>
     </form>
   );
