@@ -65,7 +65,7 @@ class TestFullLedgerScenarios:
 
     def test_interest_is_not_applied_before_first_cycle(self):
         """Start June 14 — first cycle June 15. Balance on June 14 = principal."""
-        bal = compute_current_balance(
+        compute_current_balance(
             1000.0,
             0.05,
             date(2026, 6, 14),

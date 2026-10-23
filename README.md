@@ -82,7 +82,7 @@ Run this after any schema changes. CI validates the build still compiles.
 
 ```bash
 # Backend (from backend/)
-pytest tests/ app/modules/*/tests/ --cov=app --cov-fail-under=60
+pytest tests/ app/modules/*/tests/ --cov=app --cov-fail-under=80
 
 # Frontend type check
 cd frontend && npx tsc --noEmit

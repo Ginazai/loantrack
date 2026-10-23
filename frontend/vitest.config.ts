@@ -13,7 +13,7 @@ export default defineConfig({
     css: false,
     coverage: {
       provider: "v8",
-      reporter: ["text", "text-summary"],
+      reporter: ["text", "text-summary", "lcov"], // lcov feeds SonarQube (CI)
       include: ["src/**/*.{ts,tsx}"],
       exclude: [
         "src/main.tsx",

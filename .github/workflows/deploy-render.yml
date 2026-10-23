@@ -1,0 +1,76 @@
+name: Deploy to Render (reusable)
+
+# Called by cd.yml for `staging` and `production`. Each GitHub Environment holds its own
+# secrets/variables, so the same code deploys different Render services:
+#
+#   secrets   RENDER_BACKEND_DEPLOY_HOOK    deploy hook URL of the backend service
+#             RENDER_FRONTEND_DEPLOY_HOOK   deploy hook URL of the frontend service
+#   variables APP_URL                       public URL of the frontend, for the post-deploy check
+#                                           (optional; the check is skipped if unset)
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: GitHub Environment to deploy (staging | production)
+        type: string
+        required: true
+      image_tag:
+        description: Image tag to deploy, e.g. sha-1a2b3c4
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy · ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: ${{ inputs.environment }}   # production requires reviewers (set in repo settings)
+    concurrency:
+      group: deploy-${{ inputs.environment }}   # never two deploys to one environment at once
+      cancel-in-progress: false
+    env:
+      IMAGE_TAG: ${{ inputs.image_tag }}
+      BACKEND_HOOK: ${{ secrets.RENDER_BACKEND_DEPLOY_HOOK }}
+      FRONTEND_HOOK: ${{ secrets.RENDER_FRONTEND_DEPLOY_HOOK }}
+      APP_URL: ${{ vars.APP_URL }}
+    steps:
+      - name: Validate inputs
+        run: |
+          case "$IMAGE_TAG" in
+            sha-[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]) ;;
+            *) echo "::error::image_tag must look like sha-1a2b3c4 (got '$IMAGE_TAG')"; exit 1 ;;
+          esac
+          if [ -z "$BACKEND_HOOK" ] || [ -z "$FRONTEND_HOOK" ]; then
+            echo "::error::RENDER_BACKEND_DEPLOY_HOOK / RENDER_FRONTEND_DEPLOY_HOOK are not set in the '${{ inputs.environment }}' environment."
+            exit 1
+          fi
+
+      - name: Trigger Render deploys
+        run: |
+          repo="${GITHUB_REPOSITORY,,}"
+          enc() { python3 -c 'import sys,urllib.parse as u; print(u.quote(sys.argv[1], safe=""))' "$1"; }
+          # Render requires everything except the tag to match the service's configured image URL,
+          # so the services must point at ghcr.io/<owner>/<repo>/{backend,frontend}.
+          be=$(enc "ghcr.io/${repo}/backend:${IMAGE_TAG}")
+          fe=$(enc "ghcr.io/${repo}/frontend:${IMAGE_TAG}")
+          # Hook URLs already contain ?key=..., hence &imgURL=. Never echo them: they're secrets.
+          curl -fsS -o /dev/null -X POST "${BACKEND_HOOK}&imgURL=${be}"  && echo "✓ backend deploy triggered (${IMAGE_TAG})"
+          curl -fsS -o /dev/null -X POST "${FRONTEND_HOOK}&imgURL=${fe}" && echo "✓ frontend deploy triggered (${IMAGE_TAG})"
+
+      - name: Post-deploy health check
+        if: ${{ env.APP_URL != '' }}
+        run: |
+          # Render keeps the old instance serving until the new one is healthy, so this proves the
+          # environment is up after the switch-over window, not that the new version is live.
+          # Check the Render dashboard for the deploy itself.
+          sleep 30
+          curl -fsS --retry 12 --retry-delay 10 --retry-all-errors -o /dev/null "${APP_URL%/}/health"
+          curl -fsS --retry 12 --retry-delay 10 --retry-all-errors -o /dev/null "${APP_URL%/}/api/v1/health"
+          echo "✓ ${APP_URL} healthy"
+
+      - name: No APP_URL configured
+        if: ${{ env.APP_URL == '' }}
+        run: echo "::notice::APP_URL variable not set for '${{ inputs.environment }}', so the post-deploy health check was skipped."

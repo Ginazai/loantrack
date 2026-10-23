@@ -52,7 +52,8 @@ async def create_request(
     if len(active) >= MAX_ACTIVE_REQUESTS:
         raise HTTPException(
             status.HTTP_409_CONFLICT,
-            f"You already have {MAX_ACTIVE_REQUESTS} active requests. Wait for them to be reviewed.",
+            f"You already have {MAX_ACTIVE_REQUESTS} active requests. "
+            "Wait for them to be reviewed.",
         )
 
     req = LoanRequest(
@@ -130,7 +131,7 @@ async def review_request(
     if data.status == "approved":
         if data.rate is None or data.cycle is None:
             raise HTTPException(
-                status.HTTP_422_UNPROCESSABLE_CONTENT,
+                422,  # HTTP_422_UNPROCESSABLE_CONTENT is missing in Starlette 0.37 (fastapi ^0.111)
                 "rate and cycle are required to approve a loan request",
             )
         req.rate = data.rate
