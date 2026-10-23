@@ -1,10 +1,11 @@
-import { Download, Loader2, Trash2, Upload } from "lucide-react";
+import { Document, Download, TrashCan, Upload } from "@carbon/icons-react";
+import { Button, InlineLoading, SkeletonText } from "@carbon/react";
 import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { attachmentsApi } from "../../api";
 import { formatDate } from "../../utils/dateUtils";
 import { getApiErrorMessage } from "../../utils/apiError";
-import { Drawer } from "../../components/common";
+import { Drawer, EmptyState, Notice } from "../../components/common";
 
 // jpg/png/webp/pdf, 10 MB max — mirrors the backend limit (ADR-005 /
 // payments/schemas.py::validate_attachment). Enforced again server-side;
@@ -68,69 +69,76 @@ export function PaymentAttachmentsModal({ accountId, paymentId, isAdmin, onClose
 
   return (
     <Drawer title="Comprobantes" onClose={onClose}>
+      <div className="lt-stack">
         {isLoading ? (
-          <p className="text-sm text-base-content/50">Cargando…</p>
+          <SkeletonText paragraph lineCount={3} />
         ) : attachments.length === 0 ? (
-          <p className="text-sm text-base-content/50 mb-4">Sin comprobantes adjuntos.</p>
+          <EmptyState Icon={Document} title="Sin comprobantes adjuntos." />
         ) : (
-          <ul className="divide-y divide-base-200 mb-4">
+          <ul className="lt-link-list lt-attachments">
             {attachments.map((a) => (
-              <li key={a.id} className="py-2 flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium truncate">{a.original_filename}</p>
-                  <p className="text-xs text-base-content/50">
-                    {formatSize(a.size_bytes)} · {formatDate(a.created_at)}
-                  </p>
-                </div>
-                <div className="flex gap-1 shrink-0">
-                  <button
-                    className="btn btn-ghost btn-xs btn-circle"
-                    title="Descargar"
-                    onClick={() => attachmentsApi.download(accountId, paymentId, a.id, a.original_filename)}
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                  </button>
-                  {isAdmin && (
-                    <button
-                      className="btn btn-ghost btn-xs btn-circle text-error"
-                      title="Eliminar"
-                      onClick={() => remove.mutate(a.id)}
-                      disabled={remove.isPending}
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  )}
+              <li key={a.id}>
+                <div className="lt-attachment">
+                  <div className="lt-attachment__text">
+                    <div className="lt-link-list__name lt-truncate">{a.original_filename}</div>
+                    <div className="lt-link-list__sub">
+                      {formatSize(a.size_bytes)} · {formatDate(a.created_at)}
+                    </div>
+                  </div>
+                  <div className="lt-table-actions">
+                    <Button
+                      kind="ghost"
+                      size="md"
+                      hasIconOnly
+                      renderIcon={Download}
+                      iconDescription="Descargar"
+                      tooltipPosition="left"
+                      onClick={() => attachmentsApi.download(accountId, paymentId, a.id, a.original_filename)}
+                    />
+                    {isAdmin && (
+                      <Button
+                        kind="danger--ghost"
+                        size="md"
+                        hasIconOnly
+                        renderIcon={TrashCan}
+                        iconDescription="Eliminar"
+                        tooltipPosition="left"
+                        onClick={() => remove.mutate(a.id)}
+                        disabled={remove.isPending}
+                      />
+                    )}
+                  </div>
                 </div>
               </li>
             ))}
           </ul>
         )}
 
-        {error && (
-          <div className="alert alert-error text-sm py-2 mb-3">
-            <span>{error}</span>
-          </div>
-        )}
+        {error && <Notice kind="error">{error}</Notice>}
 
         <input
           ref={fileInputRef}
           type="file"
           accept="image/jpeg,image/png,image/webp,application/pdf"
-          className="hidden"
-          onChange={(e) => handleFile(e.target.files?.[0])}
+          className="lt-visually-hidden"
+          tabIndex={-1}
+          aria-hidden="true"
+          onChange={(e) => {
+            handleFile(e.target.files?.[0]);
+            e.target.value = ""; // allow re-selecting the same file after an error
+          }}
         />
-        <button
-          className="btn btn-outline btn-sm w-full gap-2"
+        <Button
+          kind="tertiary"
+          className="lt-fit"
+          renderIcon={upload.isPending ? undefined : Upload}
           onClick={() => fileInputRef.current?.click()}
           disabled={upload.isPending}
         >
-          {upload.isPending ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : (
-            <Upload className="w-4 h-4" />
-          )}
-          Subir comprobante
-        </button>
+          {upload.isPending ? <InlineLoading description="Subiendo…" /> : "Subir comprobante"}
+        </Button>
+        <p className="lt-field-note">JPG, PNG, WebP o PDF · máximo 10 MB</p>
+      </div>
     </Drawer>
   );
 }

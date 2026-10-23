@@ -11,7 +11,7 @@ Single-tenant loan tracking tool for managing private loans, payment schedules, 
 | Auth | JWT access (15 min) + refresh (7 days) + bcrypt |
 | Rate limiting | slowapi |
 | Frontend | React 18 + Vite + TypeScript |
-| Styling | Tailwind CSS + DaisyUI (custom ledger theme) |
+| Styling | IBM Carbon Design System (`@carbon/react`, IBM Plex, SCSS) — see [ADR-007](docs/adr/007-carbon-design-system.md) |
 | State | Zustand + TanStack Query |
 | Forms | React Hook Form + Zod |
 

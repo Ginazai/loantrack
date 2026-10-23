@@ -9,7 +9,7 @@ Single-tenant internal loan tracking tool. Small team, no external customers, no
 ## Decision
 - **Backend:** FastAPI + SQLAlchemy 2.0 async + Alembic + PostgreSQL  
 - **Frontend:** React 18 + Vite + TypeScript + TanStack Query + Zustand  
-- **Styling:** Tailwind CSS + DaisyUI (custom ledger theme)  
+- **Styling:** ~~Tailwind CSS + DaisyUI (custom ledger theme)~~ — superseded by [ADR-007](007-carbon-design-system.md)  
 - **Auth:** JWT (access 15 min + refresh 7 days) + bcrypt  
 
 ## Rationale

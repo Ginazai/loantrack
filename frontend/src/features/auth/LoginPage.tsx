@@ -1,10 +1,12 @@
-import { AlertTriangle, Loader2, Wallet } from "lucide-react";
+import { ArrowRight, Wallet } from "@carbon/icons-react";
+import { Button, Form, InlineLoading, PasswordInput, TextInput, Theme } from "@carbon/react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { authApi } from "../../api";
+import { Notice } from "../../components/feedback";
 import { useAuthStore } from "../../stores/authStore";
 import { getApiErrorMessage } from "../../utils/apiError";
 import type { LoginFormData } from "../../types";
@@ -39,120 +41,87 @@ export function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex ledger-bg bg-base-200">
-      {/* Left panel — branding */}
-      <div className="hidden lg:flex w-1/2 bg-neutral flex-col justify-between p-12">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-primary rounded-md flex items-center justify-center">
-            <Wallet className="w-5 h-5 text-white" />
-          </div>
-          <div>
-            <span className="font-bold text-lg text-white">LoanTrack</span>
-            <p className="text-xs text-white/60 font-mono tracking-widest uppercase">Ledger</p>
-          </div>
+    <div className="lt-login">
+      <Theme theme="g100" className="lt-login__brand">
+        <div className="lt-login__wordmark">
+          <span className="lt-login__mark" aria-hidden="true">
+            <Wallet size={24} />
+          </span>
+          LoanTrack
         </div>
 
         <div>
-          <blockquote className="text-3xl font-bold text-white/90 leading-snug mb-4">
-            "A promissory note is only as good as the system behind it."
+          <blockquote className="lt-login__quote">
+            “A promissory note is only as good as the system behind it.”
           </blockquote>
-          <p className="text-sm text-white/65 font-mono">
+          <p className="lt-login__tagline">
             Private loan tracking · Interest calculator · Payment records
           </p>
         </div>
 
-        <div className="flex gap-8 text-white/50 text-xs font-mono uppercase tracking-widest">
+        <div className="lt-login__foot">
           <span>Secure</span>
-          <span>·</span>
+          <span aria-hidden="true">·</span>
           <span>Private</span>
-          <span>·</span>
+          <span aria-hidden="true">·</span>
           <span>Precise</span>
         </div>
-      </div>
+      </Theme>
 
-      {/* Right panel — form */}
-      <div className="flex-1 flex items-center justify-center px-6">
-        <div className="w-full max-w-sm">
-          {/* Mobile logo */}
-          <div className="flex items-center gap-3 mb-10 lg:hidden">
-            <div className="w-9 h-9 bg-primary rounded-md flex items-center justify-center">
-              <Wallet className="w-5 h-5 text-white" />
-            </div>
-            <span className="font-bold text-xl">LoanTrack</span>
+      <main className="lt-login__form-side">
+        <div className="lt-login__form">
+          <div className="lt-login__mobile-mark">
+            <span className="lt-login__mark" aria-hidden="true">
+              <Wallet size={24} />
+            </span>
+            LoanTrack
           </div>
 
-          <h2 className="text-2xl font-bold mb-1.5">Sign in</h2>
-          <p className="text-sm text-base-content/65 mb-8">Access your loan ledger</p>
+          <h1 className="lt-login__title">Sign in</h1>
+          <p className="lt-login__lede">Access your loan ledger</p>
 
           {error && (
-            <div className="alert alert-error py-2.5 text-sm mb-5">
-              <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-              <span>{error}</span>
+            <div style={{ marginBlockEnd: "1.5rem" }}>
+              <Notice kind="error" title="Sign-in failed">
+                {error}
+              </Notice>
             </div>
           )}
 
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <div className="form-control">
-              <label className="label py-1">
-                <span className="label-text text-xs font-semibold uppercase tracking-wide">
-                  Email
-                </span>
-              </label>
-              <input
-                type="email"
-                className={`input input-bordered ${errors.email ? "input-error" : ""}`}
-                placeholder="you@example.com"
-                autoComplete="email"
-                {...register("email")}
-              />
-              {errors.email && (
-                <label className="label py-0.5">
-                  <span className="label-text-alt text-error text-xs">{errors.email.message}</span>
-                </label>
-              )}
-            </div>
-
-            <div className="form-control">
-              <label className="label py-1">
-                <span className="label-text text-xs font-semibold uppercase tracking-wide">
-                  Password
-                </span>
-              </label>
-              <input
-                type="password"
-                className={`input input-bordered ${errors.password ? "input-error" : ""}`}
-                placeholder="••••••••"
-                autoComplete="current-password"
-                {...register("password")}
-              />
-              {errors.password && (
-                <label className="label py-0.5">
-                  <span className="label-text-alt text-error text-xs">{errors.password.message}</span>
-                </label>
-              )}
-            </div>
-
-            <button
+          <Form onSubmit={handleSubmit(onSubmit)} noValidate className="lt-form">
+            <TextInput
+              id="login-email"
+              type="email"
+              labelText="Email"
+              placeholder="you@example.com"
+              autoComplete="email"
+              invalid={!!errors.email}
+              invalidText={errors.email?.message}
+              {...register("email")}
+            />
+            <PasswordInput
+              id="login-password"
+              labelText="Password"
+              placeholder="••••••••"
+              autoComplete="current-password"
+              invalid={!!errors.password}
+              invalidText={errors.password?.message}
+              {...register("password")}
+            />
+            <Button
               type="submit"
-              className="btn btn-primary w-full mt-3"
+              size="lg"
+              className="lt-login__submit"
+              renderIcon={isSubmitting ? undefined : ArrowRight}
               disabled={isSubmitting}
             >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Signing in…
-                </>
-              ) : (
-                "Sign In"
-              )}
-            </button>
-          </form>
+              {isSubmitting ? <InlineLoading description="Signing in…" /> : "Sign in"}
+            </Button>
+          </Form>
 
-          <p className="text-center text-xs text-base-content/65 font-mono mt-10 uppercase tracking-widest">
-            Ledger v2 · Private Use Only
-          </p>
+          <p className="lt-login__foot-note">Ledger v2 · Private use only</p>
         </div>
-      </div>
+      </main>
     </div>
   );
 }

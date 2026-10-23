@@ -34,7 +34,9 @@ let queue: Array<(token: string) => void> = [];
 // reloaded and swallowed the error" instead of showing one.
 const AUTH_ENDPOINTS = ["/auth/login", "/auth/refresh"];
 
-function isAuthEndpoint(url: string | undefined): boolean {
+// Exported so the exact logic of the bug fix can be unit-tested directly
+// (see client.test.ts) without needing to drive the whole axios pipeline.
+export function isAuthEndpoint(url: string | undefined): boolean {
   return !!url && AUTH_ENDPOINTS.some((path) => url.includes(path));
 }
 

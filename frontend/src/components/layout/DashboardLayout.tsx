@@ -1,20 +1,87 @@
 import {
-  ChevronLeft, ChevronRight, ClipboardList, FileText, FileUp, LayoutDashboard,
-  LogOut, Moon, Settings, Sun, Users, Wallet, Webhook,
-} from "lucide-react";
-import { useState } from "react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+  Asleep,
+  Dashboard,
+  DocumentAdd,
+  DocumentImport,
+  Light,
+  Logout,
+  Money,
+  Settings,
+  UserAvatar,
+  UserMultiple,
+  Webhook,
+} from "@carbon/icons-react";
+import {
+  Button,
+  Content,
+  Header,
+  HeaderGlobalAction,
+  HeaderGlobalBar,
+  HeaderMenuButton,
+  HeaderName,
+  HeaderPanel,
+  SideNav,
+  SideNavDivider,
+  SideNavItems,
+  SideNavLink,
+  SkipToContent,
+  Tag,
+  Theme,
+} from "@carbon/react";
+import type { ComponentType } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { authApi } from "../../api";
 import { AccountSettingsModal } from "../../features/profile/AccountSettingsModal";
 import { useAuthStore } from "../../stores/authStore";
 import { useUIStore } from "../../stores/uiStore";
 
+interface NavEntry {
+  to: string;
+  label: string;
+  Icon: ComponentType<any>;
+}
+
+const ADMIN_PRIMARY: NavEntry[] = [
+  { to: "/dashboard", label: "Dashboard", Icon: Dashboard },
+  { to: "/accounts", label: "Accounts", Icon: Money },
+];
+
+const ADMIN_SECONDARY: NavEntry[] = [
+  { to: "/admin/users", label: "Users", Icon: UserMultiple },
+  { to: "/admin/requests", label: "Requests", Icon: DocumentAdd },
+  { to: "/admin/webhooks", label: "Webhooks", Icon: Webhook },
+  { to: "/admin/imports", label: "Imports", Icon: DocumentImport },
+];
+
+const USER_NAV: NavEntry[] = [
+  { to: "/my-loans", label: "My Loans", Icon: Dashboard },
+  { to: "/my-requests", label: "My Requests", Icon: DocumentAdd },
+];
+
+/** True from Carbon's `lg` breakpoint (1056px) up, where the nav can be a persistent rail. */
+function useIsDesktop() {
+  const query = "(min-width: 66rem)";
+  const [matches, setMatches] = useState(() => window.matchMedia(query).matches);
+  useEffect(() => {
+    const mql = window.matchMedia(query);
+    const onChange = () => setMatches(mql.matches);
+    mql.addEventListener("change", onChange);
+    return () => mql.removeEventListener("change", onChange);
+  }, []);
+  return matches;
+}
+
 export function DashboardLayout() {
   const { user, logout } = useAuthStore();
   const { theme, toggleTheme, sidebarOpen, setSidebarOpen } = useUIStore();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const [showSettings, setShowSettings] = useState(false);
+  const [panelOpen, setPanelOpen] = useState(false);
+  const panelWrapRef = useRef<HTMLDivElement>(null);
   const isAdmin = user?.role === "admin";
+  const isDesktop = useIsDesktop();
 
   const handleLogout = async () => {
     await authApi.logout().catch(() => {});
@@ -22,148 +89,129 @@ export function DashboardLayout() {
     navigate("/login");
   };
 
-  const navCls = ({ isActive }: { isActive: boolean }) =>
-    `sidebar-active-indicator flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors ${
-      isActive
-        ? "bg-primary/10 text-primary font-semibold"
-        : "hover:bg-white/5 text-neutral-content/70 hover:text-neutral-content"
-    }`;
+  // Close the user panel on outside click or Escape.
+  useEffect(() => {
+    if (!panelOpen) return;
+    const onDown = (e: MouseEvent) => {
+      if (!panelWrapRef.current?.contains(e.target as Node)) setPanelOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setPanelOpen(false);
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [panelOpen]);
+
+  const closeNavIfOverlay = () => {
+    // Below Carbon's `lg` breakpoint the nav is an overlay; dismiss it after navigating.
+    if (!window.matchMedia("(min-width: 66rem)").matches) setSidebarOpen(false);
+  };
+
+  const renderLink = ({ to, label, Icon }: NavEntry) => {
+    const active = pathname === to || pathname.startsWith(`${to}/`);
+    return (
+      <SideNavLink
+        key={to}
+        as={Link}
+        to={to}
+        renderIcon={Icon}
+        isActive={active}
+        aria-current={active ? "page" : undefined}
+        onClick={closeNavIfOverlay}
+      >
+        {label}
+      </SideNavLink>
+    );
+  };
 
   return (
-    <div className="flex h-screen overflow-hidden ledger-bg bg-base-200">
-      {/* ── Sidebar ───────────────────────────────────────────────────────── */}
-      <aside className={`flex flex-col bg-neutral shadow-xl transition-all duration-300 ${sidebarOpen ? "w-60" : "w-14"}`}>
-        {/* Logo */}
-        <div className={`flex items-center gap-3 border-b border-white/5 ${sidebarOpen ? "px-4 py-5" : "px-3 py-5 justify-center"}`}>
-          <div className="flex-shrink-0 w-8 h-8 bg-primary rounded-md flex items-center justify-center">
-            <Wallet className="w-4 h-4 text-white" />
-          </div>
-          {sidebarOpen && (
-            <div>
-              <span className="font-bold text-base text-white tracking-tight">LoanTrack</span>
-              <p className="text-xs text-white/30 font-mono tracking-wider">LEDGER</p>
+    <>
+      <Theme theme="g100">
+        <Header aria-label="LoanTrack">
+          <SkipToContent href="#main-content" />
+          <HeaderMenuButton
+            aria-label={sidebarOpen ? "Close navigation" : "Open navigation"}
+            isActive={sidebarOpen}
+            isCollapsible
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+          />
+          <HeaderName as={Link} to="/" prefix="">
+            LoanTrack
+          </HeaderName>
+          <HeaderGlobalBar>
+            <HeaderGlobalAction
+              aria-label={theme === "light" ? "Switch to dark theme" : "Switch to light theme"}
+              tooltipAlignment="end"
+              onClick={toggleTheme}
+            >
+              {theme === "light" ? <Asleep size={20} /> : <Light size={20} />}
+            </HeaderGlobalAction>
+            <div ref={panelWrapRef} style={{ display: "contents" }}>
+              <HeaderGlobalAction
+                aria-label="Account"
+                aria-expanded={panelOpen}
+                isActive={panelOpen}
+                tooltipAlignment="end"
+                onClick={() => setPanelOpen((v) => !v)}
+              >
+                <UserAvatar size={20} />
+              </HeaderGlobalAction>
+              <HeaderPanel aria-label="Account menu" expanded={panelOpen} className="lt-header-panel">
+                <div className="lt-header-user">
+                  <div className="lt-header-user__name">{user?.full_name}</div>
+                  <div className="lt-header-user__meta">{user?.email}</div>
+                  <Tag className="lt-header-user__role" size="sm" type={isAdmin ? "blue" : "gray"}>
+                    {isAdmin ? "Administrator" : "Borrower"}
+                  </Tag>
+                </div>
+                <Button
+                  kind="ghost"
+                  size="lg"
+                  className="lt-fit"
+                  renderIcon={Settings}
+                  onClick={() => {
+                    setPanelOpen(false);
+                    setShowSettings(true);
+                  }}
+                >
+                  Account Settings
+                </Button>
+                <Button kind="ghost" size="lg" className="lt-fit" renderIcon={Logout} onClick={handleLogout}>
+                  Sign out
+                </Button>
+              </HeaderPanel>
             </div>
-          )}
-        </div>
+          </HeaderGlobalBar>
+        </Header>
+      </Theme>
 
-        {/* Nav */}
-        <nav className="flex-1 py-4 space-y-0.5 px-2 overflow-y-auto">
+      <SideNav
+        aria-label="Side navigation"
+        isRail={isDesktop}
+        expanded={sidebarOpen}
+        onOverlayClick={() => setSidebarOpen(false)}
+      >
+        <SideNavItems>
           {isAdmin ? (
             <>
-              <NavLink to="/dashboard" className={navCls}>
-                <LayoutDashboard className={`flex-shrink-0 text-neutral-content/50 ${sidebarOpen ? "w-4 h-4" : "w-5 h-5"}`} />
-                {sidebarOpen && <span>Dashboard</span>}
-              </NavLink>
-              <NavLink to="/accounts" className={navCls}>
-                <ClipboardList className={`flex-shrink-0 text-neutral-content/50 ${sidebarOpen ? "w-4 h-4" : "w-5 h-5"}`} />
-                {sidebarOpen && <span>Accounts</span>}
-              </NavLink>
-
-              {sidebarOpen
-                ? <p className="px-3 pt-5 pb-1 text-xs font-semibold text-neutral-content/30 uppercase tracking-widest">Administration</p>
-                : <div className="my-2 mx-3 border-t border-white/5" />}
-
-              <NavLink to="/admin/users" className={navCls}>
-                <Users className={`flex-shrink-0 text-neutral-content/50 ${sidebarOpen ? "w-4 h-4" : "w-5 h-5"}`} />
-                {sidebarOpen && <span>Users</span>}
-              </NavLink>
-              <NavLink to="/admin/requests" className={navCls}>
-                <FileText className={`flex-shrink-0 text-neutral-content/50 ${sidebarOpen ? "w-4 h-4" : "w-5 h-5"}`} />
-                {sidebarOpen && <span>Requests</span>}
-              </NavLink>
-              <NavLink to="/admin/webhooks" className={navCls}>
-                <Webhook className={`flex-shrink-0 text-neutral-content/50 ${sidebarOpen ? "w-4 h-4" : "w-5 h-5"}`} />
-                {sidebarOpen && <span>Webhooks</span>}
-              </NavLink>
-              <NavLink to="/admin/imports" className={navCls}>
-                <FileUp className={`flex-shrink-0 text-neutral-content/50 ${sidebarOpen ? "w-4 h-4" : "w-5 h-5"}`} />
-                {sidebarOpen && <span>Imports</span>}
-              </NavLink>
+              {ADMIN_PRIMARY.map(renderLink)}
+              <SideNavDivider />
+              <div className="lt-nav-label" aria-hidden="true">Administration</div>
+              {ADMIN_SECONDARY.map(renderLink)}
             </>
           ) : (
-            <>
-              <NavLink to="/my-loans" className={navCls}>
-                <LayoutDashboard className={`flex-shrink-0 text-neutral-content/50 ${sidebarOpen ? "w-4 h-4" : "w-5 h-5"}`} />
-                {sidebarOpen && <span>My Loans</span>}
-              </NavLink>
-              <NavLink to="/my-requests" className={navCls}>
-                <FileText className={`flex-shrink-0 text-neutral-content/50 ${sidebarOpen ? "w-4 h-4" : "w-5 h-5"}`} />
-                {sidebarOpen && <span>My Requests</span>}
-              </NavLink>
-            </>
+            USER_NAV.map(renderLink)
           )}
-        </nav>
+        </SideNavItems>
+      </SideNav>
 
-        {/* Profile — pinned to bottom of sidebar */}
-        <div className="border-t border-white/5 p-2">
-          <div className="dropdown dropdown-top dropdown-end w-full">
-            <div
-              tabIndex={0}
-              role="button"
-              className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-md cursor-pointer hover:bg-white/5 transition-colors ${!sidebarOpen ? "justify-center" : ""}`}
-            >
-              <div className="w-7 h-7 rounded-md bg-primary flex items-center justify-center flex-shrink-0">
-                <span className="text-xs font-bold text-white">{user?.full_name?.[0]?.toUpperCase()}</span>
-              </div>
-              {sidebarOpen && (
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-neutral-content leading-tight truncate">{user?.full_name}</p>
-                  <p className="text-xs text-neutral-content/40 font-mono uppercase tracking-wide">{user?.role}</p>
-                </div>
-              )}
-            </div>
-
-            <ul
-              tabIndex={0}
-              className="dropdown-content z-50 menu menu-sm bg-base-100 rounded-box shadow-xl border border-base-300 w-52 mb-2 p-1.5"
-            >
-              <li className="px-3 py-2 pointer-events-none">
-                <div>
-                  <p className="text-xs font-semibold text-base-content truncate">{user?.full_name}</p>
-                  <p className="text-xs text-base-content/40 font-mono truncate">{user?.email}</p>
-                </div>
-              </li>
-              <div className="divider my-0.5" />
-              <li>
-                <button className="flex items-center gap-2.5 text-sm" onClick={() => setShowSettings(true)}>
-                  <Settings className="w-4 h-4 text-base-content/50" />
-                  Account Settings
-                </button>
-              </li>
-              <li>
-                <button className="flex items-center gap-2.5 text-sm text-error" onClick={handleLogout}>
-                  <LogOut className="w-4 h-4" />
-                  Sign out
-                </button>
-              </li>
-            </ul>
-          </div>
-        </div>
-      </aside>
-
-      {/* ── Main ──────────────────────────────────────────────────────────── */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <header className="bg-base-100 border-b border-base-300 px-4 py-2.5 flex items-center justify-between shadow-sm">
-          <button onClick={() => setSidebarOpen(!sidebarOpen)} className="btn btn-ghost btn-sm btn-square">
-            {sidebarOpen ? <ChevronLeft className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-          </button>
-          <button
-            onClick={toggleTheme}
-            className="btn btn-ghost btn-sm btn-square"
-            title={theme === "ledger" ? "Switch to dark mode" : "Switch to light mode"}
-          >
-            {theme === "ledger"
-              ? <Moon className="w-4 h-4 text-base-content/60" />
-              : <Sun className="w-4 h-4 text-base-content/60" />}
-          </button>
-        </header>
-
-        <main className="flex-1 overflow-y-auto p-6">
-          <Outlet />
-        </main>
-      </div>
+      <Content id="main-content" className="lt-shell-main">
+        <Outlet />
+      </Content>
 
       {showSettings && <AccountSettingsModal onClose={() => setShowSettings(false)} />}
-    </div>
+    </>
   );
 }

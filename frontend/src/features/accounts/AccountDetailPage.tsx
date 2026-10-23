@@ -1,18 +1,37 @@
+import { Add, Attachment, Download, Link as LinkIcon, Receipt, TrashCan } from "@carbon/icons-react";
 import {
-  ArrowLeft,
-  Download,
-  Inbox,
-  Link2,
-  Loader2,
-  Paperclip,
-  Trash2,
-  X,
-} from "lucide-react";
+  Button,
+  InlineLoading,
+  Modal,
+  ProgressBar,
+  SkeletonText,
+  Tab,
+  TabList,
+  TabPanel,
+  TabPanels,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+  Tabs,
+  Tag,
+  TextArea,
+} from "@carbon/react";
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { accountsApi, adminApi, paymentsApi, webhooksApi } from "../../api";
-import { ConfirmDialog, Drawer, PageHeader, StatusBadge } from "../../components/common";
+import {
+  ConfirmDialog,
+  Drawer,
+  EmptyState,
+  Notice,
+  PageHeader,
+  StatCard,
+  StatusBadge,
+} from "../../components/common";
 import {
   formatCurrency,
   formatDate,
@@ -29,6 +48,13 @@ import { useAuthStore } from "../../stores/authStore";
 import { getApiErrorMessage } from "../../utils/apiError";
 
 type Tab = "overview" | "payments" | "webhooks" | "settings";
+const TABS: Tab[] = ["overview", "payments", "webhooks", "settings"];
+const TAB_LABEL: Record<Tab, string> = {
+  overview: "Overview",
+  payments: "Payments",
+  webhooks: "Webhooks",
+  settings: "Settings",
+};
 
 export function AccountDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -131,8 +157,17 @@ export function AccountDetailPage() {
 
   if (isLoading || !account) {
     return (
-      <div className="flex justify-center py-20">
-        <span className="loading loading-spinner loading-lg" />
+      <div className="lt-page lt-stack lt-stack--loose" aria-busy="true" aria-label="Loading account">
+        <SkeletonText heading width="30%" />
+        <div className="lt-kpis">
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="lt-kpi">
+              <SkeletonText width="40%" />
+              <SkeletonText heading width="60%" />
+            </div>
+          ))}
+        </div>
+        <SkeletonText paragraph lineCount={4} />
       </div>
     );
   }
@@ -158,301 +193,297 @@ export function AccountDetailPage() {
     )
   );
 
-  return (
-    <div className="space-y-5 max-w-5xl mx-auto">
-      {/* Header */}
-      <div className="flex items-start justify-between flex-wrap gap-3">
-        <div>
-          <button
-            className="btn btn-ghost btn-xs mb-2 -ml-2 gap-1"
-            onClick={() => navigate("/accounts")}
-          >
-            <ArrowLeft className="w-3 h-3" />
-            Accounts
-          </button>
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold">{account.account_name}</h1>
-            <StatusBadge status={account.status} />
-          </div>
-          <p className="text-base-content/60 text-sm mt-0.5">
-            Borrower:{" "}
-            <span className="font-medium text-base-content">{account.borrower_name}</span>
-            {" · "}Started {formatDate(account.start_date)}
-          </p>
-        </div>
+  const late = isOverdue(account.next_due_date);
 
-        <div className="flex gap-2 flex-wrap">
-          {canAddPayment && (
-            <button className="btn btn-primary btn-sm" onClick={() => setShowPayment(true)}>
-              + Record Payment
-            </button>
-          )}
-          <button className="btn btn-ghost btn-sm" onClick={() => setShowEdit(true)}>
-            Edit
-          </button>
-          {canClose && (
-            <button
-              className="btn btn-warning btn-sm btn-outline"
-              onClick={() => setShowClose(true)}
-            >
-              Close
-            </button>
-          )}
-          {canPurge && (
-            <button
-              className="btn btn-error btn-sm btn-outline"
-              onClick={() => setShowPurge(true)}
-            >
-              Purge
-            </button>
-          )}
-        </div>
-      </div>
+  return (
+    <div className="lt-page lt-stack lt-stack--loose">
+      <PageHeader
+        breadcrumbs={[{ label: "Accounts", to: "/accounts" }, { label: account.account_name }]}
+        title={account.account_name}
+        badge={<StatusBadge status={account.status} />}
+        subtitle={`Borrower: ${account.borrower_name} · Started ${formatDate(account.start_date)}`}
+        action={
+          <>
+            {canAddPayment && (
+              <Button size="md" renderIcon={Add} onClick={() => setShowPayment(true)}>
+                Record Payment
+              </Button>
+            )}
+            <Button size="md" kind="tertiary" onClick={() => setShowEdit(true)}>
+              Edit
+            </Button>
+            {canClose && (
+              <Button size="md" kind="tertiary" onClick={() => setShowClose(true)}>
+                Close
+              </Button>
+            )}
+            {canPurge && (
+              <Button size="md" kind="danger--tertiary" onClick={() => setShowPurge(true)}>
+                Purge
+              </Button>
+            )}
+          </>
+        }
+      />
 
       {/* Key metrics */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {[
-          { label: "Principal", value: formatCurrency(account.borrow_amount) },
-          {
-            label: "Current Balance",
-            value: formatCurrency(displayBalance),
-            highlight: true,
-          },
-          { label: "Interest Rate", value: formatRate(account.rate) },
-          {
-            label: "Next Due",
-            value: account.next_due_date ? formatDate(account.next_due_date) : "—",
-            warn: isOverdue(account.next_due_date),
-          },
-        ].map((m) => (
-          <div
-            key={m.label}
-            className={`bg-base-100 rounded-2xl p-4 shadow-sm ${
-              m.warn ? "card-ledger-warning" : m.highlight ? "card-ledger" : ""
-            }`}
-          >
-            <p className="text-xs text-base-content/50 uppercase tracking-wide">{m.label}</p>
-            <p
-              className={`stat-value-mono text-lg mt-0.5 ${
-                m.warn ? "text-error" : m.highlight ? "text-primary" : ""
-              }`}
-            >
-              {m.value}
-            </p>
-          </div>
-        ))}
-      </div>
-
-      <hr className="receipt-divider" />
+      <section className="lt-kpis" aria-label="Account summary">
+        <StatCard title="Principal" value={formatCurrency(account.borrow_amount)} />
+        <StatCard title="Current Balance" value={formatCurrency(displayBalance)} />
+        <StatCard title="Interest Rate" value={formatRate(account.rate)} />
+        <StatCard
+          title="Next Due"
+          value={account.next_due_date ? formatDate(account.next_due_date) : "—"}
+          desc={late ? "Overdue" : undefined}
+          tone={late ? "danger" : "default"}
+        />
+      </section>
 
       {/* Repayment progress */}
-      <div className="bg-base-100 rounded-2xl p-4 shadow-sm">
-        <div className="flex justify-between text-sm mb-2">
-          <span className="font-medium">Repayment Progress</span>
-          <span className="text-base-content/60">{progressPct.toFixed(1)}% paid off</span>
-        </div>
-        <progress className="progress progress-primary w-full" value={progressPct} max={100} />
+      <div className="lt-panel lt-panel__body">
+        <ProgressBar
+          label="Repayment Progress"
+          value={progressPct}
+          max={100}
+          helperText={`${progressPct.toFixed(1)}% paid off`}
+        />
       </div>
 
-      {/* Tabs */}
-      <div className="tabs tabs-boxed bg-base-200 w-fit">
-        {(["overview", "payments", "webhooks", "settings"] as Tab[]).map((t) => (
-          <button
-            key={t}
-            className={`tab ${tab === t ? "tab-active" : ""}`}
-            onClick={() => setTab(t)}
-          >
-            {t.charAt(0).toUpperCase() + t.slice(1)}
-          </button>
-        ))}
-      </div>
-
-      {/* Tab: Overview */}
-      {tab === "overview" && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <BalanceChart payments={payments} borrowAmount={account.borrow_amount} />
-          <InterestChart payments={payments} />
-        </div>
-      )}
-
-      {/* Tab: Payments */}
-      {tab === "payments" && (
-        <div className="bg-base-100 rounded-2xl shadow-sm overflow-hidden">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-base-200">
-            <h2 className="font-semibold">Payment Ledger</h2>
-            {canAddPayment && (
-              <button className="btn btn-primary btn-xs" onClick={() => setShowPayment(true)}>
-                + Record Payment
-              </button>
-            )}
-          </div>
-
-          {payments.length === 0 ? (
-            <div className="text-center py-12 text-base-content/50">
-              <Inbox className="w-10 h-10 mx-auto mb-2 opacity-40" />
-              <p className="text-sm">No payments recorded yet.</p>
-            </div>
-          ) : (
-            <>
-              <div className="overflow-x-auto">
-                <table className="table table-sm">
-                  <thead>
-                    <tr>
-                      <th>#</th>
-                      <th>Date</th>
-                      <th className="text-right">Balance Before</th>
-                      <th className="text-right">Interest</th>
-                      <th className="text-right">Payment</th>
-                      <th className="text-right">Balance After</th>
-                      <th>Next Due</th>
-                      <th>Mode</th>
-                      <th />
-                      {isAdmin && <th />}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {payments.map((p, i) => (
-                      <tr key={p.id} className="hover">
-                        <td className="text-base-content/40">{i + 1}</td>
-                        <td className="font-medium">{formatDate(p.payment_date)}</td>
-                        <td className="text-right tabular-nums text-sm">
-                          {formatCurrency(p.balance_before)}
-                        </td>
-                        <td className="text-right tabular-nums text-sm text-error">
-                          +{formatCurrency(p.interests_accrued)}
-                        </td>
-                        <td className="text-right tabular-nums text-sm text-success font-semibold">
-                          −{formatCurrency(p.amount)}
-                        </td>
-                        <td className="text-right tabular-nums text-sm font-bold">
-                          {formatCurrency(p.balance_after)}
-                        </td>
-                        <td className="text-sm text-base-content/60">
-                          {p.next_due_date ? formatDate(p.next_due_date) : "—"}
-                        </td>
-                        <td>
-                          <span className="badge badge-xs badge-outline">{p.method}</span>
-                        </td>
-                        <td>
-                          <button
-                            className="btn btn-ghost btn-xs gap-1 text-base-content/60"
-                            title="Comprobantes"
-                            onClick={() => setAttachmentsPaymentId(p.id)}
-                          >
-                            <Paperclip className="w-3 h-3" />
-                            {p.attachment_count > 0 && p.attachment_count}
-                          </button>
-                        </td>
-                        {isAdmin && (
-                          <td>
-                            <button
-                              className="btn btn-ghost btn-xs text-error"
-                              onClick={() => setDeletePaymentId(p.id)}
-                              title="Delete payment"
-                            >
-                              <Trash2 className="w-3 h-3" />
-                            </button>
-                          </td>
-                        )}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              {isAdmin && (
-                <div className="flex justify-end pt-1">
-                  <button
-                    className="btn btn-ghost btn-xs gap-1.5 text-base-content/50"
-                    onClick={() => adminApi.exportAccountFullCsv(id!)}
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                    Export with payments (.csv)
-                  </button>
+      {/* Tabs — wrapped so the stack gap doesn't split the tab bar from its panel */}
+      <div>
+      <Tabs
+        selectedIndex={TABS.indexOf(tab)}
+        onChange={({ selectedIndex }: { selectedIndex: number }) => setTab(TABS[selectedIndex])}
+      >
+        <TabList aria-label="Account sections">
+          {TABS.map((t) => (
+            <Tab key={t}>{TAB_LABEL[t]}</Tab>
+          ))}
+        </TabList>
+        <TabPanels>
+          {/* Overview */}
+          <TabPanel className="lt-tab-panel">
+            {tab === "overview" &&
+              (payments.length === 0 ? (
+                <div className="lt-panel">
+                  <EmptyState
+                    Icon={Receipt}
+                    title="No payment history yet"
+                    description="Charts appear once the first payment is recorded."
+                  />
                 </div>
-              )}
-            </>
-          )}
-        </div>
-      )}
-
-      {/* Tab: Webhooks */}
-      {tab === "webhooks" && (
-        <div className="space-y-4">
-          <div className="flex justify-between items-center">
-            <p className="text-sm text-base-content/60">
-              Post real-time events to n8n, Pipedream, or any HTTP endpoint.
-            </p>
-            <button className="btn btn-primary btn-sm" onClick={() => setShowWebhook(true)}>
-              + Add Webhook
-            </button>
-          </div>
-
-          {webhooks.length === 0 ? (
-            <div className="bg-base-100 rounded-2xl p-8 text-center text-base-content/50">
-              <Link2 className="w-10 h-10 mx-auto mb-2 opacity-40" />
-              <p className="text-sm">No webhooks configured.</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {webhooks.map((wh) => (
-                <div
-                  key={wh.id}
-                  className="bg-base-100 rounded-2xl p-4 shadow-sm flex items-start justify-between gap-4"
-                >
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium truncate">{wh.target_url}</p>
-                    <div className="flex flex-wrap gap-1 mt-2">
-                      {wh.events.map((ev) => (
-                        <span key={ev} className="badge badge-xs badge-outline">
-                          {ev}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <span
-                      className={`badge badge-xs ${
-                        wh.is_active ? "badge-success" : "badge-ghost"
-                      }`}
-                    >
-                      {wh.is_active ? "active" : "inactive"}
-                    </span>
-                    <button
-                      className="btn btn-ghost btn-xs text-error"
-                      onClick={() => deleteWebhook.mutate(wh.id)}
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </div>
+              ) : (
+                <div className="lt-charts">
+                  <BalanceChart payments={payments} borrowAmount={account.borrow_amount} />
+                  <InterestChart payments={payments} />
                 </div>
               ))}
-            </div>
-          )}
-        </div>
-      )}
+          </TabPanel>
 
-      {/* Tab: Settings */}
-      {tab === "settings" && (
-        <div className="bg-base-100 rounded-2xl p-5 shadow-sm space-y-3">
-          <h2 className="font-semibold mb-4">Account Settings</h2>
-          <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-            {[
-              ["Account ID", account.id],
-              ["Created", formatDate(account.created_at)],
-              ["Last Updated", formatDate(account.updated_at)],
-              ["Cycle", account.cycle === 15 ? "Bi-monthly (15th & 30th)" : "Monthly (30th)"],
-              ["Close Reason", account.close_reason ?? "—"],
-            ].map(([k, v]) => (
-              <div key={k}>
-                <dt className="text-base-content/50">{k}</dt>
-                <dd className="font-medium break-all">{v}</dd>
+          {/* Payments */}
+          <TabPanel className="lt-tab-panel">
+            {tab === "payments" && (
+              <div className="lt-panel">
+                <div className="lt-panel__header">
+                  <h2 className="lt-panel__title">Payment Ledger</h2>
+                  {canAddPayment && (
+                    <Button size="sm" renderIcon={Add} onClick={() => setShowPayment(true)}>
+                      Record Payment
+                    </Button>
+                  )}
+                </div>
+
+                {payments.length === 0 ? (
+                  <EmptyState
+                    Icon={Receipt}
+                    title="No payments recorded yet."
+                    description="Each payment is split into interest and principal and appears here."
+                  />
+                ) : (
+                  <>
+                    <div className="lt-table-wrap">
+                      <Table size="lg" aria-label="Payment ledger">
+                        <TableHead>
+                          <TableRow>
+                            <TableHeader>#</TableHeader>
+                            <TableHeader>Date</TableHeader>
+                            <TableHeader className="lt-num">Balance Before</TableHeader>
+                            <TableHeader className="lt-num">Interest</TableHeader>
+                            <TableHeader className="lt-num">Payment</TableHeader>
+                            <TableHeader className="lt-num">Balance After</TableHeader>
+                            <TableHeader>Next Due</TableHeader>
+                            <TableHeader>Mode</TableHeader>
+                            <TableHeader>
+                              <span className="lt-visually-hidden">Receipts</span>
+                            </TableHeader>
+                            {isAdmin && (
+                              <TableHeader>
+                                <span className="lt-visually-hidden">Delete</span>
+                              </TableHeader>
+                            )}
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {payments.map((p, i) => (
+                            <TableRow key={p.id}>
+                              <TableCell className="lt-muted">{i + 1}</TableCell>
+                              <TableCell>{formatDate(p.payment_date)}</TableCell>
+                              <TableCell className="lt-num">{formatCurrency(p.balance_before)}</TableCell>
+                              <TableCell className="lt-num">
+                                +{formatCurrency(p.interests_accrued)}
+                              </TableCell>
+                              <TableCell className="lt-num">
+                                −{formatCurrency(p.amount)}
+                              </TableCell>
+                              <TableCell className="lt-num">
+                                <strong>{formatCurrency(p.balance_after)}</strong>
+                              </TableCell>
+                              <TableCell>{p.next_due_date ? formatDate(p.next_due_date) : "—"}</TableCell>
+                              <TableCell>
+                                <Tag size="sm" type="outline">
+                                  {p.method}
+                                </Tag>
+                              </TableCell>
+                              <TableCell>
+                                <div className="lt-table-actions" style={{ justifyContent: "flex-start" }}>
+                                  <Button
+                                    kind="ghost"
+                                    size="sm"
+                                    hasIconOnly
+                                    renderIcon={Attachment}
+                                    iconDescription="Comprobantes"
+                                    tooltipPosition="left"
+                                    onClick={() => setAttachmentsPaymentId(p.id)}
+                                  />
+                                  {p.attachment_count > 0 && (
+                                    <span className="lt-field-note" aria-label={`${p.attachment_count} attachments`}>
+                                      {p.attachment_count}
+                                    </span>
+                                  )}
+                                </div>
+                              </TableCell>
+                              {isAdmin && (
+                                <TableCell>
+                                  <Button
+                                    kind="danger--ghost"
+                                    size="sm"
+                                    hasIconOnly
+                                    renderIcon={TrashCan}
+                                    iconDescription="Delete payment"
+                                    tooltipPosition="left"
+                                    onClick={() => setDeletePaymentId(p.id)}
+                                  />
+                                </TableCell>
+                              )}
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                    {isAdmin && (
+                      <div className="lt-table-footer">
+                        <Button
+                          kind="ghost"
+                          size="sm"
+                          renderIcon={Download}
+                          onClick={() => adminApi.exportAccountFullCsv(id!)}
+                        >
+                          Export with payments (.csv)
+                        </Button>
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
-            ))}
-          </dl>
-        </div>
-      )}
+            )}
+          </TabPanel>
 
-      {/* ── Modals ──────────────────────────────────────────────────────── */}
+          {/* Webhooks */}
+          <TabPanel className="lt-tab-panel">
+            {tab === "webhooks" && (
+              <div className="lt-stack">
+                <div className="lt-row" style={{ justifyContent: "space-between" }}>
+                  <p className="lt-muted">Post real-time events to n8n, Pipedream, or any HTTP endpoint.</p>
+                  <Button size="md" renderIcon={Add} onClick={() => setShowWebhook(true)}>
+                    Add Webhook
+                  </Button>
+                </div>
+
+                {webhooks.length === 0 ? (
+                  <div className="lt-panel">
+                    <EmptyState
+                      Icon={LinkIcon}
+                      title="No webhooks configured."
+                      description="Add an endpoint to be notified about payments and status changes on this account."
+                    />
+                  </div>
+                ) : (
+                  <div className="lt-stack lt-stack--tight">
+                    {webhooks.map((wh) => (
+                      <div key={wh.id} className="lt-item">
+                        <div className="lt-item__top">
+                          <div className="lt-item__main">
+                            <p className="lt-item__url">{wh.target_url}</p>
+                            <div className="lt-row" style={{ gap: "0.25rem" }}>
+                              {wh.events.map((ev) => (
+                                <Tag key={ev} size="sm" type="outline">
+                                  {ev}
+                                </Tag>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="lt-row">
+                            <Tag size="sm" type={wh.is_active ? "green" : "gray"}>
+                              {wh.is_active ? "active" : "inactive"}
+                            </Tag>
+                            <Button
+                              kind="danger--ghost"
+                              size="sm"
+                              hasIconOnly
+                              renderIcon={TrashCan}
+                              iconDescription="Delete webhook"
+                              tooltipPosition="left"
+                              onClick={() => deleteWebhook.mutate(wh.id)}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </TabPanel>
+
+          {/* Settings */}
+          <TabPanel className="lt-tab-panel">
+            {tab === "settings" && (
+              <section className="lt-panel lt-panel__body" aria-labelledby="settings-heading">
+                <h2 className="lt-section-title" id="settings-heading">
+                  Account Settings
+                </h2>
+                <dl className="lt-dl">
+                  {[
+                    ["Account ID", account.id],
+                    ["Created", formatDate(account.created_at)],
+                    ["Last Updated", formatDate(account.updated_at)],
+                    ["Cycle", account.cycle === 15 ? "Bi-monthly (15th & 30th)" : "Monthly (30th)"],
+                    ["Close Reason", account.close_reason ?? "—"],
+                  ].map(([k, v]) => (
+                    <div key={k}>
+                      <dt>{k}</dt>
+                      <dd className={k === "Account ID" ? "lt-mono" : undefined}>{v}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </section>
+            )}
+          </TabPanel>
+        </TabPanels>
+      </Tabs>
+      </div>
+
+      {/* ── Overlays ─────────────────────────────────────────────────────── */}
 
       {showPayment && (
         <Drawer title="Record Payment" onClose={() => setShowPayment(false)}>
@@ -463,10 +494,10 @@ export function AccountDetailPage() {
             isLoading={addPayment.isPending}
           />
           {addPayment.isError && (
-            <div className="alert alert-error mt-3 text-sm py-2">
-              <span>
+            <div style={{ marginBlockStart: "1rem" }}>
+              <Notice kind="error" title="Couldn’t record payment">
                 {getApiErrorMessage(addPayment.error, "Failed to record payment")}
-              </span>
+              </Notice>
             </div>
           )}
         </Drawer>
@@ -484,34 +515,28 @@ export function AccountDetailPage() {
       )}
 
       {showClose && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="bg-base-100 rounded-2xl shadow-xl w-full max-w-md p-6">
-            <h2 className="text-lg font-bold mb-2">Close Account</h2>
-            <p className="text-sm text-base-content/60 mb-4">
-              This will mark the account as closed. You can optionally add a reason.
-            </p>
-            <textarea
-              className="textarea textarea-bordered w-full text-sm"
-              rows={3}
-              placeholder="Reason for closing (optional)"
-              value={closeReason}
-              onChange={(e) => setCloseReason(e.target.value)}
-            />
-            <div className="flex gap-2 justify-end mt-4">
-              <button className="btn btn-ghost btn-sm" onClick={() => setShowClose(false)}>
-                Cancel
-              </button>
-              <button
-                className="btn btn-warning btn-sm gap-2"
-                onClick={() => closeAccount.mutate()}
-                disabled={closeAccount.isPending}
-              >
-                {closeAccount.isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-                Close Account
-              </button>
-            </div>
-          </div>
-        </div>
+        <Modal
+          open
+          size="sm"
+          modalHeading="Close Account"
+          primaryButtonText={closeAccount.isPending ? "Closing…" : "Close Account"}
+          secondaryButtonText="Cancel"
+          primaryButtonDisabled={closeAccount.isPending}
+          onRequestSubmit={() => closeAccount.mutate()}
+          onRequestClose={() => setShowClose(false)}
+          onSecondarySubmit={() => setShowClose(false)}
+        >
+          <p style={{ marginBlockEnd: "1.5rem" }}>
+            This will mark the account as closed. You can optionally add a reason.
+          </p>
+          <TextArea
+            id="close-reason"
+            labelText="Reason for closing (optional)"
+            rows={3}
+            value={closeReason}
+            onChange={(e) => setCloseReason(e.target.value)}
+          />
+        </Modal>
       )}
 
       {showPurge && (

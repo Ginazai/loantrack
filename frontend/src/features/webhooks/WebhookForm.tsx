@@ -1,4 +1,5 @@
-import { Loader2, ShieldCheck } from "lucide-react";
+import { Button, Checkbox, InlineLoading, TextInput } from "@carbon/react";
+import { Notice } from "../../components/feedback";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -48,95 +49,62 @@ export function WebhookForm({ onSubmit, onCancel, isLoading }: Props) {
   });
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-      <div className="form-control">
-        <label className="label">
-          <span className="label-text font-medium">Target URL</span>
-        </label>
-        <input
-          className={`input input-bordered input-sm ${errors.target_url ? "input-error" : ""}`}
-          placeholder="https://your-n8n-instance.com/webhook/..."
-          {...register("target_url")}
-        />
-        {errors.target_url && (
-          <label className="label">
-            <span className="label-text-alt text-error">{errors.target_url.message}</span>
-          </label>
-        )}
-      </div>
+    <form onSubmit={handleSubmit(onSubmit)} noValidate className="lt-form">
+      <TextInput
+        id="webhook-url"
+        labelText="Target URL"
+        placeholder="https://your-n8n-instance.com/webhook/..."
+        invalid={!!errors.target_url}
+        invalidText={errors.target_url?.message}
+        {...register("target_url")}
+      />
 
-      <div className="form-control">
-        <label className="label">
-          <span className="label-text font-medium">Events to Subscribe</span>
-        </label>
-        <Controller
-          name="events"
-          control={control}
-          render={({ field }) => (
-            <div className="space-y-2">
+      <Controller
+        name="events"
+        control={control}
+        render={({ field }) => (
+          <fieldset className="lt-fieldset">
+            <legend className="cds--label">Events to Subscribe</legend>
+            <div className="lt-stack lt-stack--tight">
               {ALL_EVENTS.map((ev) => {
                 const checked = (field.value as string[]).includes(ev.value);
                 return (
-                  <label
-                    key={ev.value}
-                    className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                      checked
-                        ? "border-primary bg-primary/5"
-                        : "border-base-300 hover:border-base-content/30"
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      className="checkbox checkbox-primary checkbox-sm mt-0.5"
+                  <div key={ev.value} className={`lt-option-card${checked ? " lt-option-card--checked" : ""}`}>
+                    <Checkbox
+                      id={`wh-event-${ev.value}`}
+                      labelText={ev.label}
                       checked={checked}
-                      onChange={(e) => {
-                        const next = e.target.checked
-                          ? [...(field.value as string[]), ev.value]
-                          : (field.value as string[]).filter((v) => v !== ev.value);
-                        field.onChange(next);
-                      }}
+                      onChange={(_, { checked: next }) =>
+                        field.onChange(
+                          next
+                            ? [...(field.value as string[]), ev.value]
+                            : (field.value as string[]).filter((v) => v !== ev.value)
+                        )
+                      }
                     />
-                    <div>
-                      <p className="text-sm font-medium">{ev.label}</p>
-                      <p className="text-xs text-base-content/50">{ev.desc}</p>
-                    </div>
-                  </label>
+                    <p className="lt-option-card__desc">{ev.desc}</p>
+                  </div>
                 );
               })}
             </div>
-          )}
-        />
-        {errors.events && (
-          <label className="label">
-            <span className="label-text-alt text-error">{errors.events.message}</span>
-          </label>
+            {errors.events && <p className="cds--form-requirement" style={{ display: "block", maxBlockSize: "none" }}>{errors.events.message}</p>}
+          </fieldset>
         )}
-      </div>
+      />
 
-      <div className="bg-base-200 rounded-xl p-3 text-xs text-base-content/60 space-y-1">
-        <p className="font-semibold flex items-center gap-1.5">
-          <ShieldCheck className="w-3.5 h-3.5" />
-          Security
-        </p>
-        <p>
-          Each webhook request is signed with an HMAC-SHA256 signature sent in the{" "}
-          <code className="bg-base-300 px-1 rounded">X-Webhook-Signature</code> header. Verify
-          this on your n8n / Pipedream workflow to authenticate the request.
-        </p>
-      </div>
+      <Notice kind="info" title="Security">
+        Each webhook request is signed with an HMAC-SHA256 signature sent in the{" "}
+        <code>X-Webhook-Signature</code> header. Verify this on your n8n / Pipedream workflow to
+        authenticate the request.
+      </Notice>
 
-      <div className="flex gap-2 justify-end pt-2">
-        <button type="button" className="btn btn-ghost btn-sm" onClick={onCancel}>
+      <div className="lt-form__actions lt-form__actions--bleed">
+        <Button type="button" kind="secondary" size="xl" onClick={onCancel}>
           Cancel
-        </button>
-        <button
-          type="submit"
-          className="btn btn-primary btn-sm gap-2"
-          disabled={isLoading}
-        >
-          {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
-          Save Webhook
-        </button>
+        </Button>
+        <Button type="submit" size="xl" disabled={isLoading}>
+          {isLoading ? <InlineLoading description="Saving…" /> : "Save Webhook"}
+        </Button>
       </div>
     </form>
   );

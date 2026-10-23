@@ -1,0 +1,1164 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// LoanTrack · IBM Carbon Design System (v11)
+//
+// Rules for this file:
+//   • Colors come from Carbon theme tokens only ($text-primary, $layer-01 …) so
+//     the white and g100 themes both work with zero overrides.
+//   • Spacing comes from the Carbon spacing scale ($spacing-01 … $spacing-13).
+//   • Type comes from Carbon type styles via type-style().
+//   • Fonts are self-hosted through @fontsource (see main.tsx), so Carbon's own
+//     CDN @font-face is switched off.
+// ─────────────────────────────────────────────────────────────────────────────
+
+@use '@carbon/react/scss/config' with (
+  $css--font-face: false
+);
+@use '@carbon/react';
+@use '@carbon/react/scss/spacing' as *;
+@use '@carbon/react/scss/theme' as *;
+@use '@carbon/react/scss/type' as *;
+@use '@carbon/react/scss/breakpoint' as *;
+@use '@carbon/react/scss/motion' as *;
+
+// Plex Sans has tabular figures; Carbon's body font already resolves to it.
+:root {
+  --lt-drawer-md: 28rem;
+  --lt-drawer-lg: 36rem;
+  --lt-z-drawer: 9000; // same layer Carbon uses for modals
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+// ── Numbers ─────────────────────────────────────────────────────────────────
+// Money, rates and dates line up in columns when figures are tabular.
+.lt-num,
+.lt-tnum,
+.lt-kpi__value,
+.cds--data-table td.lt-num,
+.cds--data-table th.lt-num {
+  font-variant-numeric: tabular-nums;
+}
+
+.cds--data-table td.lt-num,
+.cds--data-table th.lt-num {
+  text-align: end;
+}
+
+.cds--data-table th.lt-num .cds--table-header-label,
+.cds--data-table th.lt-num .cds--table-sort__flex {
+  justify-content: flex-end;
+}
+
+// Table cells default to secondary text; primary names/titles inside them must stay primary.
+.cds--data-table td .lt-link-list__name {
+  color: $text-primary;
+}
+
+.lt-mono {
+  font-family: var(--cds-code-02-font-family, 'IBM Plex Mono', monospace);
+  font-size: 0.875rem;
+}
+
+.lt-muted {
+  color: $text-secondary;
+}
+
+.lt-danger-text {
+  color: $text-error;
+}
+
+// ── App shell ───────────────────────────────────────────────────────────────
+.lt-shell-main {
+  min-block-size: calc(100dvh - 3rem);
+  background: $background;
+}
+
+// Carbon's rail reserves 3rem; on small screens the nav is an overlay, so no margin.
+@include breakpoint-down('lg') {
+  .cds--side-nav ~ .cds--content.lt-shell-main {
+    margin-inline-start: 0;
+  }
+}
+
+@include breakpoint-down('md') {
+  .cds--content.lt-shell-main {
+    padding: $spacing-05;
+  }
+}
+
+.lt-page {
+  max-inline-size: 99rem;
+  margin-inline: auto;
+
+  &--narrow {
+    max-inline-size: 64rem;
+  }
+
+  &--medium {
+    max-inline-size: 80rem;
+  }
+}
+
+.lt-header-user {
+  padding: $spacing-05;
+  border-block-end: 1px solid $border-subtle-01;
+
+  &__name {
+    @include type-style('productive-heading-02');
+    color: $text-primary;
+  }
+
+  &__meta {
+    @include type-style('body-compact-01');
+    color: $text-secondary;
+    word-break: break-all;
+  }
+
+  &__role {
+    margin-block-start: $spacing-03;
+  }
+}
+
+.lt-switcher-item-button {
+  // SwitcherItem renders a link; ours are actions, so reset button chrome and
+  // inherit Carbon's switcher styling.
+  all: unset;
+  display: block;
+  inline-size: 100%;
+  box-sizing: border-box;
+  cursor: pointer;
+}
+
+// ── Page header ─────────────────────────────────────────────────────────────
+.lt-page-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: $spacing-05;
+  margin-block-end: $spacing-07;
+
+  &__titles {
+    min-inline-size: 0;
+  }
+
+  &__title-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: $spacing-04;
+  }
+
+  &__title {
+    @include type-style('productive-heading-05');
+    color: $text-primary;
+    margin: 0;
+  }
+
+  &__subtitle {
+    @include type-style('body-compact-02');
+    color: $text-secondary;
+    margin-block-start: $spacing-02;
+    max-inline-size: 40rem;
+  }
+
+  &__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: $spacing-03;
+  }
+
+  .cds--breadcrumb {
+    margin-block-end: $spacing-04;
+  }
+}
+
+.lt-stack > .lt-page-header {
+  margin-block-end: 0; // the stack already supplies the gap
+}
+
+.lt-section-title {
+  @include type-style('productive-heading-03');
+  color: $text-primary;
+  margin: 0 0 $spacing-05;
+}
+
+.lt-eyebrow {
+  @include type-style('label-01');
+  color: $text-secondary;
+}
+
+.lt-stack {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-06;
+
+  &--tight {
+    gap: $spacing-04;
+  }
+
+  &--loose {
+    gap: $spacing-07;
+  }
+}
+
+.lt-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: $spacing-03;
+}
+
+.lt-spacer {
+  margin-inline-start: auto;
+}
+
+// ── KPI tiles ───────────────────────────────────────────────────────────────
+.lt-kpis {
+  display: grid;
+  gap: 1px; // hairline gutters read as one instrument panel, per Carbon data-dense layouts
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  background: $border-subtle-01;
+  border: 1px solid $border-subtle-01;
+
+  @include breakpoint-down('lg') {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  // `breakpoint-down('md')` = below 672px, i.e. phones. (down('sm') would mean below 320px.)
+  @include breakpoint-down('md') {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  &--3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+
+    @include breakpoint-down('md') {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+}
+
+.lt-kpi {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: $spacing-07;
+  min-block-size: 8.5rem;
+  padding: $spacing-05;
+  background: $layer-01;
+  color: $text-primary;
+
+  &__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: $spacing-03;
+  }
+
+  &__label {
+    @include type-style('label-02');
+    color: $text-secondary;
+  }
+
+  &__icon {
+    flex-shrink: 0;
+    fill: $icon-secondary;
+  }
+
+  &__value {
+    @include type-style('productive-heading-04');
+    font-weight: 300;
+    margin: 0;
+    overflow-wrap: break-word;
+  }
+
+  &__desc {
+    @include type-style('helper-text-01');
+    color: $text-secondary;
+    margin-block-start: $spacing-02;
+  }
+
+  &--danger {
+    box-shadow: inset 0.25rem 0 0 0 $support-error;
+
+    .lt-kpi__value {
+      color: $text-error;
+    }
+
+    .lt-kpi__icon {
+      fill: $support-error;
+    }
+  }
+
+}
+
+// ── Panels (bordered containers for tables and lists) ───────────────────────
+.lt-panel {
+  background: $layer-01;
+
+  &__header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: $spacing-04;
+    padding: $spacing-05 $spacing-05 $spacing-04;
+  }
+
+  &__title {
+    @include type-style('productive-heading-03');
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: $spacing-03;
+  }
+
+  &__body {
+    padding: $spacing-05;
+  }
+
+  &--alert {
+    box-shadow: inset 0.25rem 0 0 0 $support-error;
+  }
+}
+
+// Tables sit flush inside panels.
+.lt-panel .cds--data-table-container,
+.lt-panel .cds--data-table-content {
+  padding-block-start: 0;
+}
+
+// Wide tables scroll inside their panel rather than crushing their columns on small screens.
+.lt-table-wrap {
+  overflow-x: auto;
+
+  .cds--data-table {
+    min-inline-size: 40rem;
+  }
+}
+
+.cds--data-table tbody tr.lt-clickable {
+  cursor: pointer;
+}
+
+.lt-table-link {
+  color: $link-primary;
+  text-decoration: none;
+  font-weight: 600;
+
+  &:hover {
+    color: $link-primary-hover;
+    text-decoration: underline;
+  }
+
+  &:focus-visible {
+    outline: 2px solid $focus;
+    outline-offset: 2px;
+  }
+}
+
+.lt-table-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: $spacing-02;
+}
+
+// ── Link rows (overdue list) ────────────────────────────────────────────────
+.lt-link-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+
+  li + li {
+    border-block-start: 1px solid $border-subtle-01;
+  }
+
+  a {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: $spacing-05;
+    padding: $spacing-04 $spacing-05;
+    color: $text-primary;
+    text-decoration: none;
+    transition: background-color $duration-fast-01 motion(standard, productive);
+
+    &:hover {
+      background: $layer-hover-01;
+    }
+
+    &:focus-visible {
+      outline: 2px solid $focus;
+      outline-offset: -2px;
+    }
+  }
+
+  &__name {
+    @include type-style('productive-heading-01');
+  }
+
+  &__sub {
+    @include type-style('helper-text-01');
+    color: $text-secondary;
+  }
+
+  &__amount {
+    @include type-style('productive-heading-02');
+    font-variant-numeric: tabular-nums;
+    text-align: end;
+  }
+}
+
+// ── Empty and loading states ────────────────────────────────────────────────
+.lt-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: $spacing-03;
+  padding: $spacing-09 $spacing-06;
+
+  &--center {
+    align-items: center;
+    text-align: center;
+  }
+
+  &__icon {
+    fill: $icon-disabled;
+    margin-block-end: $spacing-03;
+  }
+
+  &__title {
+    @include type-style('productive-heading-03');
+    color: $text-primary;
+    margin: 0;
+  }
+
+  &__body {
+    @include type-style('body-compact-01');
+    color: $text-secondary;
+    max-inline-size: 28rem;
+    margin: 0;
+  }
+
+  &__action {
+    margin-block-start: $spacing-04;
+  }
+}
+
+.lt-loading {
+  display: flex;
+  justify-content: center;
+  padding: $spacing-10 0;
+}
+
+// ── Forms ───────────────────────────────────────────────────────────────────
+.lt-form {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-06;
+
+  &__grid {
+    display: grid;
+    gap: $spacing-06;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+
+    @include breakpoint-down('md') {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .lt-span-2 {
+      grid-column: 1 / -1;
+    }
+  }
+
+  &__actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0; // Carbon button pairs sit flush
+    margin-block-start: $spacing-04;
+  }
+
+  &__section {
+    padding: $spacing-05;
+    background: $layer-01;
+  }
+}
+
+.lt-field-note {
+  @include type-style('helper-text-01');
+  color: $text-secondary;
+}
+
+.lt-option-card {
+  display: block;
+  padding: $spacing-04 $spacing-05;
+  background: $field-01;
+  border: 1px solid transparent;
+
+  &--checked {
+    border-color: $interactive;
+  }
+
+  &__desc {
+    @include type-style('helper-text-01');
+    color: $text-secondary;
+    margin-inline-start: 1.5rem;
+  }
+}
+
+// Footer buttons: Carbon modal-style, full-bleed pair.
+.lt-drawer__footer,
+.lt-form__actions--bleed {
+  display: flex;
+  justify-content: flex-end;
+  margin-inline: -#{$spacing-06};
+  margin-block-end: -#{$spacing-06};
+  margin-block-start: auto; // pin to the bottom of a short form…
+  position: sticky; // …and keep it in reach on a long one
+  inset-block-end: 0;
+  z-index: 1;
+
+  .cds--btn {
+    flex: 1 1 50%;
+    max-inline-size: none;
+  }
+}
+
+// ── Description list ────────────────────────────────────────────────────────
+.lt-dl {
+  display: grid;
+  gap: $spacing-05 $spacing-07;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0;
+
+  @include breakpoint-down('md') {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  dt {
+    @include type-style('label-01');
+    color: $text-secondary;
+  }
+
+  dd {
+    @include type-style('body-compact-02');
+    margin: $spacing-01 0 0;
+    word-break: break-all;
+  }
+}
+
+// ── Drawer (side panel) ─────────────────────────────────────────────────────
+@keyframes lt-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes lt-slide {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.lt-drawer {
+  position: fixed;
+  inset: 0;
+  z-index: var(--lt-z-drawer);
+  display: flex;
+  justify-content: flex-end;
+
+  &__scrim {
+    position: absolute;
+    inset: 0;
+    background: $overlay;
+    animation: lt-fade $duration-moderate-01 motion(standard, productive);
+  }
+
+  &__panel {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    inline-size: 100%;
+    max-inline-size: var(--lt-drawer-md);
+    block-size: 100%;
+    background: $background;
+    border-inline-start: 1px solid $border-subtle-01;
+    animation: lt-slide $duration-moderate-02 motion(entrance, expressive);
+
+    &:focus {
+      outline: none;
+    }
+
+    &[data-width='lg'] {
+      max-inline-size: var(--lt-drawer-lg);
+    }
+  }
+
+  &__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: $spacing-05;
+    padding: $spacing-05 0 $spacing-05 $spacing-06;
+    border-block-end: 1px solid $border-subtle-01;
+  }
+
+  &__title {
+    @include type-style('productive-heading-04');
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+
+  &__subtitle {
+    @include type-style('body-compact-01');
+    color: $text-secondary;
+    margin: $spacing-02 0 0;
+  }
+
+  &__body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    padding: $spacing-06;
+
+    > .lt-form {
+      flex: 1;
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lt-drawer__scrim,
+  .lt-drawer__panel {
+    animation: none;
+  }
+}
+
+// ── Charts (Recharts, themed with Carbon tokens) ────────────────────────────
+.lt-chart {
+  background: $layer-01;
+  padding: $spacing-05;
+
+  &__title {
+    @include type-style('productive-heading-02');
+    margin: 0 0 $spacing-05;
+  }
+
+  .recharts-cartesian-axis-tick-value {
+    fill: $text-secondary;
+    font-size: 0.75rem;
+  }
+
+  .recharts-legend-item-text {
+    color: $text-secondary !important;
+    font-size: 0.75rem;
+  }
+}
+
+.lt-chart-tooltip {
+  background: $layer-02;
+  border: 1px solid $border-subtle-01;
+  padding: $spacing-03 $spacing-04;
+  @include type-style('body-compact-01');
+
+  &__label {
+    @include type-style('label-01');
+    color: $text-secondary;
+    margin-block-end: $spacing-02;
+  }
+
+  &__row {
+    display: flex;
+    align-items: center;
+    gap: $spacing-03;
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__swatch {
+    inline-size: 0.5rem;
+    block-size: 0.5rem;
+    flex-shrink: 0;
+  }
+}
+
+// ── Loan cards (borrower portal) ────────────────────────────────────────────
+.lt-loan {
+  background: $layer-01;
+
+  &--overdue {
+    box-shadow: inset 0.25rem 0 0 0 $support-warning;
+  }
+
+  &__top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: $spacing-04;
+    padding: $spacing-05 $spacing-05 0;
+  }
+
+  &__name {
+    @include type-style('productive-heading-03');
+    margin: 0;
+  }
+
+  &__meta {
+    @include type-style('helper-text-01');
+    color: $text-secondary;
+    margin-block-start: $spacing-02;
+  }
+
+  &__figures {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+    gap: $spacing-05;
+    padding: $spacing-05;
+  }
+
+  &__progress {
+    padding: 0 $spacing-05 $spacing-05;
+  }
+
+  &__detail {
+    border-block-start: 1px solid $border-subtle-01;
+    padding: $spacing-05;
+  }
+}
+
+.lt-figure {
+  &__label {
+    @include type-style('label-01');
+    color: $text-secondary;
+  }
+
+  &__value {
+    @include type-style('productive-heading-03');
+    font-variant-numeric: tabular-nums;
+    margin-block-start: $spacing-02;
+    overflow-wrap: anywhere;
+  }
+}
+
+.lt-ledger-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: $spacing-05;
+  padding: $spacing-04 0;
+  border-block-end: 1px solid $border-subtle-01;
+  font-variant-numeric: tabular-nums;
+
+  &:last-child {
+    border-block-end: 0;
+  }
+
+  &__amount {
+    @include type-style('productive-heading-02');
+    color: $text-primary; // support-success green is only 3:1 on gray; the "+" carries the meaning
+  }
+}
+
+// ── Request / webhook rows ──────────────────────────────────────────────────
+.lt-item {
+  background: $layer-01;
+  padding: $spacing-05;
+
+  &--attention {
+    box-shadow: inset 0.25rem 0 0 0 $support-warning;
+  }
+
+  &--info {
+    box-shadow: inset 0.25rem 0 0 0 $support-info;
+  }
+
+  &--success {
+    box-shadow: inset 0.25rem 0 0 0 $support-success;
+  }
+
+  // Paused items are dimmed with a quieter text token, never with opacity (which fails contrast).
+  &--muted &__url {
+    color: $text-secondary;
+  }
+
+  &__top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: $spacing-05;
+  }
+
+  &__main {
+    flex: 1;
+    min-inline-size: 0;
+  }
+
+  &__title {
+    @include type-style('productive-heading-02');
+    margin: 0;
+  }
+
+  &__meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $spacing-01 $spacing-05;
+    margin-block-start: $spacing-02;
+    @include type-style('helper-text-01');
+    color: $text-secondary;
+    font-variant-numeric: tabular-nums;
+  }
+
+  &__detail {
+    margin-block-start: $spacing-05;
+    padding-block-start: $spacing-05;
+    border-block-start: 1px solid $border-subtle-01;
+  }
+
+  &__url {
+    @include type-style('code-02');
+    overflow-wrap: anywhere;
+    margin: $spacing-03 0;
+  }
+}
+
+.lt-quote-box {
+  background: $layer-02;
+  padding: $spacing-04 $spacing-05;
+
+  &__label {
+    @include type-style('label-01');
+    color: $text-secondary;
+    margin-block-end: $spacing-02;
+  }
+}
+
+// ── Login ───────────────────────────────────────────────────────────────────
+.lt-login {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-block-size: 100dvh;
+  background: $background;
+
+  @include breakpoint(lg) {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  &__brand {
+    display: none;
+    position: relative;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: $spacing-09 $spacing-10;
+    background-color: $background;
+    color: $text-primary;
+    // Ledger ruling: a hairline 64px grid, drawn with hard-stop gradients (no soft fades).
+    background-image:
+      linear-gradient(to right, rgb(255 255 255 / 5%) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(255 255 255 / 5%) 1px, transparent 1px);
+    background-size: 4rem 4rem;
+    background-position: -1px -1px;
+
+    @include breakpoint(lg) {
+      display: flex;
+    }
+  }
+
+  &__wordmark {
+    display: flex;
+    align-items: center;
+    gap: $spacing-04;
+    @include type-style('productive-heading-04');
+  }
+
+  &__mark {
+    display: grid;
+    place-items: center;
+    inline-size: 2.5rem;
+    block-size: 2.5rem;
+    background: $interactive;
+    color: $text-on-color;
+  }
+
+  &__quote {
+    @include type-style('productive-heading-06');
+    font-weight: 300;
+    max-inline-size: 36rem;
+    margin: 0 0 $spacing-06;
+  }
+
+  &__tagline {
+    @include type-style('body-compact-02');
+    color: $text-secondary;
+  }
+
+  &__foot {
+    display: flex;
+    gap: $spacing-05;
+    @include type-style('label-02');
+    color: $text-secondary;
+  }
+
+  &__form-side {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: $spacing-07 $spacing-06;
+    background: $background;
+  }
+
+  &__form {
+    inline-size: 100%;
+    max-inline-size: 24rem;
+  }
+
+  &__mobile-mark {
+    display: flex;
+    align-items: center;
+    gap: $spacing-04;
+    margin-block-end: $spacing-09;
+    @include type-style('productive-heading-04');
+
+    @include breakpoint(lg) {
+      display: none;
+    }
+  }
+
+  &__title {
+    @include type-style('productive-heading-05');
+    margin: 0 0 $spacing-02;
+  }
+
+  &__lede {
+    @include type-style('body-compact-02');
+    color: $text-secondary;
+    margin: 0 0 $spacing-07;
+  }
+
+  &__submit {
+    inline-size: 100%;
+    max-inline-size: none;
+  }
+
+  &__foot-note {
+    @include type-style('label-01');
+    color: $text-secondary;
+    margin-block-start: $spacing-09;
+  }
+}
+
+// ── Utilities ───────────────────────────────────────────────────────────────
+.lt-visually-hidden {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.lt-fit {
+  max-inline-size: none;
+  inline-size: 100%;
+}
+
+.lt-toolbar-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: $spacing-03;
+  padding: $spacing-04 $spacing-05;
+}
+
+// ── Side nav group label (only meaningful when the rail is expanded) ────────
+.lt-nav-label {
+  @include type-style('label-01');
+  color: $text-secondary;
+  padding: $spacing-05 $spacing-05 $spacing-02;
+}
+
+.cds--side-nav:not(.cds--side-nav--expanded) .lt-nav-label {
+  display: none;
+}
+
+// User panel sits in Carbon's g100 header zone; buttons span the panel.
+.lt-header-panel .cds--btn.lt-fit {
+  display: flex;
+  justify-content: space-between;
+  max-inline-size: none;
+}
+
+.lt-success-text {
+  color: $text-primary; // paid-off balances read as calm, not celebratory
+  font-weight: 600;
+}
+
+.lt-inline-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: $spacing-02;
+}
+
+.lt-danger-icon {
+  fill: $support-error;
+  flex-shrink: 0;
+}
+
+.lt-toolbar-search {
+  inline-size: 18rem;
+  max-inline-size: 100%;
+}
+
+.lt-count {
+  padding: 0 $spacing-05 $spacing-03;
+  margin: 0;
+}
+
+// Download is a small ghost action under tables.
+.lt-table-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding: $spacing-03 $spacing-05;
+  border-block-start: 1px solid $border-subtle-01;
+}
+
+.lt-fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-inline-size: 0;
+
+  > legend {
+    padding: 0;
+    margin-block-end: $spacing-03;
+  }
+}
+
+:not(.cds--snippet) > code,
+:not(pre):not(.cds--snippet) > code {
+  font-family: var(--cds-code-02-font-family, 'IBM Plex Mono', monospace);
+  font-size: 0.875em;
+  background: $layer-02;
+  padding: 0 $spacing-02;
+}
+
+.lt-truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lt-attachment {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: $spacing-04;
+  padding: $spacing-03 0;
+
+  &__text {
+    min-inline-size: 0;
+  }
+}
+
+.lt-attachments li + li {
+  border-block-start: 1px solid $border-subtle-01;
+}
+
+// ── Account detail: tabs + charts ───────────────────────────────────────────
+.lt-tab-panel.cds--tab-content {
+  padding: $spacing-06 0 0;
+}
+
+.lt-charts {
+  display: grid;
+  gap: $spacing-05;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+
+  @include breakpoint-down('lg') {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.lt-panel__body.lt-panel {
+  padding: $spacing-05;
+}
+
+.lt-chip-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $spacing-03;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.lt-chip-link {
+  display: flex;
+  flex-direction: column;
+  padding: $spacing-03 $spacing-05;
+  background: $layer-02;
+  color: $text-primary;
+  text-decoration: none;
+  border: 1px solid $border-subtle-01;
+  transition: background-color $duration-fast-01 motion(standard, productive);
+
+  &:hover {
+    background: $layer-hover-02;
+  }
+
+  &:focus-visible {
+    outline: 2px solid $focus;
+    outline-offset: -2px;
+  }
+}
+
+.lt-success-icon {
+  fill: $support-success;
+  flex-shrink: 0;
+}
+
+.lt-import-fields {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(7rem, 1fr));
+  gap: $spacing-03;
+  min-inline-size: 30rem;
+}
+
+.lt-empty-row {
+  padding: $spacing-06 $spacing-05;
+}
+
+.lt-panel--success {
+  box-shadow: inset 0.25rem 0 0 0 $support-success;
+}
+
+// Carbon's snippet and drop zone own their look; don't let app rules leak in.
+.cds--snippet code {
+  background: none;
+  padding: 0;
+}
+
+.lt-panel .cds--file__drop-container,
+.lt-panel .cds--file-browse-btn {
+  inline-size: 100%;
+  max-inline-size: none;
+}

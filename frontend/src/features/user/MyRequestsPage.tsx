@@ -1,30 +1,56 @@
+import {
+  Add,
+  CheckmarkFilled,
+  ChevronDown,
+  ChevronUp,
+  Close,
+  ErrorFilled,
+  DocumentBlank,
+  Time,
+} from "@carbon/icons-react";
+import {
+  Button,
+  ContentSwitcher,
+  InlineLoading,
+  SkeletonText,
+  Switch,
+  Tag,
+  TextArea,
+  TextInput,
+} from "@carbon/react";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { loanRequestsApi } from "../../api";
 import type { LoanRequest, LoanRequestFormData } from "../../types";
 import { getApiErrorMessage } from "../../utils/apiError";
-import {
-  FileText, Plus, X, Clock, CheckCircle2, XCircle,
-  ChevronDown, ChevronUp,
-} from "lucide-react";
 import { formatCurrency, formatDate } from "../../utils/dateUtils";
-import { Drawer } from "../../components/common";
+import { Drawer, EmptyState, Notice, PageHeader } from "../../components/common";
 
 type Filter = "all" | "requested" | "under_review" | "approved" | "rejected";
+const FILTERS: Filter[] = ["all", "requested", "under_review", "approved", "rejected"];
+const FILTER_LABEL: Record<Filter, string> = {
+  all: "All",
+  requested: "Pending",
+  under_review: "Under Review",
+  approved: "Approved",
+  rejected: "Rejected",
+};
 
-const STATUS_META: Record<string, { badge: string; Icon: React.ElementType; label: string }> = {
-  requested:    { badge: "badge-warning",  Icon: Clock,         label: "Pending"      },
-  under_review: { badge: "badge-info",     Icon: Clock,         label: "Under Review" },
-  approved:     { badge: "badge-success",  Icon: CheckCircle2,  label: "Approved"     },
-  rejected:     { badge: "badge-error",    Icon: XCircle,       label: "Rejected"     },
+type TagType = "magenta" | "blue" | "green" | "red" | "gray";
+
+const STATUS_META: Record<string, { type: TagType; Icon: React.ElementType; label: string }> = {
+  requested:    { type: "magenta", Icon: Time,            label: "Pending"      },
+  under_review: { type: "blue",    Icon: Time,            label: "Under Review" },
+  approved:     { type: "green",   Icon: CheckmarkFilled, label: "Approved"     },
+  rejected:     { type: "red",     Icon: ErrorFilled,     label: "Rejected"     },
 };
 
 function RequestBadge({ status }: { status: string }) {
-  const { badge, Icon, label } = STATUS_META[status] ?? { badge: "badge-ghost", Icon: Clock, label: status };
+  const { type, Icon, label } = STATUS_META[status] ?? { type: "gray" as TagType, Icon: Time, label: status };
   return (
-    <span className={`badge badge-sm gap-1 ${badge}`}>
-      <Icon className="w-2.5 h-2.5" />{label}
-    </span>
+    <Tag size="sm" type={type} renderIcon={Icon}>
+      {label}
+    </Tag>
   );
 }
 
@@ -32,7 +58,6 @@ function RequestLoanModal({ onClose, onSuccess }: { onClose: () => void; onSucce
   const [form, setForm] = useState<LoanRequestFormData>({ account_name: "", borrow_amount: 0 });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const lbl = "label-text text-xs font-semibold uppercase tracking-wide";
 
   const handleSubmit = async () => {
     if (!form.account_name || !form.borrow_amount) { setError("Fill all required fields"); return; }
@@ -48,33 +73,48 @@ function RequestLoanModal({ onClose, onSuccess }: { onClose: () => void; onSucce
 
   return (
     <Drawer title="New Loan Request" onClose={onClose}>
-        {error && <div className="alert alert-error py-2 text-sm mb-4">{error}</div>}
-        <div className="space-y-3">
-          <div className="form-control">
-            <label className="label py-1"><span className={lbl}>Loan Name / Purpose</span></label>
-            <input className="input input-bordered input-sm" placeholder="e.g. Home renovation" value={form.account_name} onChange={(e) => setForm({ ...form, account_name: e.target.value })} />
-          </div>
-          <div className="form-control">
-            <label className="label py-1"><span className={lbl}>Amount</span></label>
-            <label className="input input-bordered input-sm flex items-center gap-1.5">
-              <span className="text-base-content/40 font-mono text-xs">$</span>
-              <input type="number" min="0" step="0.01" className="grow font-mono" value={form.borrow_amount || ""} onChange={(e) => setForm({ ...form, borrow_amount: Number(e.target.value) })} />
-            </label>
-          </div>
-          <p className="text-xs text-base-content/40 -mt-1">
-            Interest rate and payment schedule are set by the lender when your request is approved.
-          </p>
-          <div className="form-control">
-            <label className="label py-1"><span className={lbl}>Reason <span className="text-base-content/30">(optional)</span></span></label>
-            <textarea className="textarea textarea-bordered textarea-sm text-sm" rows={2} placeholder="Why do you need this loan?" value={form.reason ?? ""} onChange={(e) => setForm({ ...form, reason: e.target.value })} />
-          </div>
+      <form
+        className="lt-form"
+        noValidate
+        onSubmit={(e) => {
+          e.preventDefault();
+          handleSubmit();
+        }}
+      >
+        {error && <Notice kind="error">{error}</Notice>}
+        <TextInput
+          id="request-name"
+          labelText="Loan Name / Purpose"
+          placeholder="e.g. Home renovation"
+          value={form.account_name}
+          onChange={(e) => setForm({ ...form, account_name: e.target.value })}
+        />
+        <TextInput
+          id="request-amount"
+          type="number"
+          min="0"
+          step="0.01"
+          inputMode="decimal"
+          labelText="Amount (USD)"
+          helperText="Interest rate and payment schedule are set by the lender when your request is approved."
+          value={form.borrow_amount || ""}
+          onChange={(e) => setForm({ ...form, borrow_amount: Number(e.target.value) })}
+        />
+        <TextArea
+          id="request-reason"
+          labelText="Reason (optional)"
+          rows={3}
+          placeholder="Why do you need this loan?"
+          value={form.reason ?? ""}
+          onChange={(e) => setForm({ ...form, reason: e.target.value })}
+        />
+        <div className="lt-form__actions lt-form__actions--bleed">
+          <Button type="button" kind="secondary" size="xl" onClick={onClose}>Cancel</Button>
+          <Button type="submit" size="xl" disabled={saving}>
+            {saving ? <InlineLoading description="Submitting…" /> : "Submit Request"}
+          </Button>
         </div>
-        <div className="flex gap-2 justify-end mt-5">
-          <button className="btn btn-ghost btn-sm" onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary btn-sm" onClick={handleSubmit} disabled={saving}>
-            {saving ? <span className="loading loading-spinner loading-xs" /> : "Submit Request"}
-          </button>
-        </div>
+      </form>
     </Drawer>
   );
 }
@@ -82,72 +122,91 @@ function RequestLoanModal({ onClose, onSuccess }: { onClose: () => void; onSucce
 function RequestCard({ req, onCancel }: { req: LoanRequest; onCancel: (id: string) => void }) {
   const [expanded, setExpanded] = useState(false);
   const cancellable = req.status === "requested" || req.status === "under_review";
+  const detailId = `request-detail-${req.id}`;
 
   return (
-    <div className={`card bg-base-100 border shadow-sm ${
-      req.status === "rejected" ? "border-error/20" :
-      req.status === "approved" ? "border-success/20 card-ledger-success" :
-      req.status === "under_review" ? "card-ledger border-base-300" :
-      "card-ledger-warning border-warning/20"
-    }`}>
-      <div className="card-body p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap mb-1">
-              <RequestBadge status={req.status} />
-              <span className="font-semibold text-sm">{req.account_name}</span>
-            </div>
-            <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-base-content/50 font-mono">
-              <span>{formatCurrency(Number(req.borrow_amount))}</span>
-              {req.rate !== null && req.cycle !== null ? (
-                <>
-                  <span>{(Number(req.rate) * 100).toFixed(2)}%</span>
-                  <span>{req.cycle === 15 ? "Bi-monthly" : "Monthly"}</span>
-                </>
-              ) : (
-                <span className="text-base-content/30">Terms set upon approval</span>
-              )}
-              <span>Submitted {formatDate(req.created_at)}</span>
-            </div>
+    <article
+      className={`lt-item${
+        req.status === "approved"
+          ? " lt-item--success"
+          : req.status === "under_review"
+            ? " lt-item--info"
+            : req.status === "requested"
+              ? " lt-item--attention"
+              : ""
+      }`}
+    >
+      <div className="lt-item__top">
+        <div className="lt-item__main">
+          <div className="lt-row">
+            <RequestBadge status={req.status} />
+            <h2 className="lt-item__title">{req.account_name}</h2>
           </div>
-          <div className="flex items-center gap-1 flex-shrink-0">
-            {(req.reason || req.rejection_reason) && (
-              <button className="btn btn-ghost btn-xs" onClick={() => setExpanded(!expanded)}>
-                {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-              </button>
+          <div className="lt-item__meta">
+            <span>{formatCurrency(Number(req.borrow_amount))}</span>
+            {req.rate !== null && req.cycle !== null ? (
+              <>
+                <span>{(Number(req.rate) * 100).toFixed(2)}%</span>
+                <span>{req.cycle === 15 ? "Bi-monthly" : "Monthly"}</span>
+              </>
+            ) : (
+              <span>Terms set upon approval</span>
             )}
-            {cancellable && (
-              <button className="btn btn-ghost btn-xs text-error" onClick={() => onCancel(req.id)} title="Cancel request">
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
+            <span>Submitted {formatDate(req.created_at)}</span>
           </div>
         </div>
-
-        {expanded && (
-          <div className="mt-3 pt-3 border-t border-base-200 space-y-2">
-            {req.reason && (
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-base-content/40 mb-1">Your Reason</p>
-                <p className="text-sm text-base-content/70">{req.reason}</p>
-              </div>
-            )}
-            {req.status === "rejected" && req.rejection_reason && (
-              <div className="bg-error/5 border border-error/15 rounded-md p-3">
-                <p className="text-xs font-semibold uppercase tracking-wider text-error/60 mb-1">Rejection Reason</p>
-                <p className="text-sm text-error/80">{req.rejection_reason}</p>
-              </div>
-            )}
-            {req.status === "approved" && (
-              <div className="flex items-center gap-2 text-success text-xs">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                Approved {req.reviewed_at ? `on ${formatDate(req.reviewed_at)}` : ""} · Loan account created
-              </div>
-            )}
-          </div>
-        )}
+        <div className="lt-row" style={{ flexWrap: "nowrap", gap: 0 }}>
+          {(req.reason || req.rejection_reason) && (
+            <Button
+              kind="ghost"
+              size="md"
+              hasIconOnly
+              renderIcon={expanded ? ChevronUp : ChevronDown}
+              iconDescription={expanded ? "Hide details" : "Show details"}
+              tooltipPosition="left"
+              aria-expanded={expanded}
+              aria-controls={detailId}
+              onClick={() => setExpanded(!expanded)}
+            />
+          )}
+          {cancellable && (
+            <Button
+              kind="danger--ghost"
+              size="md"
+              hasIconOnly
+              renderIcon={Close}
+              iconDescription="Cancel request"
+              tooltipPosition="left"
+              onClick={() => onCancel(req.id)}
+            />
+          )}
+        </div>
       </div>
-    </div>
+
+      {expanded && (
+        <div className="lt-item__detail lt-stack lt-stack--tight" id={detailId}>
+          {req.reason && (
+            <div>
+              <p className="lt-eyebrow">Your Reason</p>
+              <p>{req.reason}</p>
+            </div>
+          )}
+          {req.status === "rejected" && req.rejection_reason && (
+            <Notice kind="error" title="Rejection reason">
+              {req.rejection_reason}
+            </Notice>
+          )}
+          {req.status === "approved" && (
+            <div className="lt-row">
+              <CheckmarkFilled size={16} className="lt-success-icon" aria-hidden="true" />
+              <span>
+                Approved {req.reviewed_at ? `on ${formatDate(req.reviewed_at)}` : ""} · Loan account created
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+    </article>
   );
 }
 
@@ -175,61 +234,52 @@ export default function MyRequestsPage() {
   for (const r of requests) counts[r.status] = (counts[r.status] ?? 0) + 1;
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">My Requests</h1>
-          <p className="text-sm text-base-content/50 mt-0.5">
-            {active.length} active · {3 - active.length} slot{3 - active.length !== 1 ? "s" : ""} remaining
-          </p>
-        </div>
-        <button
-          className="btn btn-primary btn-sm gap-2"
-          onClick={() => setShowModal(true)}
-          disabled={!canRequest}
-          title={!canRequest ? "Max 3 active requests" : ""}
-        >
-          <Plus className="w-4 h-4" />
-          New Request
-        </button>
-      </div>
+    <div className="lt-page lt-page--narrow lt-stack lt-stack--loose">
+      <PageHeader
+        title="My Requests"
+        subtitle={`${active.length} active · ${3 - active.length} slot${3 - active.length !== 1 ? "s" : ""} remaining`}
+        action={
+          <Button size="md" renderIcon={Add} onClick={() => setShowModal(true)} disabled={!canRequest}>
+            New Request
+          </Button>
+        }
+      />
 
-      {/* Filter tabs */}
-      <div className="flex gap-1 flex-wrap">
-        {(["all", "requested", "under_review", "approved", "rejected"] as Filter[]).map((s) => (
-          <button
+      <ContentSwitcher
+        size="md"
+        selectedIndex={FILTERS.indexOf(filter)}
+        onChange={({ name }) => setFilter(name as Filter)}
+      >
+        {FILTERS.map((s) => (
+          <Switch
             key={s}
-            className={`btn btn-xs gap-1.5 ${filter === s ? "btn-primary" : "btn-ghost"}`}
-            onClick={() => setFilter(s)}
-          >
-            {{ all: "All", requested: "Pending", under_review: "Under Review", approved: "Approved", rejected: "Rejected" }[s]}
-            {counts[s === "all" ? "all" : s] > 0 && (
-              <span className={`badge badge-xs ${filter === s ? "badge-primary-content bg-white/20" : "badge-ghost"}`}>
-                {counts[s === "all" ? "all" : s] ?? 0}
-              </span>
-            )}
-          </button>
+            name={s}
+            text={`${FILTER_LABEL[s]}${counts[s] > 0 ? ` (${counts[s]})` : ""}`}
+          />
         ))}
-      </div>
+      </ContentSwitcher>
 
       {isLoading ? (
-        <div className="p-10 text-center"><span className="loading loading-spinner loading-md text-primary" /></div>
+        <div aria-busy="true" aria-label="Loading requests">
+          <SkeletonText paragraph lineCount={4} />
+        </div>
       ) : filtered.length === 0 ? (
-        <div className="card bg-base-100 border border-base-300">
-          <div className="card-body p-12 text-center">
-            <FileText className="w-10 h-10 mx-auto text-base-content/20 mb-3" />
-            <p className="text-sm text-base-content/40">
-              {filter === "all" ? "No requests yet." : `No ${filter.replace("_", " ")} requests.`}
-            </p>
-            {filter === "all" && canRequest && (
-              <button className="btn btn-primary btn-sm mt-4 mx-auto" onClick={() => setShowModal(true)}>
-                Submit your first request
-              </button>
-            )}
-          </div>
+        <div className="lt-panel">
+          <EmptyState
+            Icon={DocumentBlank}
+            title={filter === "all" ? "No requests yet." : `No ${filter.replace("_", " ")} requests.`}
+            description={filter === "all" ? "Submit a request and the lender will review it." : undefined}
+            action={
+              filter === "all" && canRequest ? (
+                <Button onClick={() => setShowModal(true)} renderIcon={Add}>
+                  Submit your first request
+                </Button>
+              ) : undefined
+            }
+          />
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="lt-stack lt-stack--tight">
           {filtered.map((req) => (
             <RequestCard key={req.id} req={req} onCancel={(id) => cancelMutation.mutate(id)} />
           ))}
@@ -237,9 +287,9 @@ export default function MyRequestsPage() {
       )}
 
       {!canRequest && (
-        <p className="text-xs text-center text-warning">
+        <Notice kind="warning">
           You have {active.length}/3 active requests. Cancel or wait for one to be reviewed before submitting another.
-        </p>
+        </Notice>
       )}
 
       {showModal && (

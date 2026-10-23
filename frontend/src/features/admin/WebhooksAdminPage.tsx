@@ -1,9 +1,11 @@
+import { Add, Webhook } from "@carbon/icons-react";
+import { Button, CodeSnippet, Checkbox, InlineLoading, Layer, SkeletonText, Tag, TextInput, Toggle } from "@carbon/react";
+import { TrashCan } from "@carbon/icons-react";
 import { useEffect, useState } from "react";
 import { adminApi } from "../../api";
 import type { WebhookConfig, WebhookFormData, WebhookEventType } from "../../types";
 import { getApiErrorMessage } from "../../utils/apiError";
-import { Webhook, Plus, Trash2, ToggleLeft, ToggleRight, Info } from "lucide-react";
-import { Drawer } from "../../components/common";
+import { ConfirmDialog, Drawer, EmptyState, Notice, PageHeader } from "../../components/common";
 
 const ALL_EVENTS: { value: WebhookEventType; label: string; desc: string }[] = [
   { value: "account.created", label: "Account Created", desc: "Fires when any new loan account is opened" },
@@ -52,52 +54,51 @@ function CreateWebhookModal({ onClose, onCreated }: { onClose: () => void; onCre
     } finally { setSaving(false); }
   };
 
-  const lbl = "label-text text-xs font-semibold uppercase tracking-wide";
-
   return (
     <Drawer title="New Global Webhook" onClose={onClose}>
-        {error && <div className="alert alert-error py-2 text-sm mb-4">{error}</div>}
-        <div className="space-y-4">
-          <div className="form-control">
-            <label className="label py-1"><span className={lbl}>Endpoint URL</span></label>
-            <input
-              className="input input-bordered input-sm font-mono"
-              placeholder="https://eodh8xkd7f2op7r.m.pipedream.net"
-              value={form.target_url}
-              onChange={(e) => setForm({ ...form, target_url: e.target.value })}
-            />
-          </div>
-          <div>
-            <label className="label py-1"><span className={lbl}>Events to Subscribe</span></label>
-            <div className="space-y-2">
-              {ALL_EVENTS.map(({ value, label, desc }) => (
-                <label
-                  key={value}
-                  className={`flex items-start gap-3 p-3 rounded-md border cursor-pointer transition-colors ${
-                    form.events.includes(value) ? "border-primary/40 bg-primary/5" : "border-base-300 hover:bg-base-200"
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    className="checkbox checkbox-primary checkbox-sm mt-0.5"
-                    checked={form.events.includes(value)}
+      <form
+        className="lt-form"
+        noValidate
+        onSubmit={(e) => {
+          e.preventDefault();
+          handleCreate();
+        }}
+      >
+        {error && <Notice kind="error">{error}</Notice>}
+        <TextInput
+          id="global-webhook-url"
+          labelText="Endpoint URL"
+          placeholder="https://eodh8xkd7f2op7r.m.pipedream.net"
+          value={form.target_url}
+          onChange={(e) => setForm({ ...form, target_url: e.target.value })}
+        />
+        <fieldset className="lt-fieldset">
+          <legend className="cds--label">Events to Subscribe</legend>
+          <div className="lt-stack lt-stack--tight">
+            {ALL_EVENTS.map(({ value, label, desc }) => {
+              const checked = form.events.includes(value);
+              return (
+                <div key={value} className={`lt-option-card${checked ? " lt-option-card--checked" : ""}`}>
+                  <Checkbox
+                    id={`global-ev-${value}`}
+                    labelText={<span className="lt-mono">{value}</span>}
+                    checked={checked}
                     onChange={() => toggleEvent(value)}
+                    aria-label={label}
                   />
-                  <div>
-                    <p className="text-sm font-medium font-mono">{value}</p>
-                    <p className="text-xs text-base-content/50 mt-0.5">{desc}</p>
-                  </div>
-                </label>
-              ))}
-            </div>
+                  <p className="lt-option-card__desc">{desc}</p>
+                </div>
+              );
+            })}
           </div>
+        </fieldset>
+        <div className="lt-form__actions lt-form__actions--bleed">
+          <Button type="button" kind="secondary" size="xl" onClick={onClose}>Cancel</Button>
+          <Button type="submit" size="xl" disabled={saving}>
+            {saving ? <InlineLoading description="Creating…" /> : "Create Webhook"}
+          </Button>
         </div>
-        <div className="flex justify-end gap-2 mt-5">
-          <button className="btn btn-ghost btn-sm" onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary btn-sm" onClick={handleCreate} disabled={saving}>
-            {saving ? <span className="loading loading-spinner loading-xs" /> : "Create Webhook"}
-          </button>
-        </div>
+      </form>
     </Drawer>
   );
 }
@@ -107,15 +108,16 @@ export default function WebhooksAdminPage() {
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [showPayload, setShowPayload] = useState(false);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   useEffect(() => {
     adminApi.listGlobalWebhooks().then(setWebhooks).finally(() => setLoading(false));
   }, []);
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Delete this global webhook?")) return;
     await adminApi.deleteGlobalWebhook(id);
     setWebhooks((prev) => prev.filter((w) => w.id !== id));
+    setDeleteId(null);
   };
 
   const handleToggle = async (wh: WebhookConfig) => {
@@ -124,90 +126,119 @@ export default function WebhooksAdminPage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Global Webhooks</h1>
-          <p className="text-sm text-base-content/50 mt-0.5 max-w-md">
-            Fire for all accounts — invite emails, CRM sync, audit pipelines.
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <button className="btn btn-ghost btn-sm gap-2" onClick={() => setShowPayload(!showPayload)}>
-            <Info className="w-4 h-4" /> Payload
-          </button>
-          <button className="btn btn-primary btn-sm gap-2" onClick={() => setShowCreate(true)}>
-            <Plus className="w-4 h-4" /> Add Webhook
-          </button>
-        </div>
-      </div>
+    <div className="lt-page lt-page--narrow lt-stack lt-stack--loose">
+      <PageHeader
+        title="Global Webhooks"
+        subtitle="Fire for all accounts — invite emails, CRM sync, audit pipelines."
+        action={
+          <>
+            <Button
+              kind="ghost"
+              size="md"
+              aria-expanded={showPayload}
+              onClick={() => setShowPayload(!showPayload)}
+            >
+              {showPayload ? "Hide payload" : "Payload"}
+            </Button>
+            <Button size="md" renderIcon={Add} onClick={() => setShowCreate(true)}>
+              Add Webhook
+            </Button>
+          </>
+        }
+      />
 
       {showPayload && (
-        <div className="card bg-neutral text-neutral-content shadow border border-neutral overflow-hidden">
-          <div className="card-body p-5">
-            <div className="flex items-center gap-2 mb-3">
-              <Webhook className="w-4 h-4 text-accent" />
-              <h3 className="text-sm font-semibold text-neutral-content/80 uppercase tracking-wider">Sample Payload</h3>
-            </div>
-            <p className="text-xs text-neutral-content/50 mb-3">Every event POST contains the full account snapshot plus event metadata.</p>
-            <pre className="text-xs font-mono text-accent/90 overflow-x-auto bg-black/20 rounded-md p-4 leading-relaxed">
+        <section className="lt-panel lt-panel__body" aria-labelledby="payload-heading">
+          <h2 className="lt-section-title" id="payload-heading">Sample Payload</h2>
+          <p className="lt-muted" style={{ marginBlockEnd: "1rem" }}>
+            Every event POST contains the full account snapshot plus event metadata.
+          </p>
+          <Layer>
+            <CodeSnippet type="multi" feedback="Copied" wrapText>
               {JSON.stringify(PAYLOAD_SAMPLE, null, 2)}
-            </pre>
-          </div>
-        </div>
+            </CodeSnippet>
+          </Layer>
+        </section>
       )}
 
-      <div className="space-y-3">
-        {loading ? (
-          <div className="p-8 text-center"><span className="loading loading-spinner loading-md text-primary" /></div>
-        ) : webhooks.length === 0 ? (
-          <div className="card bg-base-100 border border-base-300">
-            <div className="card-body p-10 text-center">
-              <Webhook className="w-10 h-10 mx-auto text-base-content/20 mb-3" />
-              <p className="text-sm text-base-content/40">No global webhooks configured.</p>
-            </div>
-          </div>
-        ) : (
-          webhooks.map((wh) => (
-            <div key={wh.id} className={`card bg-base-100 shadow-sm border ${wh.is_active ? "border-base-300 card-ledger" : "border-base-300 opacity-60"}`}>
-              <div className="card-body p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className={`badge badge-sm ${wh.is_active ? "badge-success" : "badge-ghost"}`}>
-                        {wh.is_active ? "Active" : "Paused"}
-                      </span>
-                      <span className="badge badge-xs badge-outline font-mono">global</span>
-                    </div>
-                    <p className="font-mono text-sm mt-2 break-all text-base-content/80">{wh.target_url}</p>
-                    <div className="flex flex-wrap gap-1.5 mt-2">
-                      {wh.events.map((ev) => (
-                        <span key={ev} className="badge badge-xs badge-accent badge-outline font-mono">{ev}</span>
-                      ))}
-                    </div>
-                    <p className="text-xs text-base-content/30 font-mono mt-2">
-                      Created {new Date(wh.created_at).toLocaleDateString()}
-                    </p>
+      {loading ? (
+        <div aria-busy="true" aria-label="Loading webhooks">
+          <SkeletonText paragraph lineCount={3} />
+        </div>
+      ) : webhooks.length === 0 ? (
+        <div className="lt-panel">
+          <EmptyState
+            Icon={Webhook}
+            title="No global webhooks configured."
+            description="Add an endpoint to receive events from every account."
+            action={<Button renderIcon={Add} onClick={() => setShowCreate(true)}>Add Webhook</Button>}
+          />
+        </div>
+      ) : (
+        <div className="lt-stack lt-stack--tight">
+          {webhooks.map((wh) => (
+            <article key={wh.id} className={`lt-item${wh.is_active ? "" : " lt-item--muted"}`}>
+              <div className="lt-item__top">
+                <div className="lt-item__main">
+                  <div className="lt-row">
+                    <Tag size="sm" type={wh.is_active ? "green" : "gray"}>
+                      {wh.is_active ? "Active" : "Paused"}
+                    </Tag>
+                    <Tag size="sm" type="outline">global</Tag>
                   </div>
-                  <div className="flex items-center gap-1 flex-shrink-0">
-                    <button className="btn btn-ghost btn-xs" onClick={() => handleToggle(wh)} title={wh.is_active ? "Pause" : "Resume"}>
-                      {wh.is_active ? <ToggleRight className="w-4 h-4 text-success" /> : <ToggleLeft className="w-4 h-4" />}
-                    </button>
-                    <button className="btn btn-ghost btn-xs text-error" onClick={() => handleDelete(wh.id)}>
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                  <p className="lt-item__url lt-mono">{wh.target_url}</p>
+                  <div className="lt-row" style={{ gap: "0.25rem" }}>
+                    {wh.events.map((ev) => (
+                      <Tag key={ev} size="sm" type="outline">
+                        <span className="lt-mono">{ev}</span>
+                      </Tag>
+                    ))}
                   </div>
+                  <p className="lt-field-note" style={{ marginBlockStart: "0.75rem" }}>
+                    Created {new Date(wh.created_at).toLocaleDateString()}
+                  </p>
+                </div>
+                <div className="lt-table-actions">
+                  <Toggle
+                    id={`wh-toggle-${wh.id}`}
+                    size="sm"
+                    hideLabel
+                    labelText=""
+                    aria-label={wh.is_active ? "Webhook active — switch off to pause" : "Webhook paused — switch on to resume"}
+                    toggled={wh.is_active}
+                    onToggle={() => handleToggle(wh)}
+                  />
+                  <Button
+                    kind="danger--ghost"
+                    size="sm"
+                    hasIconOnly
+                    renderIcon={TrashCan}
+                    iconDescription="Delete webhook"
+                    tooltipPosition="left"
+                    onClick={() => setDeleteId(wh.id)}
+                  />
                 </div>
               </div>
-            </div>
-          ))
-        )}
-      </div>
+            </article>
+          ))}
+        </div>
+      )}
 
       {showCreate && (
         <CreateWebhookModal
           onClose={() => setShowCreate(false)}
           onCreated={(wh) => setWebhooks((prev) => [wh, ...prev])}
+        />
+      )}
+
+      {deleteId && (
+        <ConfirmDialog
+          title="Delete Global Webhook"
+          message="This will stop delivering events to this endpoint. This can't be undone."
+          confirmLabel="Delete Webhook"
+          dangerous
+          onConfirm={() => handleDelete(deleteId)}
+          onCancel={() => setDeleteId(null)}
         />
       )}
     </div>
