@@ -268,7 +268,7 @@ export default function RequestsPage() {
                             onClick={() => handleReview(req, "approved")}
                             disabled={acting === req.id}
                           >
-                            {acting === req.id ? <InlineLoading description="Working…" /> : "Approve & Create Loan"}
+                            {acting === req.id ? <InlineLoading description="Working…" /> : "Approve & create loan"}
                           </Button>
                         </div>
                       </div>
@@ -294,7 +294,7 @@ export default function RequestsPage() {
         <ConfirmDialog
           title="Delete Request"
           message="This will permanently delete this loan request record."
-          confirmLabel="Delete Request"
+          confirmLabel="Delete request"
           dangerous
           onConfirm={() => handleDeleteRequest(deleteRequestId)}
           onCancel={() => setDeleteRequestId(null)}

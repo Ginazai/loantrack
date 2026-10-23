@@ -56,9 +56,9 @@ describe("ConfirmDialog", () => {
 
   it("uses a custom confirm label", () => {
     render(
-      <ConfirmDialog title="T" message="M" confirmLabel="Purge Forever" onConfirm={vi.fn()} onCancel={vi.fn()} />
+      <ConfirmDialog title="T" message="M" confirmLabel="Purge forever" onConfirm={vi.fn()} onCancel={vi.fn()} />
     );
-    expect(screen.getByText("Purge Forever")).toBeInTheDocument();
+    expect(screen.getByText("Purge forever")).toBeInTheDocument();
   });
 
   it("applies the dangerous styling when set", () => {

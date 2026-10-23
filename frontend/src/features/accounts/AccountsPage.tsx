@@ -60,7 +60,7 @@ export function AccountsPage() {
               <MenuItem label="All payments (.csv)" onClick={() => adminApi.exportPaymentsCsv()} />
             </MenuButton>
             <Button size="md" renderIcon={Add} onClick={() => setShowCreate(true)}>
-              New Account
+              New account
             </Button>
           </>
         }
@@ -130,7 +130,7 @@ export function AccountsPage() {
               description="Create a loan account to start tracking balances, interest and payments."
               action={
                 <Button renderIcon={Add} onClick={() => setShowCreate(true)}>
-                  New Account
+                  New account
                 </Button>
               }
             />

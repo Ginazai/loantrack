@@ -149,7 +149,7 @@ export function PaymentForm({ account, onSubmit, onCancel, isLoading }: Props) {
           Cancel
         </Button>
         <Button type="submit" size="xl" disabled={isLoading}>
-          {isLoading ? <InlineLoading description="Recording…" /> : "Record Payment"}
+          {isLoading ? <InlineLoading description="Recording…" /> : "Record payment"}
         </Button>
       </div>
     </form>

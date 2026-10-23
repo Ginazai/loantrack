@@ -19,7 +19,7 @@ describe("WebhookForm", () => {
       screen.getByPlaceholderText("https://your-n8n-instance.com/webhook/..."),
       "not-a-url"
     );
-    await user.click(screen.getByText("Save Webhook"));
+    await user.click(screen.getByText("Save webhook"));
 
     expect(await screen.findByText("Must be a valid URL")).toBeInTheDocument();
     expect(onSubmit).not.toHaveBeenCalled();
@@ -37,7 +37,7 @@ describe("WebhookForm", () => {
     // Uncheck the one default event.
     const checkbox = screen.getByRole("checkbox", { name: "Payment Added" });
     await user.click(checkbox);
-    await user.click(screen.getByText("Save Webhook"));
+    await user.click(screen.getByText("Save webhook"));
 
     expect(await screen.findByText("Select at least one event")).toBeInTheDocument();
     expect(onSubmit).not.toHaveBeenCalled();
@@ -54,7 +54,7 @@ describe("WebhookForm", () => {
     );
     const cycleCheckbox = screen.getByRole("checkbox", { name: "Cycle Closed" });
     await user.click(cycleCheckbox);
-    await user.click(screen.getByText("Save Webhook"));
+    await user.click(screen.getByText("Save webhook"));
 
     await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
     const submitted = onSubmit.mock.calls[0][0];

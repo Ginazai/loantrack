@@ -207,7 +207,7 @@ export function AccountForm({ account, onSubmit, onCancel, isLoading }: Props) {
                         onClick={handleCreateUser}
                         disabled={creatingUser}
                       >
-                        {creatingUser ? <InlineLoading description="Creating…" /> : "Create & Link"}
+                        {creatingUser ? <InlineLoading description="Creating…" /> : "Create & link"}
                       </Button>
                     </div>
                   </div>
@@ -304,9 +304,9 @@ export function AccountForm({ account, onSubmit, onCancel, isLoading }: Props) {
           {isLoading ? (
             <InlineLoading description={isEdit ? "Saving…" : "Creating…"} />
           ) : isEdit ? (
-            "Save Changes"
+            "Save changes"
           ) : (
-            "Create Account"
+            "Create account"
           )}
         </Button>
       </div>
