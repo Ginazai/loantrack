@@ -36,10 +36,17 @@ server {
     location /api/ {
         proxy_pass ${BACKEND_URL};
         proxy_http_version 1.1;
-        proxy_set_header Host $host;
+
+        # Send SNI so Render's edge can complete the TLS handshake.
+        proxy_ssl_server_name on;
+
+        # Use the backend hostname selected by proxy_pass instead of the frontend host.
+        proxy_set_header Host $proxy_host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # Render terminates TLS before nginx, so the scheme is present in this header.
+        proxy_set_header X-Forwarded-Proto $http_x_forwarded_proto;
     }
 
     # React SPA — all routes fall back to index.html
