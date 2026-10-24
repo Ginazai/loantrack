@@ -1,0 +1,25 @@
+# Runtime dependencies, mirrored from [tool.poetry.dependencies] in pyproject.toml.
+# Input for the hashed lockfile `requirements-ci.txt` (see the header of that file).
+fastapi>=0.111.0,<0.112
+uvicorn[standard]>=0.30.0,<0.31
+python-multipart>=0.0.9,<0.1
+sqlalchemy[asyncio]>=2.0.0,<3
+asyncpg>=0.29.0,<0.30
+alembic>=1.13.0,<2
+pydantic>=2.7.0,<3
+pydantic-settings>=2.3.0,<3
+email-validator>=2.1.0,<3
+python-jose[cryptography]>=3.3.0,<4
+passlib[bcrypt]>=1.7.4,<2
+bcrypt>=3.1.7,<4
+cryptography>=42.0.0,<43
+sendgrid>=6.11.0,<7
+twilio>=9.2.0,<10
+azure-storage-blob>=12.20.0,<13
+httpx>=0.27.0,<0.28
+slowapi>=0.1.9,<0.2
+
+# Regenerate the lockfile after changing this file or requirements-dev.txt (Python 3.12):
+#   pip install pip-tools
+#   pip-compile --generate-hashes --allow-unsafe --strip-extras --annotation-style=line \
+#       --output-file=requirements-ci.txt requirements.in requirements-dev.txt
