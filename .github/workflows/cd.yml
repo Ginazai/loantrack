@@ -85,6 +85,9 @@ jobs:
   staging:
     name: Staging
     needs: publish
+    permissions:
+      contents: read
+      packages: read
     uses: ./.github/workflows/deploy-render.yml
     with:
       environment: staging
@@ -94,6 +97,9 @@ jobs:
   production:
     name: Production
     needs: [publish, staging]
+    permissions:
+      contents: read
+      packages: read
     # Normal path: staging succeeded. Rollback path: manual dispatch (publish/staging are skipped).
     if: >-
       always() && !cancelled() &&
