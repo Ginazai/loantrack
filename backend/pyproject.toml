@@ -10,7 +10,7 @@ python = "^3.11"
 
 # Web framework
 fastapi = "^0.111.0"
-uvicorn = { extras = ["standard"], version = "^0.30.0" }
+uvicorn = { extras = ["standard"], version = ">=0.30,<0.55" }
 python-multipart = "^0.0.9"         # form data / file uploads
 
 # Database
