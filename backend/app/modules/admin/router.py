@@ -1,7 +1,11 @@
+import csv
+import io
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy import select, update
+from sqlalchemy import select as sql_select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
@@ -10,6 +14,7 @@ from app.core.security import generate_webhook_secret, hash_password
 from app.modules.accounts.models import LoanAccount
 from app.modules.accounts.schemas import LoanAccountFilter
 from app.modules.accounts.service import LoanAccountService
+from app.modules.payments.models import Payment as PaymentModel
 from app.modules.users.models import RefreshToken, User
 from app.modules.users.schemas import AdminUserUpdate, UserCreate, UserOut
 from app.modules.webhooks.models import WebhookConfig
@@ -220,14 +225,6 @@ async def delete_loan_request(
 
 
 # ── CSV exports ────────────────────────────────────────────────────────────────
-
-import csv
-import io
-
-from fastapi.responses import StreamingResponse
-from sqlalchemy import select as sql_select
-
-from app.modules.payments.models import Payment as PaymentModel
 
 
 @router.get("/export/accounts.csv")

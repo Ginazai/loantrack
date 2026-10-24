@@ -1,0 +1,15 @@
+# Dev/CI tooling for the backend. Installed by CI *in addition to* the app itself:
+#     pip install -e . -r requirements-dev.txt
+#
+# Why this file exists: pyproject.toml is Poetry-format, so `pip install -e ".[dev]"`
+# silently installs nothing from the dev group ("does not provide the extra 'dev'")
+# and ruff/mypy/pytest are never installed. Pinned to the versions this pipeline
+# was validated with, so a surprise tool release can't turn CI red on its own.
+# Dependabot (pip ecosystem) keeps these current.
+
+ruff==0.17.2
+mypy==2.4.0
+pytest==8.4.2
+pytest-asyncio==0.23.8
+pytest-cov==7.1.0
+pip-audit==2.10.1

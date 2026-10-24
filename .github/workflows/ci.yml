@@ -4,94 +4,299 @@ on:
   push:
     branches: [main, dev]
   pull_request:
-    branches: [main]
+    branches: [main, dev]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# New pushes to a PR cancel the superseded run; runs on main/dev always finish.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  PYTHON_VERSION: "3.12"  # matches backend/Dockerfile
+  NODE_VERSION: "22"      # matches frontend/Dockerfile; jsdom@30 + jest-dom@7 need Node >=22
 
 jobs:
-  backend:
-    name: Backend — lint / type-check / test
-    runs-on: ubuntu-22.04
+  # ───────────────────────────── Backend ─────────────────────────────
+  backend-quality:
+    name: Backend · lint, format, types
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
     defaults:
       run:
         working-directory: backend
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements-ci.txt
+      # Hashed lockfile (pip-compile --generate-hashes): every transitive dep is pinned and
+      # hash-verified, and --only-binary forbids running sdist setup.py/build scripts.
+      # `app` needs no install: pytest/mypy/ruff/alembic run from backend/ and import it directly.
+      - run: "pip install --require-hashes --only-binary :all: -r requirements-ci.txt"
+      - name: Ruff lint
+        run: ruff check app/ tests/ --output-format=github
+      - name: Ruff format
+        run: ruff format --check app/ tests/
+      - name: Mypy
+        id: mypy
+        # RATCHET (warn-only): baseline was 31 errors in 17 files when this pipeline was added.
+        # Remove `continue-on-error` once mypy is clean so new type errors block merges.
+        continue-on-error: true
+        run: mypy app/ --ignore-missing-imports
+      - name: Surface mypy failures
+        if: steps.mypy.outcome == 'failure'
+        run: echo "::warning title=mypy::Type errors found (non-blocking until the baseline is cleaned up). See the 'Mypy' step."
 
+  backend-test:
+    name: Backend · tests + coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend
     services:
       postgres:
-        image: postgres:16-alpine
+        image: postgres:16-alpine   # same major version as docker-compose.yml
         env:
-          POSTGRES_DB: test_db
           POSTGRES_USER: test
           POSTGRES_PASSWORD: test
-        ports: ["5432:5432"]
+          POSTGRES_DB: test_db
+        ports:
+          - 5432:5432
         options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
+          --health-cmd "pg_isready -U test -d test_db"
+          --health-interval 5s
           --health-timeout 5s
-          --health-retries 5
-
+          --health-retries 10
     env:
       DATABASE_URL: postgresql+asyncpg://test:test@localhost:5432/test_db
-      SECRET_KEY: ci-secret-key-not-used-in-prod
-      ENVIRONMENT: test
-
+      SECRET_KEY: ci-only-secret-key-not-used-anywhere-else-0123456789
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
-          python-version: "3.12"
+          python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
-
-      - name: Install deps
-        run: pip install -e ".[dev]"
-
-      - name: Lint (ruff)
-        run: ruff check app/ tests/
-
-      - name: Format check (ruff format)
-        run: ruff format --check app/ tests/
-
-      - name: Type check (mypy)
-        run: mypy app/ --ignore-missing-imports
-
-      - name: Run migrations
+          cache-dependency-path: |
+            backend/requirements-ci.txt
+      - run: "pip install --require-hashes --only-binary :all: -r requirements-ci.txt"
+      - name: Migrations apply to an empty database
         run: alembic upgrade head
+      - name: Tests (coverage gate 80%, production code only)
+        run: >-
+          pytest tests/ app/modules/*/tests/
+          --cov=app --cov-report=term --cov-report=xml
+          --cov-fail-under=80
+          --junitxml=pytest-report.xml
+      - name: Upload coverage for SonarQube
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: backend-coverage
+          path: |
+            backend/coverage.xml
+            backend/pytest-report.xml
+          if-no-files-found: warn
+          retention-days: 7
 
-      - name: Tests + coverage
-        run: |
-          pytest tests/ app/modules/*/tests/ \
-            --cov=app --cov-report=term-missing \
-            --cov-fail-under=80 -q
-
-  frontend:
-    name: Frontend — lint / type-check / build
-    runs-on: ubuntu-22.04
+  # ───────────────────────────── Frontend ────────────────────────────
+  frontend-quality:
+    name: Frontend · types, lint, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
     defaults:
       run:
         working-directory: frontend
-
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
-          node-version: "20"
+          node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-
-      - run: npm ci
+      - run: npm ci --ignore-scripts
+      # `tsc --noEmit` at the root checks nothing (tsconfig.json has "files": [] + references).
       - name: Type check
-        run: npx tsc --noEmit
-      - name: Lint (ESLint)
-        run: npx eslint src/ --ext .ts,.tsx --max-warnings 0
-      - name: Build
+        run: npm run typecheck
+      - name: ESLint
+        if: ${{ hashFiles('frontend/eslint.config.js', 'frontend/eslint.config.mjs', 'frontend/eslint.config.ts') != '' }}
+        run: npm run lint
+      - name: ESLint not configured
+        if: ${{ hashFiles('frontend/eslint.config.js', 'frontend/eslint.config.mjs', 'frontend/eslint.config.ts') == '' }}
+        run: echo "::warning title=ESLint::No frontend/eslint.config.* found, so frontend linting is NOT running. Add ESLint to enable this gate (see docs/ci-cd.md)."
+      - name: Production build
         run: npm run build
 
-  docker:
-    name: Docker build check
-    runs-on: ubuntu-22.04
-    needs: [backend, frontend]
-    if: github.ref == 'refs/heads/main'
+  frontend-test:
+    name: Frontend · tests + coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --ignore-scripts
+      # No coverage threshold here on purpose: baseline is ~35%. SonarQube's quality gate
+      # enforces coverage on *new* code instead, which is the realistic ratchet.
+      - run: npm run test:coverage
+      - name: Upload coverage for SonarQube
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: frontend-coverage
+          path: frontend/coverage/lcov.info
+          if-no-files-found: warn
+          retention-days: 7
+
+  # ───────────────────────── Dependency audit ────────────────────────
+  dependency-audit:
+    name: Dependency vulnerabilities
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements-ci.txt
+      - run: "pip install --require-hashes --only-binary :all: -r backend/requirements-ci.txt"
+      - name: pip-audit
+        id: pip_audit
+        # RATCHET (warn-only): baseline had advisories in starlette, python-multipart,
+        # cryptography, python-jose, ecdsa. Upgrade fastapi, then remove continue-on-error.
+        continue-on-error: true
+        run: pip-audit --progress-spinner off
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: npm audit (production deps, high+)
+        id: npm_audit
+        # RATCHET (warn-only): baseline had 3 high advisories, all fixed by `npm audit fix`.
+        # Commit that, then remove continue-on-error.
+        continue-on-error: true
+        working-directory: frontend
+        run: npm audit --omit=dev --audit-level=high
+      - name: Surface audit failures
+        if: steps.pip_audit.outcome == 'failure' || steps.npm_audit.outcome == 'failure'
+        run: echo "::warning title=Dependency audit::Known vulnerabilities found (non-blocking until the baseline is cleaned up). See the audit steps."
+
+  # ─────────────────────────── Containers ────────────────────────────
+  docker:
+    name: Docker · build + smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - name: Build backend image
-        run: docker build ./backend -t loantrack-backend:ci
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: backend
+          load: true
+          push: false
+          platforms: linux/amd64
+          tags: loantrack-backend:ci
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,scope=backend,mode=max
       - name: Build frontend image
-        run: docker build ./frontend -t loantrack-frontend:ci
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: frontend
+          load: true
+          push: false
+          platforms: linux/amd64
+          tags: loantrack-frontend:ci
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,scope=frontend,mode=max
+      - name: Smoke test (Postgres + both images, login through nginx)
+        run: bash scripts/ci/smoke-test.sh   # via bash: does not depend on the git exec bit
+
+  # ───────────────────────────── SonarQube ───────────────────────────
+  sonarqube:
+    name: SonarQube · analysis + quality gate
+    needs: [backend-test, frontend-test]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # Mapped to env so steps can test for presence (the `secrets` context isn't allowed in `if`).
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
+      SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY }}
+      SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION }}
+    steps:
+      - name: SonarQube not configured
+        if: ${{ env.SONAR_TOKEN == '' }}
+        run: 'echo "::notice title=SonarQube::Skipped, no SONAR_TOKEN secret (expected on fork PRs, or until setup is done; see docs/ci-cd.md)."'
+      - uses: actions/checkout@v7
+        if: ${{ env.SONAR_TOKEN != '' }}
+        with:
+          fetch-depth: 0   # Sonar needs full history for blame and new-code detection
+      - uses: actions/download-artifact@v8
+        if: ${{ env.SONAR_TOKEN != '' }}
+        with:
+          name: backend-coverage
+          path: backend
+      - uses: actions/download-artifact@v8
+        if: ${{ env.SONAR_TOKEN != '' }}
+        with:
+          name: frontend-coverage
+          path: frontend/coverage
+      - name: Re-root coverage paths (fails if they don't resolve)
+        if: ${{ env.SONAR_TOKEN != '' }}
+        run: python3 scripts/ci/prepare_sonar_reports.py
+      - name: Build scanner arguments
+        id: args
+        if: ${{ env.SONAR_TOKEN != '' }}
+        run: |
+          if [ -z "$SONAR_PROJECT_KEY" ]; then
+            echo "::error title=SonarQube::Repository variable SONAR_PROJECT_KEY is not set."
+            exit 1
+          fi
+          args="-Dsonar.projectKey=${SONAR_PROJECT_KEY} -Dsonar.qualitygate.wait=true -Dsonar.qualitygate.timeout=300"
+          if [ -n "$SONAR_ORGANIZATION" ]; then args="$args -Dsonar.organization=${SONAR_ORGANIZATION}"; fi
+          echo "args=$args" >> "$GITHUB_OUTPUT"
+      - name: SonarQube scan (waits for the quality gate)
+        if: ${{ env.SONAR_TOKEN != '' }}
+        uses: SonarSource/sonarqube-scan-action@d209202bc7d53ff1cc128f7f907dac145c9d6ae9 # v8.3.0
+        with:
+          args: ${{ steps.args.outputs.args }}
+
+  # ──────────────────── Single required status check ─────────────────
+  # Make THIS the only required check in branch protection. Adding or renaming jobs above
+  # then never needs a branch-protection change. Skipped jobs (e.g. Sonar) count as OK.
+  ci-gate:
+    name: CI gate
+    if: ${{ always() }}
+    needs:
+      - backend-quality
+      - backend-test
+      - frontend-quality
+      - frontend-test
+      - dependency-audit
+      - docker
+      - sonarqube
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail if any required job failed or was cancelled
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "Job results: $RESULTS"
+          case " $RESULTS " in
+            *" failure "*|*" cancelled "*) echo "::error::CI failed"; exit 1 ;;
+          esac

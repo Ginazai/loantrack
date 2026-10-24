@@ -18,7 +18,7 @@ Single-tenant loan tracking tool for managing private loans, payment schedules, 
 ## Prerequisites
 
 - Docker + Docker Compose v2
-- Node 20+ (local frontend dev only)
+- Node 22+ (local frontend dev only)
 - Python 3.12+ (local backend dev only)
 
 ## Quick Start
@@ -82,7 +82,7 @@ Run this after any schema changes. CI validates the build still compiles.
 
 ```bash
 # Backend (from backend/)
-pytest tests/ app/modules/*/tests/ --cov=app --cov-fail-under=60
+pytest tests/ app/modules/*/tests/ --cov=app --cov-fail-under=80
 
 # Frontend type check
 cd frontend && npx tsc --noEmit

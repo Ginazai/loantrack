@@ -50,6 +50,7 @@ slowapi = "^0.1.9"
 pytest = "^8.2.0"
 pytest-asyncio = "^0.23.0"
 httpx = "^0.27.0"                   # also in dev for test client
+pytest-cov = ">=5.0"                # coverage reporting (--cov); used by CI
 
 [tool.poetry.group.lint.dependencies]
 ruff = "^0.4.0"
@@ -72,6 +73,16 @@ asyncio_mode = "auto"
 # exercise add_payment/delete_payment/recalculate_ledger end-to-end.)
 concurrency = ["greenlet", "thread"]
 
+# Report paths relative to the working directory (backend/) instead of absolute
+# runner paths, so scripts/ci/prepare-sonar-reports.sh can re-root them for Sonar.
+relative_files = true
+
+# Measure production code only. Without this, test files count toward coverage
+# and inflate the number (~88% reported vs ~82% for the code that actually ships).
+omit = ["*/tests/*", "*/conftest.py"]
+
 [tool.ruff]
 line-length = 100
+
+[tool.ruff.lint]
 select = ["E", "F", "I"]
