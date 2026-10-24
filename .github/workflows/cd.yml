@@ -108,7 +108,9 @@ jobs:
     # Normal path: staging succeeded. Rollback path: manual dispatch (publish/staging are skipped).
     if: >-
       always() && !cancelled() &&
-      (needs.staging.result == 'success' || github.event_name == 'workflow_dispatch')
+      (needs.staging.result == 'success' || github.event_name == 'workflow_dispatch') &&
+      (github.event_name == 'workflow_dispatch' ||
+       github.event.workflow_run.head_repository.full_name == github.repository)
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:

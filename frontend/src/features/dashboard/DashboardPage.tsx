@@ -28,10 +28,10 @@ export function DashboardPage() {
   const active = accounts.filter((a) => a.status === "active" || a.status === "open");
   const overdue = active.filter((a) => isOverdue(a.next_due_date));
   const totalOutstanding = active.reduce(
-    (sum, a) => sum + parseFloat(a.current_balance ?? a.borrow_amount),
+    (sum, a) => sum + Number.parseFloat(a.current_balance ?? a.borrow_amount),
     0
   );
-  const totalPrincipal = active.reduce((sum, a) => sum + parseFloat(a.borrow_amount), 0);
+  const totalPrincipal = active.reduce((sum, a) => sum + Number.parseFloat(a.borrow_amount), 0);
 
   return (
     <div className="lt-page lt-stack lt-stack--loose">

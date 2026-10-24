@@ -65,7 +65,7 @@ docker run -d --name "$API" --network "$NET" --network-alias backend -p 127.0.0.
   -e UVICORN_WORKERS=1 -e ALLOWED_ORIGINS='["http://localhost"]' \
   "$BACKEND_IMAGE" >/dev/null
 
-docker run -d --name "$WEB" --network "$NET" -p 127.0.0.1:18080:80 "$FRONTEND_IMAGE" >/dev/null
+docker run -d --name "$WEB" --network "$NET" -p 127.0.0.1:18080:8080 "$FRONTEND_IMAGE" >/dev/null
 
 wait_until "backend" 45 curl -fsS http://127.0.0.1:18000/api/v1/health
 wait_until "frontend" 20 curl -fsS http://127.0.0.1:18080/health

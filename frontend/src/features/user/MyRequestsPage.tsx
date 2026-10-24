@@ -78,7 +78,7 @@ function RequestLoanModal({ onClose, onSuccess }: { onClose: () => void; onSucce
         noValidate
         onSubmit={(e) => {
           e.preventDefault();
-          handleSubmit();
+          void handleSubmit();
         }}
       >
         {error && <Notice kind="error">{error}</Notice>}

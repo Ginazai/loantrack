@@ -71,7 +71,7 @@ function EditUserDrawer({
         noValidate
         onSubmit={(e) => {
           e.preventDefault();
-          handleSave();
+          void handleSave();
         }}
       >
         {error && <Notice kind="error">{error}</Notice>}
@@ -144,7 +144,7 @@ function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreate
         noValidate
         onSubmit={(e) => {
           e.preventDefault();
-          handleCreate();
+          void handleCreate();
         }}
       >
         {error && <Notice kind="error">{error}</Notice>}

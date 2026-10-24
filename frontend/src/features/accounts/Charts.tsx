@@ -47,7 +47,7 @@ function buildChartData(payments: Payment[], borrowAmount: string): ChartRow[] {
 
 /** Round the Y axis to even, human steps ($5k, $10k, $25k…) with a little headroom above the data. */
 function niceTicks(max: number): number[] {
-  if (!isFinite(max) || max <= 0) return [0, 1, 2, 3, 4];
+  if (!Number.isFinite(max) || max <= 0) return [0, 1, 2, 3, 4];
   const target = max * 1.05;
   const mag = Math.pow(10, Math.floor(Math.log10(target)) - 1);
   const step =

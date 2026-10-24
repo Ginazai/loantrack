@@ -61,7 +61,7 @@ function CreateWebhookModal({ onClose, onCreated }: { onClose: () => void; onCre
         noValidate
         onSubmit={(e) => {
           e.preventDefault();
-          handleCreate();
+          void handleCreate();
         }}
       >
         {error && <Notice kind="error">{error}</Notice>}

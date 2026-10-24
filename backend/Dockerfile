@@ -29,7 +29,7 @@ WORKDIR /app
 COPY --from=builder /app/.venv /app/.venv
 
 # Copy application source
-COPY --chown=app:app . .
+COPY . .
 
 # Make the venv the active Python environment
 ENV PATH="/app/.venv/bin:$PATH" \
@@ -37,8 +37,8 @@ ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONUNBUFFERED=1
 
 # Entrypoint: run migrations then start the server
-COPY --chown=app:app entrypoint.sh /entrypoint.sh
-RUN sed -i 's/\r$//' /entrypoint.sh && chmod +x /entrypoint.sh
+COPY entrypoint.sh /entrypoint.sh
+RUN sed -i 's/\r$//' /entrypoint.sh && chmod 755 /entrypoint.sh
 
 USER app
 

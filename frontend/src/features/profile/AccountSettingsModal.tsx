@@ -43,7 +43,7 @@ export function AccountSettingsModal({ onClose }: Props) {
         noValidate
         onSubmit={(e) => {
           e.preventDefault();
-          handleSave();
+          void handleSave();
         }}
       >
         {error && <Notice kind="error">{error}</Notice>}
