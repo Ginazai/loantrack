@@ -1,4 +1,4 @@
-name: Deploy to Render (reusable)
+﻿name: Deploy to Render (reusable)
 
 # Called by cd.yml for `staging` and `production`. Each GitHub Environment holds its own
 # secrets/variables, so the same code deploys different Render services:
@@ -57,8 +57,24 @@ jobs:
           be=$(enc "ghcr.io/${repo}/backend:${IMAGE_TAG}")
           fe=$(enc "ghcr.io/${repo}/frontend:${IMAGE_TAG}")
           # Hook URLs already contain ?key=..., hence &imgURL=. Never echo them: they're secrets.
-          curl -fsS -o /dev/null -X POST "${BACKEND_HOOK}&imgURL=${be}"  && echo "✓ backend deploy triggered (${IMAGE_TAG})"
-          curl -fsS -o /dev/null -X POST "${FRONTEND_HOOK}&imgURL=${fe}" && echo "✓ frontend deploy triggered (${IMAGE_TAG})"
+          # curl's own error text omits the URL, but we print only the status and Render's response
+          # body (which explains rejections such as an imgURL mismatch), never the request URL.
+          trigger() {  # $1 = label, $2 = full hook URL
+            local body status
+            body=$(mktemp)
+            status=$(curl -sS -o "$body" -w '%{http_code}' -X POST "$2") || { echo "::error::$1: could not reach Render"; rm -f "$body"; return 1; }
+            if [ "$status" -ge 200 ] && [ "$status" -lt 300 ]; then
+              echo "✓ $1 deploy triggered (${IMAGE_TAG}) [HTTP $status]"
+              rm -f "$body"
+            else
+              echo "::error::$1 deploy hook returned HTTP $status"
+              head -c 500 "$body"; echo
+              rm -f "$body"
+              return 1
+            fi
+          }
+          trigger backend  "${BACKEND_HOOK}&imgURL=${be}"
+          trigger frontend "${FRONTEND_HOOK}&imgURL=${fe}"
 
       - name: Post-deploy health check
         if: ${{ env.APP_URL != '' }}
