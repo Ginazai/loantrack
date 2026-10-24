@@ -1,11 +1,19 @@
 name: CD
 
 # Runs only after CI succeeded on a push to main (never for PRs or forks).
-#   publish -> staging (automatic) -> production (waits for approval)
+#   publish -> staging (automatic) -> promote (opens a PR; a human reviews + merges it)
+#
+# This workflow NEVER deploys to production. It only opens or updates a pull request that
+# edits `image_tag` in deploy/production.yml. Merging that PR (after review) triggers
+# deploy-production.yml, which verifies the approval and then deploys.
 #
 # ROLLBACK: Actions -> CD -> Run workflow -> image_tag = an older `sha-xxxxxxx`.
-# That skips build and staging and redeploys the existing image to production
-# (still behind the production approval). The image must still exist in GHCR.
+# That skips build and staging and opens a rollback PR through the same review path.
+# The image must still exist in GHCR.
+#
+# REQUIRED REPO SETTING: Settings -> Actions -> General -> Workflow permissions ->
+# enable "Allow GitHub Actions to create and approve pull requests".
+
 on:
   workflow_run:
     workflows: [CI]
@@ -94,18 +102,72 @@ jobs:
       image_tag: ${{ needs.publish.outputs.tag }}
     secrets: inherit
 
-  production:
-    name: Production
+  promote:
+    name: Open production promotion PR
     needs: [publish, staging]
-    permissions:
-      contents: read
-      packages: read
     # Normal path: staging succeeded. Rollback path: manual dispatch (publish/staging are skipped).
     if: >-
       always() && !cancelled() &&
       (needs.staging.result == 'success' || github.event_name == 'workflow_dispatch')
-    uses: ./.github/workflows/deploy-render.yml
-    with:
-      environment: production
-      image_tag: ${{ inputs.image_tag || needs.publish.outputs.tag }}
-    secrets: inherit
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write        # push the promotion branch
+      pull-requests: write   # open / update the PR
+    concurrency:
+      group: promote-production
+      cancel-in-progress: false
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ inputs.image_tag || needs.publish.outputs.tag }}
+      EVENT: ${{ github.event_name }}
+      SOURCE_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+      - name: Open or update the PR
+        run: |
+          set -euo pipefail
+          case "$TAG" in
+            sha-[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]) ;;
+            *) echo "::error::image_tag must look like sha-1a2b3c4 (got '$TAG')"; exit 1 ;;
+          esac
+
+          pin() { sed -n -E 's/^image_tag:[[:space:]]*"?([^"[:space:]#]+)"?.*/\1/p' | head -1; }
+          current=$(pin < deploy/production.yml)
+          if [ "$current" = "$TAG" ]; then
+            echo "::notice title=Already pinned::main already pins ${TAG}; nothing to promote."
+            exit 0
+          fi
+
+          if [ "$EVENT" = workflow_dispatch ]; then
+            kind="Rollback"; branch="rollback/production-${TAG}"
+          else
+            kind="Promote"; branch="promote/production"   # one rolling PR: newer builds update it
+          fi
+
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B "$branch" origin/main
+          # Replace only the tag value, so line endings and comments stay untouched.
+          sed -i -E "s/^(image_tag:[[:space:]]*)[^[:space:]#]+/\1${TAG}/" deploy/production.yml
+          git commit -am "${kind} production to ${TAG}"
+          git push --force origin "$branch"
+
+          title="${kind} production to ${TAG}"
+          body="$(printf '%s\n' \
+            "**Image tag:** \`${TAG}\` (was \`${current}\`)" \
+            "**Source commit:** ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/commit/${SOURCE_SHA}" \
+            "**Triggered by:** ${EVENT} · [run #${GITHUB_RUN_NUMBER}](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})" \
+            "" \
+            "Staging deployed this build successfully (rollbacks reuse an existing image)." \
+            "**Approve and merge this PR to deploy to production.** Nothing deploys until it is merged.")"
+
+          existing=$(gh pr list --head "$branch" --base main --state open --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            gh pr edit "$existing" --title "$title" --body "$body"
+            echo "Updated PR #${existing}"
+          else
+            gh pr create --base main --head "$branch" --title "$title" --body "$body"
+          fi
