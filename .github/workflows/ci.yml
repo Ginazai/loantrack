@@ -35,11 +35,11 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
           cache-dependency-path: |
-            backend/pyproject.toml
-            backend/requirements-dev.txt
-      # NOT `pip install -e ".[dev]"`: pyproject is Poetry-format, so that extra doesn't exist
-      # and the dev tools would silently not be installed. See backend/requirements-dev.txt.
-      - run: pip install -e . -r requirements-dev.txt
+            backend/requirements-ci.txt
+      # Hashed lockfile (pip-compile --generate-hashes): every transitive dep is pinned and
+      # hash-verified, and --only-binary forbids running sdist setup.py/build scripts.
+      # `app` needs no install: pytest/mypy/ruff/alembic run from backend/ and import it directly.
+      - run: "pip install --require-hashes --only-binary :all: -r requirements-ci.txt"
       - name: Ruff lint
         run: ruff check app/ tests/ --output-format=github
       - name: Ruff format
@@ -85,9 +85,8 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
           cache-dependency-path: |
-            backend/pyproject.toml
-            backend/requirements-dev.txt
-      - run: pip install -e . -r requirements-dev.txt
+            backend/requirements-ci.txt
+      - run: "pip install --require-hashes --only-binary :all: -r requirements-ci.txt"
       - name: Migrations apply to an empty database
         run: alembic upgrade head
       - name: Tests (coverage gate 80%, production code only)
@@ -122,13 +121,13 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       # `tsc --noEmit` at the root checks nothing (tsconfig.json has "files": [] + references).
       - name: Type check
-        run: npx tsc -b
+        run: npm run typecheck
       - name: ESLint
         if: ${{ hashFiles('frontend/eslint.config.js', 'frontend/eslint.config.mjs', 'frontend/eslint.config.ts') != '' }}
-        run: npx eslint src --max-warnings 0
+        run: npm run lint
       - name: ESLint not configured
         if: ${{ hashFiles('frontend/eslint.config.js', 'frontend/eslint.config.mjs', 'frontend/eslint.config.ts') == '' }}
         run: echo "::warning title=ESLint::No frontend/eslint.config.* found, so frontend linting is NOT running. Add ESLint to enable this gate (see docs/ci-cd.md)."
@@ -149,10 +148,10 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       # No coverage threshold here on purpose: baseline is ~35%. SonarQube's quality gate
       # enforces coverage on *new* code instead, which is the realistic ratchet.
-      - run: npx vitest run --coverage
+      - run: npm run test:coverage
       - name: Upload coverage for SonarQube
         if: always()
         uses: actions/upload-artifact@v7
@@ -174,15 +173,14 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
           cache-dependency-path: |
-            backend/pyproject.toml
-            backend/requirements-dev.txt
-      - run: pip install -e backend -r backend/requirements-dev.txt
+            backend/requirements-ci.txt
+      - run: "pip install --require-hashes --only-binary :all: -r backend/requirements-ci.txt"
       - name: pip-audit
         id: pip_audit
         # RATCHET (warn-only): baseline had advisories in starlette, python-multipart,
         # cryptography, python-jose, ecdsa. Upgrade fastapi, then remove continue-on-error.
         continue-on-error: true
-        run: pip-audit --skip-editable --progress-spinner off
+        run: pip-audit --progress-spinner off
       - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}

@@ -82,8 +82,8 @@ def _cobertura_candidates(filename: str, sources: list[str], prefix: str) -> lis
     return out
 
 
-def fix_cobertura(xml_path: Path, prefix: str) -> list[str]:
-    text = xml_path.read_text(encoding="utf-8")
+def reroot_cobertura(text: str, prefix: str) -> tuple[str, list[str]]:
+    """Pure text transform: return (rewritten XML, list of repo-relative file paths)."""
     sources = re.findall(r"<source>([^<]*)</source>", text) or ["."]
 
     def reroot(match: re.Match[str]) -> str:
@@ -102,22 +102,33 @@ def fix_cobertura(xml_path: Path, prefix: str) -> list[str]:
     # Pin <source> to the repo root. Whether Sonar joins filename onto <source>
     # or onto the project base dir, the result is then the same real file.
     text = re.sub(r"<source>[^<]*</source>", f"<source>{REPO_ROOT}</source>", text)
-    xml_path.write_text(text, encoding="utf-8")
-
-    return re.findall(r'<class\b[^>]*?\bfilename="([^"]+)"', text)
+    return text, re.findall(r'<class\b[^>]*?\bfilename="([^"]+)"', text)
 
 
-def fix_lcov(lcov_path: Path, prefix: str) -> list[str]:
-    lines = lcov_path.read_text(encoding="utf-8").splitlines()
+def fix_cobertura() -> list[str]:
+    # The file location is a module constant; report *content* never influences which file
+    # is read or written (only the pure transform above sees untrusted data).
+    text, files = reroot_cobertura(BACKEND_XML.read_text(encoding="utf-8"), "backend")
+    BACKEND_XML.write_text(text, encoding="utf-8")
+    return files
+
+
+def reroot_lcov(text: str, prefix: str) -> tuple[str, list[str]]:
+    """Pure text transform: return (rewritten lcov, list of repo-relative file paths)."""
     out: list[str] = []
     files: list[str] = []
-    for line in lines:
+    for line in text.splitlines():
         if line.startswith("SF:"):
             path = _prefix(line[3:], prefix)
             files.append(path)
             line = f"SF:{path}"
         out.append(line)
-    lcov_path.write_text("\n".join(out) + "\n", encoding="utf-8")
+    return "\n".join(out) + "\n", files
+
+
+def fix_lcov() -> list[str]:
+    text, files = reroot_lcov(FRONTEND_LCOV.read_text(encoding="utf-8"), "frontend")
+    FRONTEND_LCOV.write_text(text, encoding="utf-8")
     return files
 
 
@@ -153,8 +164,8 @@ def main() -> int:
         return 1
 
     try:
-        ok &= verify("backend", fix_cobertura(BACKEND_XML, "backend"))
-        ok &= verify("frontend", fix_lcov(FRONTEND_LCOV, "frontend"))
+        ok &= verify("backend", fix_cobertura())
+        ok &= verify("frontend", fix_lcov())
     except UnsafePathError as exc:
         print(f"::error title=coverage report::{exc}")
         return 1
