@@ -6,12 +6,12 @@ name: Deploy production
 #
 #   cd.yml                  opens/updates the "promotion" PR after staging passes
 #   a human                 reviews + approves + merges it
-#   deploy-production.yml   (this file) verifies the approval, then deploys + soaks + notifies
+#   deploy-production.yml   (this file) verifies the approval, then deploys + soaks
 #
 # THE GATE IS ENFORCED HERE, IN CODE, so it works on any GitHub plan. On a public repo (or a
 # paid plan) ALSO turn on branch protection for main so an unapproved PR can't be merged at
 # all; see the setup list in docs. Without branch protection an unapproved merge still can't
-# deploy (this workflow fails closed and alerts) but the pin on main is then ahead of prod
+# deploy (this workflow fails closed) but the pin on main is then ahead of prod
 # until a follow-up PR fixes it.
 #
 # RETRY a failed deploy: re-run the failed run from the Actions tab (same commit, same checks).
@@ -102,24 +102,4 @@ jobs:
       soak_minutes: 5   # keep probing health for 5 min after the deploy looks healthy
       approved_by: ${{ needs.verify.outputs.approvers }}
       change_url: ${{ needs.verify.outputs.pr_url }}
-    secrets: inherit
-
-  notify:
-    name: Notify
-    needs: [verify, production]
-    if: >-
-      always() && (
-        contains(needs.*.result, 'failure') ||
-        needs.production.result == 'success'
-      )
-    uses: ./.github/workflows/notify-slack.yml
-    with:
-      headline: >-
-        ${{ needs.verify.result == 'failure' && '🚫 Production deploy BLOCKED: change did not come from an approved PR'
-        || needs.production.result == 'success' && '✅ Production deploy succeeded'
-        || '🚨 Production deploy FAILED' }}
-      tag: ${{ needs.verify.outputs.tag }}
-      details: "${{ format('verify: {0} · production: {1}', needs.verify.result, needs.production.result) }}"
-      link: ${{ needs.verify.outputs.pr_url }}
-      rollback_hint: ${{ needs.production.result == 'failure' }}
     secrets: inherit
