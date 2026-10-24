@@ -29,7 +29,7 @@ passlib = { extras = ["bcrypt"], version = "^1.7.4" }
 bcrypt = ">=3.1.7,<4.0.0"   
 
 # Encryption at rest
-cryptography = "^42.0.0"           # AES-256 per-record encryption
+cryptography = ">=42,<51"           # AES-256 per-record encryption
 
 # Email
 sendgrid = "^6.11.0"
