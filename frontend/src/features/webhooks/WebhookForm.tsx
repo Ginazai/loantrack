@@ -1,6 +1,6 @@
 import { Button, Checkbox, InlineLoading, TextInput } from "@carbon/react";
 import { Notice } from "../../components/feedback";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import type { WebhookEventType, WebhookFormData } from "../../types";
@@ -44,7 +44,7 @@ export function WebhookForm({ onSubmit, onCancel, isLoading }: Props) {
     control,
     formState: { errors },
   } = useForm<WebhookFormData>({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(schema) as unknown as Resolver<WebhookFormData>,
     defaultValues: { events: ["payment.added"] },
   });
 

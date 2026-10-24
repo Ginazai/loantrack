@@ -11,7 +11,7 @@ import {
   TextInput,
 } from "@carbon/react";
 import { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import type { LoanAccount, AccountFormData, User, UserCreateFormData } from "../../types";
@@ -70,7 +70,7 @@ export function AccountForm({ account, onSubmit, onCancel, isLoading }: Props) {
     setValue,
     formState: { errors },
   } = useForm<AccountFormData>({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(schema) as unknown as Resolver<AccountFormData>, // coerce => zod input is unknown
     defaultValues: account
       ? {
           account_name: account.account_name,

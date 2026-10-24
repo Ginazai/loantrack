@@ -1,6 +1,6 @@
 import { InlineLoading, Button, ContentSwitcher, OperationalTag, Switch, Tag, TextInput } from "@carbon/react";
 import { useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import type { LoanAccount, PaymentFormData } from "../../types";
@@ -38,7 +38,7 @@ export function PaymentForm({ account, onSubmit, onCancel, isLoading }: Props) {
     setValue,
     formState: { errors },
   } = useForm<PaymentFormData>({
-    resolver: zodResolver(schema),
+    resolver: zodResolver(schema) as unknown as Resolver<PaymentFormData>, // coerce => zod input is unknown
     defaultValues: {
       method: "auto",
       payment_date: nextDue.toISOString().split("T")[0],
