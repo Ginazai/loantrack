@@ -4,7 +4,7 @@
 # this single file, so they must be pulled in here or its PRs drop pytest/ruff/mypy (exit 127).
 -r requirements-dev.txt
 fastapi>=0.111.0,<0.112
-uvicorn[standard]>=0.30.0,<0.31
+uvicorn[standard]>=0.30.0,<0.55
 python-multipart>=0.0.9,<0.1
 sqlalchemy[asyncio]>=2.0.0,<3
 asyncpg>=0.29.0,<0.30
