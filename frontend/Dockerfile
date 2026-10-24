@@ -23,7 +23,7 @@ COPY . .
 RUN npm run build
 
 # ── Stage 2: serve with nginx ─────────────────────────────────────────────────
-FROM nginxinc/nginx-unprivileged:1.29-alpine AS runtime
+FROM nginxinc/nginx-unprivileged:1.31-alpine AS runtime
 
 # nginx:1.27 runs every *.template file in /etc/nginx/templates/ through
 # envsubst automatically at container start (before nginx itself starts),
