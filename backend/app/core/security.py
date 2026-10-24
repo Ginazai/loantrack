@@ -4,25 +4,29 @@ import json
 import uuid
 from datetime import datetime, timedelta, timezone
 
+import bcrypt
 from jose import jwt
-from passlib.context import CryptContext
 
 from app.core.config import get_settings
 
 settings = get_settings()
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-
 # ── Password ──────────────────────────────────────────────────────────────────
 
 
+# bcrypt used directly: passlib 1.7.4 is unmaintained and breaks on bcrypt >= 4.1 (its
+# startup self-test hashes a >72-byte secret, which bcrypt 5 rejects). bcrypt only reads the
+# first 72 bytes, and 5.x raises instead of truncating, so truncate to keep old behaviour.
+def _b(plain: str) -> bytes:
+    return plain.encode()[:72]
+
+
 def hash_password(plain: str) -> str:
-    return pwd_context.hash(plain)
+    return bcrypt.hashpw(_b(plain), bcrypt.gensalt()).decode()
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return pwd_context.verify(plain, hashed)
+    return bcrypt.checkpw(_b(plain), hashed.encode())
 
 
 # ── JWT ───────────────────────────────────────────────────────────────────────
