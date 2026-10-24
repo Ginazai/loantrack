@@ -113,21 +113,114 @@ def fix_cobertura() -> list[str]:
     return files
 
 
-def reroot_lcov(text: str, prefix: str) -> tuple[str, list[str]]:
-    """Pure text transform: return (rewritten lcov, list of repo-relative file paths)."""
+# Directories never worth indexing (large, generated, or not source).
+_PRUNE_DIRS = frozenset({"node_modules", "coverage", "dist", ".git", "__pycache__", ".venv"})
+
+# Count-style lcov summary records. Mapping to a literal means the tag we write back is
+# a constant from this table, never the string that was read from the report.
+_COUNT_TAGS = {
+    "LF": "LF",
+    "LH": "LH",
+    "FNF": "FNF",
+    "FNH": "FNH",
+    "BRF": "BRF",
+    "BRH": "BRH",
+}
+
+
+def _index_repo_files(subdir: str) -> dict[str, str]:
+    """Map every real file under `subdir` to its repo-root-relative POSIX path.
+
+    The strings come from the filesystem listing, not from the coverage report. Looking a
+    reported path up here and writing back the *value* means the report never supplies the
+    text that ends up in `SF:` lines. A path that is not in the index is not written at all.
+    """
+    index: dict[str, str] = {}
+    for dirpath, dirnames, filenames in os.walk(REPO_ROOT / subdir):
+        dirnames[:] = [d for d in dirnames if d not in _PRUNE_DIRS]
+        for name in filenames:
+            rel = Path(dirpath, name).relative_to(REPO_ROOT).as_posix()
+            index[rel] = rel
+    return index
+
+
+def _ints(value: str, count: int) -> list[int]:
+    """Parse the first `count` comma-separated fields as integers (ValueError otherwise)."""
+    parts = value.split(",")
+    if len(parts) < count:
+        raise ValueError(f"malformed lcov record: expected {count} fields, got {value!r}")
+    return [int(p) for p in parts[:count]]
+
+
+def reroot_lcov(text: str, prefix: str, known_files: dict[str, str]) -> tuple[str, list[str]]:
+    """Pure transform: return (rebuilt lcov, every repo-relative path the report listed).
+
+    The output is *rebuilt*, not edited in place. Each record is re-emitted from typed
+    values: integers are parsed and re-formatted, `SF:` paths are taken from `known_files`
+    (the filesystem index), tags come from fixed literals, and function names are replaced
+    by synthetic ids (SonarQube only uses line and branch coverage). Nothing read from the
+    report is copied through verbatim.
+
+    Records whose file is not in `known_files` are dropped from the output but still
+    returned in the path list, so `verify()` counts them as unresolved.
+    """
     out: list[str] = []
     files: list[str] = []
-    for line in text.splitlines():
-        if line.startswith("SF:"):
-            path = _prefix(line[3:], prefix)
+    current: list[str] | None = None  # lines of the record being built; None = skipping
+    fn_ids: dict[str, int] = {}
+
+    def fn_id(name: str) -> int:
+        return fn_ids.setdefault(name, len(fn_ids))
+
+    for raw in text.splitlines():
+        tag, _, value = raw.partition(":")
+        if tag == "SF":
+            path = _prefix(value, prefix)
             files.append(path)
-            line = f"SF:{path}"
-        out.append(line)
-    return "\n".join(out) + "\n", files
+            trusted = known_files.get(path)
+            fn_ids = {}
+            current = ["TN:", f"SF:{trusted}"] if trusted is not None else None
+        elif current is None:
+            continue
+        elif tag == "end_of_record":
+            current.append("end_of_record")
+            out.extend(current)
+            current = None
+        elif tag == "DA":
+            line_no, hits = _ints(value, 2)
+            current.append(f"DA:{line_no},{hits}")
+        elif tag == "BRDA":
+            parts = value.split(",")
+            line_no, block, branch = _ints(value, 3)
+            if len(parts) < 4:
+                raise ValueError(f"malformed lcov BRDA record: {value!r}")
+            taken = "-" if parts[3].strip() == "-" else str(int(parts[3]))
+            current.append(f"BRDA:{line_no},{block},{branch},{taken}")
+        elif tag == "FN":
+            # `FN:<start>,<name>` or `FN:<start>,<end>,<name>`
+            parts = value.split(",", 2)
+            if len(parts) == 3 and parts[1].strip().lstrip("-").isdigit():
+                start, end = int(parts[0]), int(parts[1])
+                current.append(f"FN:{start},{end},fn_{fn_id(parts[2])}")
+            else:
+                start = int(parts[0])
+                name = value.partition(",")[2]
+                current.append(f"FN:{start},fn_{fn_id(name)}")
+        elif tag == "FNDA":
+            hits = _ints(value, 1)[0]
+            current.append(f"FNDA:{hits},fn_{fn_id(value.partition(',')[2])}")
+        elif tag in _COUNT_TAGS:
+            current.append(f"{_COUNT_TAGS[tag]}:{int(value)}")
+        # Anything else (TN, VER, FNL, FNA, comments, ...) is intentionally not carried over.
+    return ("\n".join(out) + "\n" if out else ""), files
 
 
 def fix_lcov() -> list[str]:
-    text, files = reroot_lcov(FRONTEND_LCOV.read_text(encoding="utf-8"), "frontend")
+    text, files = reroot_lcov(
+        FRONTEND_LCOV.read_text(encoding="utf-8"),
+        "frontend",
+        _index_repo_files("frontend"),
+    )
     FRONTEND_LCOV.write_text(text, encoding="utf-8")
     return files
 
@@ -148,7 +241,7 @@ def verify(label: str, files: list[str]) -> bool:
     print(f"{label}: {len(files) - len(missing)}/{len(files)} paths resolve ({ratio:.0%})")
     if ratio < MIN_RESOLVED_RATIO:
         for f in missing[:10]:
-            print(f"  missing: {f}")
+            print(f"  missing: {f!r}")
         print(f"::error title={label}::coverage paths do not resolve; Sonar would show 0%")
         return False
     return True
@@ -166,7 +259,7 @@ def main() -> int:
     try:
         ok &= verify("backend", fix_cobertura())
         ok &= verify("frontend", fix_lcov())
-    except UnsafePathError as exc:
+    except ValueError as exc:  # includes UnsafePathError
         print(f"::error title=coverage report::{exc}")
         return 1
     return 0 if ok else 1
