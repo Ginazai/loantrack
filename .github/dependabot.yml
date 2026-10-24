@@ -13,9 +13,20 @@ updates:
     directory: /frontend
     schedule: { interval: weekly }
     open-pull-requests-limit: 5
+    # Peer-locked packages must move together or `npm ci` fails with ERESOLVE / runtime breaks.
+    # Group order matters: a dependency lands in the first group that matches it.
     groups:
+      react:
+        patterns: [react, react-dom, "@types/react", "@types/react-dom"]
+      vitest:
+        patterns: [vitest, "@vitest/*"]
+      zod:
+        patterns: [zod, "@hookform/resolvers"]  # resolvers 3.x cannot validate zod 4 schemas
       minor-and-patch:
         update-types: [minor, patch]
+    ignore:
+      # Pinned on purpose: Carbon fails to compile on sass 1.106.x (docs/adr/007-carbon-design-system.md).
+      - dependency-name: sass
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: weekly }
