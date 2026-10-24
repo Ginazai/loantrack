@@ -114,9 +114,9 @@ export function AccountsTable({ accounts, variant = "full", pageSize = 20 }: Pro
       case "current_balance": {
         const raw = a.current_balance ?? (full ? null : a.borrow_amount);
         if (raw == null) return "—";
-        const n = parseFloat(raw);
+        const n = Number.parseFloat(raw);
         const cls =
-          n <= 0 ? "lt-success-text" : n > parseFloat(a.borrow_amount) ? "lt-danger-text" : "";
+          n <= 0 ? "lt-success-text" : n > Number.parseFloat(a.borrow_amount) ? "lt-danger-text" : "";
         return <span className={cls}>{formatCurrency(raw)}</span>;
       }
       case "rate":

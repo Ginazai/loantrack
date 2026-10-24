@@ -23,7 +23,7 @@ COPY . .
 RUN npm run build
 
 # ── Stage 2: serve with nginx ─────────────────────────────────────────────────
-FROM nginx:1.29-alpine AS runtime
+FROM nginxinc/nginx-unprivileged:1.29-alpine AS runtime
 
 # nginx:1.27 runs every *.template file in /etc/nginx/templates/ through
 # envsubst automatically at container start (before nginx itself starts),
@@ -43,9 +43,11 @@ ENV BACKEND_URL=http://backend:8000
 # Copy built assets from builder
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-EXPOSE 80
+USER nginx
+
+EXPOSE 8080
 
 HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=3 \
-    CMD wget -qO- http://localhost/health || exit 1
+    CMD wget -qO- http://localhost:8080/health || exit 1
 
 CMD ["nginx", "-g", "daemon off;"]

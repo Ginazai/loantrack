@@ -44,7 +44,8 @@ class TestTokenCreation:
 
     def test_same_token_same_hash(self):
         raw = "consistent-token"
-        assert hash_token(raw) == hash_token(raw)
+        first, second = hash_token(raw), hash_token(raw)
+        assert first == second
 
     def test_different_tokens_different_hashes(self):
         assert hash_token("token-a") != hash_token("token-b")
