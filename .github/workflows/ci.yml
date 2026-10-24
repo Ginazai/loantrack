@@ -3,6 +3,10 @@ name: CI
 on:
   push:
     branches: [main, dev]
+    # A merged promotion PR only changes deploy/production.yml. Skipping CI for it stops
+    # CI -> CD from rebuilding and opening yet another promotion PR (an endless loop).
+    # A push that touches anything else still runs CI, since this only skips when ALL files match.
+    paths-ignore: ["deploy/**"]
   pull_request:
     branches: [main, dev]
   workflow_dispatch:

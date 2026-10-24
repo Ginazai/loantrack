@@ -1,12 +1,20 @@
-﻿name: Deploy to Render (reusable)
+name: Deploy to Render (reusable)
 
 # Called by cd.yml for `staging` and `production`. Each GitHub Environment holds its own
 # secrets/variables, so the same code deploys different Render services:
 #
 #   secrets   RENDER_BACKEND_DEPLOY_HOOK    deploy hook URL of the backend service
 #             RENDER_FRONTEND_DEPLOY_HOOK   deploy hook URL of the frontend service
-#   variables APP_URL                       public URL of the frontend, for the post-deploy check
-#                                           (optional; the check is skipped if unset)
+#   variables APP_URL                       public URL of the frontend, for post-deploy checks
+#                                           and the Deployments tab link (optional for staging;
+#                                           strongly recommended for production)
+#
+# Flow:  preflight (cheap sanity checks) -> deploy (Render hooks, health check, optional soak)
+#
+# This workflow does NOT decide whether a deploy is allowed. Callers do:
+#   staging     cd.yml, automatically after CI passes on main
+#   production  deploy-production.yml, only after verifying the commit came from an approved,
+#               merged promotion PR (see that file)
 on:
   workflow_call:
     inputs:
@@ -18,33 +26,92 @@ on:
         description: Image tag to deploy, e.g. sha-1a2b3c4
         type: string
         required: true
+      soak_minutes:
+        description: >-
+          Minutes to keep probing /api/v1/health after the deploy first looks healthy
+          (0 = skip). A sustained failure fails the job, which triggers the CD notification.
+        type: number
+        required: false
+        default: 0
+      approved_by:
+        description: Who approved this change (shown in the deployment summary).
+        type: string
+        required: false
+        default: ""
+      change_url:
+        description: Link to the PR that authorised this deploy (shown in the summary).
+        type: string
+        required: false
+        default: ""
 
 permissions:
   contents: read
 
 jobs:
-  deploy:
-    name: Deploy · ${{ inputs.environment }}
+  # Fails fast, before any hook fires, on a malformed tag or an image that was deleted from GHCR.
+  preflight:
+    name: Preflight · ${{ inputs.environment }}
     runs-on: ubuntu-latest
-    timeout-minutes: 15
-    environment: ${{ inputs.environment }}   # production requires reviewers (set in repo settings)
-    concurrency:
-      group: deploy-${{ inputs.environment }}   # never two deploys to one environment at once
-      cancel-in-progress: false
+    timeout-minutes: 5
+    permissions:
+      packages: read
     env:
       IMAGE_TAG: ${{ inputs.image_tag }}
-      BACKEND_HOOK: ${{ secrets.RENDER_BACKEND_DEPLOY_HOOK }}
-      FRONTEND_HOOK: ${{ secrets.RENDER_FRONTEND_DEPLOY_HOOK }}
-      APP_URL: ${{ vars.APP_URL }}
+      ENVIRONMENT: ${{ inputs.environment }}
+      GITHUB_TOKEN: ${{ github.token }}
     steps:
       - name: Validate inputs
         run: |
+          case "$ENVIRONMENT" in
+            staging|production) ;;
+            *) echo "::error::environment must be 'staging' or 'production' (got '$ENVIRONMENT')"; exit 1 ;;
+          esac
           case "$IMAGE_TAG" in
             sha-[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]) ;;
             *) echo "::error::image_tag must look like sha-1a2b3c4 (got '$IMAGE_TAG')"; exit 1 ;;
           esac
+
+      - name: Verify both images exist in GHCR
+        run: |
+          repo="${GITHUB_REPOSITORY,,}"
+          echo "$GITHUB_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin >/dev/null
+          missing=0
+          for svc in backend frontend; do
+            ref="ghcr.io/${repo}/${svc}:${IMAGE_TAG}"
+            if docker buildx imagetools inspect "$ref" >/dev/null 2>&1; then
+              echo "✓ $ref"
+            else
+              echo "::error title=Image not found::$ref does not exist or is not readable by this workflow (typo'd tag, deleted image, or the package is not linked to this repo)."
+              missing=1
+            fi
+          done
+          exit "$missing"
+
+  deploy:
+    name: Deploy · ${{ inputs.environment }}
+    needs: preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    environment:
+      name: ${{ inputs.environment }}   # scopes secrets/vars per environment
+      url: ${{ vars.APP_URL }}          # shows up as a "View deployment" link in the Deployments tab
+    concurrency:
+      group: deploy-${{ inputs.environment }}   # never two deploys to one environment at once
+      cancel-in-progress: false
+    env:
+      ENVIRONMENT: ${{ inputs.environment }}
+      IMAGE_TAG: ${{ inputs.image_tag }}
+      SOAK_MINUTES: ${{ inputs.soak_minutes }}
+      BACKEND_HOOK: ${{ secrets.RENDER_BACKEND_DEPLOY_HOOK }}
+      FRONTEND_HOOK: ${{ secrets.RENDER_FRONTEND_DEPLOY_HOOK }}
+      APP_URL: ${{ vars.APP_URL }}
+    steps:
+      - name: Validate deploy hooks
+        run: |
           if [ -z "$BACKEND_HOOK" ] || [ -z "$FRONTEND_HOOK" ]; then
-            echo "::error::RENDER_BACKEND_DEPLOY_HOOK / RENDER_FRONTEND_DEPLOY_HOOK are not set in the '${{ inputs.environment }}' environment."
+            echo "::error::RENDER_BACKEND_DEPLOY_HOOK / RENDER_FRONTEND_DEPLOY_HOOK are not set in the '${ENVIRONMENT}' environment."
             exit 1
           fi
 
@@ -77,16 +144,99 @@ jobs:
           trigger frontend "${FRONTEND_HOOK}&imgURL=${fe}"
 
       - name: Post-deploy health check
+        id: health
         if: ${{ env.APP_URL != '' }}
         run: |
+          set -uo pipefail
           # Render keeps the old instance serving until the new one is healthy, so this proves the
           # environment is up after the switch-over window, not that the new version is live.
           # Check the Render dashboard for the deploy itself.
+          probe() { curl -sS -o /dev/null --max-time 10 -w '%{http_code} %{time_total}' "${APP_URL%/}$1" 2>/dev/null || true; }
+          rows=""
+          wait_healthy() {  # $1 = path; up to 15 attempts, 10s apart
+            local i code t
+            for i in $(seq 1 15); do
+              read -r code t <<<"$(probe "$1")"; code=${code:-000}; t=${t:-0}
+              case "$code" in
+                2??) echo "✓ $1 -> $code in ${t}s (attempt $i)"; rows+="| \`$1\` | ✅ $code | ${t}s | $i |"$'\n'; return 0 ;;
+                *)   echo "… $1 -> $code (attempt $i/15)"; sleep 10 ;;
+              esac
+            done
+            rows+="| \`$1\` | ❌ $code | - | 15 |"$'\n'
+            return 1
+          }
           sleep 30
-          curl -fsS --retry 12 --retry-delay 10 --retry-all-errors -o /dev/null "${APP_URL%/}/health"
-          curl -fsS --retry 12 --retry-delay 10 --retry-all-errors -o /dev/null "${APP_URL%/}/api/v1/health"
+          rc=0
+          wait_healthy /health         || rc=1
+          wait_healthy /api/v1/health  || rc=1
+          {
+            echo "#### Health after deploy"
+            echo
+            echo "| Endpoint | Result | Latency | Attempts |"
+            echo "|---|---|---|---|"
+            printf '%s' "$rows"
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$rc" -ne 0 ]; then echo "::error title=Health check failed::${APP_URL} did not become healthy after the deploy."; exit 1; fi
           echo "✓ ${APP_URL} healthy"
+
+      # Mirrors the "monitor for errors, roll back on regression" step of a staged rollout.
+      # Not a rollback itself: a failure fails the job, which fires the CD notification.
+      - name: Soak (keep probing after deploy)
+        if: ${{ env.APP_URL != '' && inputs.soak_minutes > 0 }}
+        run: |
+          set -uo pipefail
+          minutes=${SOAK_MINUTES%%.*}
+          interval=15
+          end=$(( $(date +%s) + minutes * 60 ))
+          probes=0; failures=0; consecutive=0; max_t=0
+          while [ "$(date +%s)" -lt "$end" ]; do
+            read -r code t <<<"$(curl -sS -o /dev/null --max-time 10 -w '%{http_code} %{time_total}' "${APP_URL%/}/api/v1/health" 2>/dev/null || true)"
+            code=${code:-000}; t=${t:-0}
+            probes=$((probes + 1))
+            max_t=$(awk -v a="$max_t" -v b="$t" 'BEGIN { print (b > a) ? b : a }')
+            case "$code" in
+              2??) consecutive=0 ;;
+              *)   failures=$((failures + 1)); consecutive=$((consecutive + 1))
+                   echo "::warning title=Soak::/api/v1/health -> $code ($consecutive in a row)" ;;
+            esac
+            if [ "$consecutive" -ge 3 ]; then
+              echo "::error title=Soak failed::Health broke after the deploy: 3 consecutive failures. Roll back (Actions -> CD -> Run workflow -> previous image_tag)."
+              echo "#### Soak: ❌ failed after $probes probes ($failures failures)" >> "$GITHUB_STEP_SUMMARY"
+              exit 1
+            fi
+            sleep "$interval"
+          done
+          echo "✓ soak clean: $probes probes, $failures failures, max latency ${max_t}s"
+          echo "#### Soak: ✅ ${minutes} min, $probes probes, $failures failures, max latency ${max_t}s" >> "$GITHUB_STEP_SUMMARY"
 
       - name: No APP_URL configured
         if: ${{ env.APP_URL == '' }}
-        run: echo "::notice::APP_URL variable not set for '${{ inputs.environment }}', so the post-deploy health check was skipped."
+        run: |
+          if [ "$ENVIRONMENT" = production ]; then
+            echo "::warning title=Unverified production deploy::APP_URL is not set for 'production', so no post-deploy health check or soak ran."
+          else
+            echo "::notice::APP_URL variable not set for '${ENVIRONMENT}', so the post-deploy health check was skipped."
+          fi
+
+      - name: Deployment summary
+        if: ${{ always() }}
+        env:
+          JOB_STATUS: ${{ job.status }}
+          APPROVERS: ${{ inputs.approved_by }}
+          CHANGE_URL: ${{ inputs.change_url }}
+          TRIGGERED_BY: ${{ github.actor }}
+        run: |
+          short="${IMAGE_TAG#sha-}"
+          {
+            echo "### Deploy · ${ENVIRONMENT}: ${JOB_STATUS}"
+            echo
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Image tag | \`${IMAGE_TAG}\` |"
+            echo "| Commit | [${short}](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/commit/${short}) |"
+            echo "| Triggered by | ${TRIGGERED_BY} |"
+            [ -n "${CHANGE_URL:-}" ] && echo "| Change | ${CHANGE_URL} |"
+            [ -n "${APPROVERS:-}" ] && echo "| Approved by | ${APPROVERS} |"
+            [ -n "${APP_URL:-}" ] && echo "| URL | ${APP_URL} |"
+            echo "| Run | [#${GITHUB_RUN_NUMBER}](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}) |"
+          } >> "$GITHUB_STEP_SUMMARY"
