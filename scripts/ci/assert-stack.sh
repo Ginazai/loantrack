@@ -28,30 +28,30 @@ login() {  # $1 = base url  ->  prints access token
 
 # 1. Backend is up (implies: migrations applied, app imported, DB reachable at boot)
 code=$(curl -s -o /dev/null -w '%{http_code}' "$API_URL/api/v1/health" || true)
-[ "$code" = "200" ] || fail "backend /api/v1/health returned '$code' (expected 200)"
+[[ "$code" == "200" ]] || fail "backend /api/v1/health returned '$code' (expected 200)"
 pass "backend health"
 
 # 2. Seeded admin can log in (implies: seed ran, DB read/write works, password hashing + JWT work)
 token=$(login "$API_URL") || fail "login against backend failed"
-[ -n "$token" ] || fail "login returned an empty access token"
+[[ -n "$token" ]] || fail "login returned an empty access token"
 pass "login returns an access token"
 
 # 3. The token is actually accepted by a protected route
 me=$(curl -fsS "$API_URL/api/v1/auth/me" -H "Authorization: Bearer $token") || fail "/auth/me rejected a freshly issued token"
-[ "$(printf '%s' "$me" | json_field email)" = "$SMOKE_EMAIL" ] || fail "/auth/me returned a different user"
+[[ "$(printf '%s' "$me" | json_field email)" == "$SMOKE_EMAIL" ]] || fail "/auth/me returned a different user"
 pass "token accepted by /auth/me"
 
 # 4. Frontend container: static serving + the /api reverse proxy (the nginx template's whole job)
-if [ -n "${WEB_URL:-}" ]; then
+if [[ -n "${WEB_URL:-}" ]]; then
   code=$(curl -s -o /dev/null -w '%{http_code}' "$WEB_URL/health" || true)
-  [ "$code" = "200" ] || fail "frontend /health returned '$code'"
+  [[ "$code" == "200" ]] || fail "frontend /health returned '$code'"
   pass "frontend health"
 
   curl -fsS "$WEB_URL/" | grep -q 'id="root"' || fail "frontend / did not serve the SPA shell"
   pass "frontend serves the SPA shell"
 
   token_via_proxy=$(login "$WEB_URL") || fail "login through the nginx /api proxy failed"
-  [ -n "$token_via_proxy" ] || fail "proxy login returned an empty token"
+  [[ -n "$token_via_proxy" ]] || fail "proxy login returned an empty token"
   pass "login works through the nginx proxy"
 fi
 

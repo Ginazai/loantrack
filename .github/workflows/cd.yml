@@ -27,7 +27,8 @@ jobs:
     if: >-
       github.event_name == 'workflow_run' &&
       github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.event == 'push'
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 25
     permissions:
@@ -36,6 +37,8 @@ jobs:
     outputs:
       tag: ${{ steps.meta.outputs.tag }}
     steps:
+      # Safe to check out head_sha: the job `if` above only admits a successful *push* run whose
+      # head repository is this repo (never a fork), so this is trusted, already-merged code.
       - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.workflow_run.head_sha }}   # exactly the commit CI validated

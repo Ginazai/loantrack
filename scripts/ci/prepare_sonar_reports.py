@@ -37,8 +37,31 @@ FRONTEND_LCOV = REPO_ROOT / "frontend" / "coverage" / "lcov.info"
 MIN_RESOLVED_RATIO = 0.95
 
 
+class UnsafePathError(ValueError):
+    """A path read from a coverage report would escape the repository."""
+
+
+def _safe_repo_path(raw: str) -> str:
+    """Return `raw` as a normalised, repo-root-relative POSIX path, or raise.
+
+    Coverage reports are build artifacts (downloaded between jobs), i.e. input we do not
+    control. Reject absolute paths and `..` traversal, and confirm the resolved target
+    stays inside the repository, before the value is rewritten or touched on disk.
+    """
+    if not raw or "\x00" in raw or os.path.isabs(raw) or re.match(r"^[A-Za-z]:[\\/]", raw):
+        raise UnsafePathError(f"absolute or empty path in coverage report: {raw!r}")
+    normalised = posixpath.normpath(raw.replace("\\", "/"))
+    if normalised == ".." or normalised.startswith("../"):
+        raise UnsafePathError(f"path escapes the repository: {raw!r}")
+    root = REPO_ROOT.resolve()
+    if not (root / normalised).resolve().is_relative_to(root):
+        raise UnsafePathError(f"path resolves outside the repository: {raw!r}")
+    return normalised
+
+
 def _prefix(path: str, prefix: str) -> str:
-    return path if path.startswith(prefix + "/") else f"{prefix}/{path}"
+    path = _safe_repo_path(path)
+    return path if path.startswith(prefix + "/") else _safe_repo_path(f"{prefix}/{path}")
 
 
 def _cobertura_candidates(filename: str, sources: list[str], prefix: str) -> list[str]:
@@ -64,7 +87,14 @@ def fix_cobertura(xml_path: Path, prefix: str) -> list[str]:
     sources = re.findall(r"<source>([^<]*)</source>", text) or ["."]
 
     def reroot(match: re.Match[str]) -> str:
-        candidates = _cobertura_candidates(match.group(2), sources, prefix)
+        candidates: list[str] = []
+        for raw in _cobertura_candidates(match.group(2), sources, prefix):
+            try:
+                candidates.append(_safe_repo_path(raw))
+            except UnsafePathError:
+                continue  # an odd <source> must not abort the run; fail only if nothing is safe
+        if not candidates:
+            raise UnsafePathError(f"no safe path for coverage entry {match.group(2)!r}")
         chosen = next((c for c in candidates if (REPO_ROOT / c).is_file()), candidates[0])
         return match.group(1) + chosen + match.group(3)
 
@@ -91,11 +121,18 @@ def fix_lcov(lcov_path: Path, prefix: str) -> list[str]:
     return files
 
 
+def _is_repo_file(rel: str) -> bool:
+    try:
+        return (REPO_ROOT / _safe_repo_path(rel)).is_file()
+    except UnsafePathError:
+        return False
+
+
 def verify(label: str, files: list[str]) -> bool:
     if not files:
         print(f"::error title={label}::report lists no files; coverage would be 0%")
         return False
-    missing = [f for f in files if not (REPO_ROOT / f).is_file()]
+    missing = [f for f in files if not _is_repo_file(f)]
     ratio = 1 - len(missing) / len(files)
     print(f"{label}: {len(files) - len(missing)}/{len(files)} paths resolve ({ratio:.0%})")
     if ratio < MIN_RESOLVED_RATIO:
@@ -115,8 +152,12 @@ def main() -> int:
     if not ok:
         return 1
 
-    ok &= verify("backend", fix_cobertura(BACKEND_XML, "backend"))
-    ok &= verify("frontend", fix_lcov(FRONTEND_LCOV, "frontend"))
+    try:
+        ok &= verify("backend", fix_cobertura(BACKEND_XML, "backend"))
+        ok &= verify("frontend", fix_lcov(FRONTEND_LCOV, "frontend"))
+    except UnsafePathError as exc:
+        print(f"::error title=coverage report::{exc}")
+        return 1
     return 0 if ok else 1
 
 

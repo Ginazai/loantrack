@@ -18,7 +18,7 @@ Single-tenant loan tracking tool for managing private loans, payment schedules, 
 ## Prerequisites
 
 - Docker + Docker Compose v2
-- Node 20+ (local frontend dev only)
+- Node 22+ (local frontend dev only)
 - Python 3.12+ (local backend dev only)
 
 ## Quick Start

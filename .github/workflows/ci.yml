@@ -17,7 +17,7 @@ concurrency:
 
 env:
   PYTHON_VERSION: "3.12"  # matches backend/Dockerfile
-  NODE_VERSION: "20"      # matches frontend/Dockerfile
+  NODE_VERSION: "22"      # matches frontend/Dockerfile; jsdom@30 + jest-dom@7 need Node >=22
 
 jobs:
   # ───────────────────────────── Backend ─────────────────────────────
@@ -226,7 +226,7 @@ jobs:
           cache-from: type=gha,scope=frontend
           cache-to: type=gha,scope=frontend,mode=max
       - name: Smoke test (Postgres + both images, login through nginx)
-        run: scripts/ci/smoke-test.sh
+        run: bash scripts/ci/smoke-test.sh   # via bash: does not depend on the git exec bit
 
   # ───────────────────────────── SonarQube ───────────────────────────
   sonarqube:

@@ -27,7 +27,7 @@ export SMOKE_PASSWORD
 
 cleanup() {
   status=$?
-  if [ "$status" -ne 0 ]; then
+  if [[ "$status" -ne 0 ]]; then
     echo "::group::container logs (smoke test failed)"
     for c in "$API" "$WEB" "$PG"; do echo "--- $c ---"; docker logs --tail 80 "$c" 2>&1 || true; done
     echo "::endgroup::"
@@ -70,4 +70,4 @@ docker run -d --name "$WEB" --network "$NET" -p 127.0.0.1:18080:80 "$FRONTEND_IM
 wait_until "backend" 45 curl -fsS http://127.0.0.1:18000/api/v1/health
 wait_until "frontend" 20 curl -fsS http://127.0.0.1:18080/health
 
-API_URL=http://127.0.0.1:18000 WEB_URL=http://127.0.0.1:18080 "$HERE/assert-stack.sh"
+API_URL=http://127.0.0.1:18000 WEB_URL=http://127.0.0.1:18080 bash "$HERE/assert-stack.sh"
