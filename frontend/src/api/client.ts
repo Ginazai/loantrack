@@ -1,7 +1,13 @@
 import axios, { AxiosError } from "axios";
 import { useAuthStore } from "../stores/authStore";
 import { useConnectionStore } from "../stores/connectionStore";
-import { MAX_COLD_RETRIES, retryDelayMs, shouldRetryColdStart, sleep } from "./coldStart";
+import {
+  MAX_COLD_RETRIES,
+  retryDelayMs,
+  shouldRetryColdStart,
+  sleep,
+  wakeBackend,
+} from "./coldStart";
 
 // VITE_API_BASE_URL is baked in at build time by Vite.
 // Falls back to relative path for local dev (docker-compose nginx proxy).
@@ -62,6 +68,7 @@ async function refreshWithColdStartRetry(refreshToken: string | null) {
         throw e;
       }
       useConnectionStore.getState().setWaking(true);
+      void wakeBackend();
       await sleep(retryDelayMs(attempt, (e as AxiosError).response?.headers?.["retry-after"]));
     }
   }
@@ -82,6 +89,7 @@ client.interceptors.response.use(
       if (shouldRetryColdStart(error, retries, isAuthEndpoint(original.url))) {
         original._coldRetries = retries + 1;
         useConnectionStore.getState().setWaking(true);
+        void wakeBackend(); // the proxied retry below can't wake it; only a direct hit does
         await sleep(retryDelayMs(retries + 1, error.response?.headers?.["retry-after"]));
         return client(original);
       }
@@ -128,11 +136,13 @@ client.interceptors.response.use(
 );
 
 /**
- * Fire-and-forget request that starts waking a sleeping backend as soon as the app
- * loads (the login page appears instantly, but the API behind it may not be up yet).
- * Any failure is handled by the retry loop above; nothing is surfaced here.
+ * Starts waking a sleeping backend as soon as the app loads (the login page appears
+ * instantly, but the API behind it may not be up yet). The direct ping is what actually
+ * wakes it; the proxied /health request then waits for it, via the retry loop above.
+ * Nothing is surfaced to the user here.
  */
 export function warmUpBackend(): void {
+  void wakeBackend();
   client.get("/health").catch(() => undefined);
 }
 

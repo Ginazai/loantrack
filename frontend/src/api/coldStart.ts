@@ -6,11 +6,20 @@ import axios, { AxiosError } from "axios";
  * (or sometimes 429) instead of holding the request. Without this, the first
  * page load after a quiet spell fails until someone opens the backend URL by hand.
  *
- * Pure functions only; the retry loop itself lives in client.ts.
+ * IMPORTANT: retrying through our own nginx proxy does NOT wake a sleeping Render service.
+ * Render answers a request that comes from another Render service (our nginx -> backend)
+ * with an instant 502 and never starts the target; only a request from outside Render, such
+ * as the user's browser hitting the backend's public URL directly, does. So every retry here
+ * is paired with a direct "wake ping" from the browser (see wakeBackend). See ADR-009.
  */
 
-/** Wait before retry N (1-based). Sums to ~58 s, in the range of a Render cold start. */
-const RETRY_SCHEDULE_MS = [2000, 3000, 5000, 8000, 10000, 10000, 10000, 10000];
+/**
+ * Wait before retry N (1-based). Sums to ~2 minutes: Render needs about a minute to start a
+ * free service, and our container runs migrations and the seed script before it listens.
+ */
+const RETRY_SCHEDULE_MS = [
+  2000, 3000, 5000, 8000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000, 10000,
+];
 export const MAX_COLD_RETRIES = RETRY_SCHEDULE_MS.length;
 
 /** Longest pause a server-sent Retry-After may impose, so a bad header can't stall the UI. */
@@ -71,4 +80,60 @@ export function shouldRetryColdStart(
 
 export function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+let backendUrl: Promise<string | null> | null = null;
+
+/**
+ * The backend's public URL, as configured for the frontend container (nginx serves it at
+ * /runtime-config.json from BACKEND_URL). Null when it isn't published, e.g. local docker
+ * compose, where the backend never sleeps and nothing needs waking.
+ */
+export function resolveBackendUrl(): Promise<string | null> {
+  if (!backendUrl) {
+    backendUrl = fetch("/runtime-config.json", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((cfg: { backendUrl?: unknown } | null) => {
+        const url = typeof cfg?.backendUrl === "string" ? cfg.backendUrl.trim() : "";
+        return /^https?:\/\//.test(url) ? url.replace(/\/+$/, "") : null;
+      })
+      .catch(() => null)
+      .then((url) => {
+        if (!url) backendUrl = null; // don't cache a miss: try again next time
+        return url;
+      });
+  }
+  return backendUrl;
+}
+
+let wakeInFlight: Promise<void> | null = null;
+
+/**
+ * Hit the backend's public URL straight from the browser so Render starts it.
+ * `no-cors` + no credentials: we only need the request to arrive, not to read the answer
+ * (Render may reply with its own "waking up" page, which is fine). Never throws; at most one
+ * ping is in flight at a time so a slow wake can't pile up requests.
+ */
+export function wakeBackend(): Promise<void> {
+  if (wakeInFlight) return wakeInFlight;
+  wakeInFlight = resolveBackendUrl()
+    .then(async (base) => {
+      if (!base) return;
+      await fetch(`${base}/api/v1/health`, {
+        mode: "no-cors",
+        cache: "no-store",
+        credentials: "omit",
+      });
+    })
+    .catch(() => undefined)
+    .finally(() => {
+      wakeInFlight = null;
+    });
+  return wakeInFlight;
+}
+
+/** Test hook: forget the cached backend URL and any in-flight wake ping. */
+export function resetWakeStateForTests(): void {
+  backendUrl = null;
+  wakeInFlight = null;
 }

@@ -23,6 +23,16 @@ server {
         add_header Content-Type text/plain;
     }
 
+    # Tells the browser where the backend lives so it can wake it directly. On Render's
+    # free tier a sleeping backend is NOT woken by this proxy (Render answers a request
+    # from another Render service with an instant 502); only a request from outside Render
+    # starts it. See docs/adr/009-cold-start-handling.md.
+    location = /runtime-config.json {
+        default_type application/json;
+        add_header Cache-Control "no-store";
+        return 200 '{"backendUrl":"${BACKEND_URL}"}';
+    }
+
     # Proxy API calls to the backend. ${BACKEND_URL} is substituted at
     # container start (nginx:1.27's built-in envsubst-on-templates entrypoint
     # step — see /docker-entrypoint.d/20-envsubst-on-templates.sh in the base

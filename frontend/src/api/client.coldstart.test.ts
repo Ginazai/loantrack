@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import axios from "axios";
 import client, { warmUpBackend } from "./client";
-import { MAX_COLD_RETRIES } from "./coldStart";
+import { MAX_COLD_RETRIES, resetWakeStateForTests } from "./coldStart";
 import { useAuthStore } from "../stores/authStore";
 import { useConnectionStore } from "../stores/connectionStore";
 
@@ -32,6 +32,7 @@ describe("cold-start retries in the API client", () => {
   const location = { href: "/accounts" };
 
   beforeEach(() => {
+    resetWakeStateForTests();
     vi.useFakeTimers();
     useAuthStore.setState({ accessToken: "access", refreshToken: "refresh", user: null });
     useConnectionStore.setState({ waking: false });
@@ -68,7 +69,7 @@ describe("cold-start retries in the API client", () => {
 
     const pending = client.get("/accounts");
     const assertion = expect(pending).rejects.toMatchObject({ response: { status: 502 } });
-    await vi.advanceTimersByTimeAsync(120_000);
+    await vi.advanceTimersByTimeAsync(300_000);
     await assertion;
 
     expect(adapter).toHaveBeenCalledTimes(1 + MAX_COLD_RETRIES);
@@ -164,5 +165,91 @@ describe("cold-start retries in the API client", () => {
     await vi.advanceTimersByTimeAsync(1);
 
     expect(adapter.mock.calls[0][0].url).toBe("/health");
+  });
+});
+
+/**
+ * Render's free tier answers a request that comes from ANOTHER RENDER SERVICE (our nginx
+ * proxy) to a sleeping service with an instant 502 and never wakes it. Only a request that
+ * arrives from outside Render, i.e. from the user's browser straight to the backend's public
+ * URL, starts it (confirmed against three independent community reports; see ADR-009).
+ * This fake platform encodes that rule, so the suite fails if the client only retries
+ * through the proxy.
+ */
+describe("sleeping backend that only wakes for direct browser requests (Render free tier)", () => {
+  const originalAdapter = client.defaults.adapter;
+  const BACKEND = "https://loantrack-api.onrender.com";
+  let awake: boolean;
+  let directWakePings: number;
+
+  beforeEach(() => {
+    resetWakeStateForTests();
+    vi.useFakeTimers();
+    awake = false;
+    directWakePings = 0;
+    useAuthStore.setState({ accessToken: "access", refreshToken: "refresh", user: null });
+    useConnectionStore.setState({ waking: false });
+
+    // Through nginx: instant 502 until the backend is up. Never wakes it.
+    client.defaults.adapter = ((c: Cfg) => (awake ? ok(c, { awake: true }) : fail(c, 502))) as never;
+
+    // Browser fetches: runtime config from nginx, and the direct no-cors wake ping.
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string) => {
+        if (String(url).endsWith("/runtime-config.json")) {
+          return new Response(JSON.stringify({ backendUrl: `${BACKEND}/` }), { status: 200 });
+        }
+        if (String(url) === `${BACKEND}/api/v1/health`) {
+          directWakePings += 1;
+          setTimeout(() => (awake = true), 40_000); // ~40 s to boot after the first direct hit
+          return new Response("", { status: 200 });
+        }
+        throw new Error(`unexpected fetch ${url}`);
+      }),
+    );
+  });
+
+  afterEach(() => {
+    client.defaults.adapter = originalAdapter;
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it("wakes the backend with a direct request and then succeeds through the proxy", async () => {
+    const pending = client.get("/accounts");
+    await vi.advanceTimersByTimeAsync(120_000);
+
+    await expect(pending).resolves.toMatchObject({ data: { awake: true } });
+    expect(directWakePings).toBeGreaterThan(0);
+    expect(useConnectionStore.getState().waking).toBe(false);
+  });
+
+  it("sends the wake ping with no-cors and no credentials, to the backend's public URL", async () => {
+    const pending = client.get("/accounts");
+    await vi.advanceTimersByTimeAsync(120_000);
+    await pending;
+
+    const call = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls.find(
+      ([u]) => u === `${BACKEND}/api/v1/health`,
+    )!;
+    expect(call[1]).toMatchObject({ mode: "no-cors", credentials: "omit" });
+  });
+
+  it("warmUpBackend wakes the backend directly, before any request has failed", async () => {
+    warmUpBackend();
+    await vi.advanceTimersByTimeAsync(1);
+
+    expect(directWakePings).toBe(1);
+  });
+
+  it("still works (just without a wake ping) when no runtime config is served, e.g. docker compose", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("<html>spa fallback</html>", { status: 200 })),
+    );
+    awake = true; // local dev: backend is never asleep
+    await expect(client.get("/accounts")).resolves.toMatchObject({ status: 200 });
   });
 });

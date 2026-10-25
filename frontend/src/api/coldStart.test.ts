@@ -68,13 +68,13 @@ describe("shouldRetryColdStart", () => {
 });
 
 describe("retryDelayMs", () => {
-  it("backs off over roughly a minute in total", () => {
+  it("backs off over roughly two minutes in total (a Render cold start plus our migrations)", () => {
     const total = Array.from({ length: MAX_COLD_RETRIES }, (_, i) => retryDelayMs(i + 1)).reduce(
       (a, b) => a + b,
       0,
     );
-    expect(total).toBeGreaterThanOrEqual(50_000);
-    expect(total).toBeLessThanOrEqual(70_000);
+    expect(total).toBeGreaterThanOrEqual(100_000);
+    expect(total).toBeLessThanOrEqual(140_000);
     expect(retryDelayMs(1)).toBeLessThan(retryDelayMs(MAX_COLD_RETRIES));
   });
 
