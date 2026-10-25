@@ -1,12 +1,12 @@
 # ADR-008: Promote to production through a reviewed pull request (GitOps pin)
 
-**Status:** Accepted (written retroactively on 2026-10-24 from the workflow files; the original decision date is not recorded in the repo)  
+**Status:** Accepted (written retroactively on 2026-10-24 from the workflow files; the original decision date is not recorded in the repo)
 **Date:** 2026-10-24
 
 ## Context
 Images are built once per `main` commit and pushed to GHCR as `sha-<7>`. Staging deploys automatically. Production must not deploy without a human decision, must be reproducible (what is running should be answerable from the repo), and must have a rollback path that goes through the same checks.
 
-The earlier flow, still described in older versions of `docs/ci-cd.md`, was `staging → [approval] → production` with a GitHub Environment "Required reviewers" rule on `production`.
+The earlier flow, still described in older versions of `docs/ci-cd.md`, was `staging â†’ [approval] â†’ production` with a GitHub Environment "Required reviewers" rule on `production`.
 
 ## Decision
 `deploy/production.yml` on `main` holds one line, `image_tag: sha-xxxxxxx`, and that tag is what production runs.

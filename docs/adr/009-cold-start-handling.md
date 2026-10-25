@@ -1,6 +1,6 @@
 # ADR-009: Wake a sleeping Render backend from the browser, and retry while it boots
 
-**Status:** Accepted  
+**Status:** Accepted
 **Date:** 2026-10-24 (revised the same day, see *Revision* at the end)
 
 ## Context
