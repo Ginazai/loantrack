@@ -1,0 +1,50 @@
+# Optional: keeps a sleeping Render backend warm so the first visitor after a quiet
+# spell doesn't wait through a cold start. The app already copes with cold starts on
+# its own (client retries + wake-up ping, see ADR-009); this removes the wait.
+#
+# Off by default. It does nothing until the repository VARIABLE KEEP_ALIVE_URL is set
+# (Settings -> Secrets and variables -> Actions -> Variables), e.g.
+#     https://<your-backend>.onrender.com/api/v1/health
+#
+# Read before enabling:
+#  * Ping the BACKEND only. Render's free tier meters instance hours; one service
+#    awake 24/7 is roughly a month of hours, two would not fit. Check your plan's limit.
+#  * GitHub cron is best-effort: runs can be delayed by several minutes, and GitHub
+#    disables scheduled workflows on a repo with no activity for 60 days.
+#  * A paid always-on instance is the reliable fix; this is the free workaround.
+name: Keep backend awake
+
+on:
+  schedule:
+    - cron: "*/10 * * * *" # Render free services sleep after ~15 min without traffic
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: keep-alive
+  cancel-in-progress: true
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ping backend health endpoint
+        env:
+          KEEP_ALIVE_URL: ${{ vars.KEEP_ALIVE_URL }}
+        run: |
+          if [ -z "$KEEP_ALIVE_URL" ]; then
+            echo "::notice::KEEP_ALIVE_URL is not set; nothing to do."
+            exit 0
+          fi
+          case "$KEEP_ALIVE_URL" in
+            https://*) ;;
+            *) echo "::error::KEEP_ALIVE_URL must start with https://"; exit 1 ;;
+          esac
+          # A cold start can take a minute or more: allow a long wait, retry transient errors.
+          curl --fail --silent --show-error \
+            --max-time 150 --retry 3 --retry-delay 15 --retry-all-errors \
+            --output /dev/null \
+            --write-out "HTTP %{http_code} in %{time_total}s\n" \
+            "$KEEP_ALIVE_URL"

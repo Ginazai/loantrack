@@ -1162,3 +1162,18 @@ html {
   inline-size: 100%;
   max-inline-size: none;
 }
+
+// Banner shown while a sleeping backend is waking up (see ServerWakingNotice).
+.lt-waking {
+  position: fixed;
+  inset-block-start: $spacing-05;
+  inset-inline: 0;
+  margin-inline: auto;
+  inline-size: min(36rem, calc(100% - #{$spacing-06}));
+  z-index: 9500; // above Carbon modals (9000)
+
+  .cds--inline-notification {
+    max-inline-size: none;
+    margin: 0;
+  }
+}

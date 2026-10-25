@@ -5,6 +5,9 @@ Rules:
 - Cycle dates are the 15th and 30th of every month.
   Months with fewer than 30 days use the last day instead of the 30th.
 - Interest accrues only on cycle dates, applied to the opening balance.
+- ``rate`` is a fraction applied *per cycle* (twice a month), not per year,
+  and interest compounds: each cycle's opening balance is the previous
+  closing balance, unpaid interest included.
 - Payments between cycle dates are recorded with their actual date but
   only reduce the balance that feeds the *next* cycle's interest calculation.
 - The reference point for the first cycle is account.start_date, not
@@ -75,7 +78,13 @@ def advance_cycle(current: date) -> date:
 
 def get_cycle_dates(start_date: date, until: date) -> list[date]:
     """
-    Return all cycle dates from the first one after *start_date* up to *until*.
+    Return all cycle dates from the first one on or after *start_date* up to
+    *until* (inclusive).
+
+    If *start_date* is itself the 15th or 30th, it is included, so that cycle's
+    interest accrues on day zero. This is intentional (see
+    ``test_start_on_cycle_date_includes_it``); approving a loan request on a
+    cycle date relies on it too.
     """
     cycles: list[date] = []
     current = next_cycle_date(start_date)
@@ -204,9 +213,13 @@ def compute_payment_ledger_entry(
     """
     Compute the ledger snapshot for a single incoming payment.
 
-    Interest is only accrued if *payment_date* lands on a cycle date AND
-    that cycle date has not already been processed (i.e., it's after the
-    last recorded cycle).
+    NOTE: nothing in the app or its tests calls this function. Payment
+    snapshots come from ``project_ledger`` (see ADR-003), which is the source of
+    truth; prefer that for new code.
+
+    Interest is accrued once if *payment_date* is on or after the first cycle
+    date following *last_cycle_date* (or *start_date*). A payment made several
+    cycles later still accrues only one cycle of interest here.
 
     Returns a dict with keys: balance_before, interests_accrued, balance_after
     """

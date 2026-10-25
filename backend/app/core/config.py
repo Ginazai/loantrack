@@ -37,7 +37,10 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     LOG_LEVEL: str = "INFO"
+    # NOT USED. Kept so existing .env files that set it still load. A global per-IP
+    # limit would count every user behind the shared proxy address together.
     RATE_LIMIT_PER_MINUTE: int = 60
+    # Login attempts per minute per client address (per worker process).
     AUTH_RATE_LIMIT_PER_MINUTE: int = 5
 
     ALLOWED_ORIGINS: list[str] = ["http://localhost:5173"]

@@ -76,3 +76,11 @@ crea la tabla (a decidir junto con el equipo antes de desplegar a producción).
 - Si el proceso backend se reinicia entre corridas, no se pierde ni duplica
   nada: la próxima corrida vuelve a calcular `get_cycle_dates` completo y la
   tabla de notificaciones ya escritas actúa como filtro idempotente.
+
+## Actualización (2026-10-24): varios workers de uvicorn
+El contenedor arranca uvicorn con `--workers ${UVICORN_WORKERS:-2}` y **cada worker ejecuta su propia copia** de `_cycle_close_scan_loop` y de `_webhook_retry_loop` (lectura de código; no reproducido en ejecución).
+- **Escaneo de ciclos:** dos workers pueden calcular las mismas fechas pendientes. `UNIQUE(account_id, cycle_date)` evita duplicados: la transacción de uno falla, se revierte (incluidos sus `WebhookEvent`) y se registra `cycle_close_scan_error`. Los eventos no se duplican, pero el error aparece en los logs.
+- **Entrega de webhooks:** `deliver_pending` no bloquea filas, así que dos workers pueden enviar el mismo evento. Los receptores deben ser idempotentes.
+- La afirmación "idempotente" de esta ADR es cierta para los *datos* (la tabla de notificaciones), no para el ruido en logs.
+
+Mitigación inmediata: `UVICORN_WORKERS=1`. Solución de fondo: `FOR UPDATE SKIP LOCKED` o ejecutar los loops en un solo proceso. Ver [architecture.md](../architecture.md#background-tasks).
