@@ -8,7 +8,7 @@ export function ServerWakingNotice() {
   return (
     <div className="lt-waking">
       <Notice kind="info" title="Connecting to the server">
-        It was idle and is starting up, which can take up to a minute. Your request will
+        It was idle and is starting up, which can take a minute or two. Your request will
         continue automatically.
       </Notice>
     </div>

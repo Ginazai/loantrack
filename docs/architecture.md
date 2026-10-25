@@ -134,17 +134,28 @@ There is no "undo import".
 
 ## Cold starts on Render
 
-On Render's free tier an idle service is spun down and the next request has to wake it, which takes tens of seconds (the container also runs `alembic upgrade head` and the seed script before uvicorn starts). While it wakes, the proxy in front of it answers with errors instead of the app (**502 and 429** were reported; 503/504 are handled too), so the SPA used to fail until someone opened the backend URL by hand. Now ([ADR-009](adr/009-cold-start-handling.md)):
+On Render's free tier an idle service is spun down (after about 15 minutes without inbound traffic) and the next request has to start it, which takes about a minute. Our backend container also runs `alembic upgrade head` and the seed script before uvicorn listens, so it can take longer.
 
-- **Wake-up ping.** `main.tsx` calls `GET /api/v1/health` as soon as the app loads, so the backend starts waking while the login page is still on screen.
-- **Automatic retry** (`frontend/src/api/client.ts` + `coldStart.ts`). A failed request is resent up to 8 times over about a minute (2, 3, 5, 8, then 10 s steps; a `Retry-After` header can lengthen a step, up to 15 s). After that the real error is shown.
+**A sleeping backend is not woken by the frontend's nginx proxy.** Per community reports of the free tier *(not stated in Render's own docs; confirmed by the symptoms here, not by us against Render)*, a request that comes from another Render service gets an instant 502 from Render's proxy and never starts the target. Only a request from **outside Render**, such as the user's browser or a GitHub Actions job, wakes it. That is why the SPA used to fail with 502 (or 429) until someone opened the backend URL by hand, and why simply retrying through nginx cannot fix it ([ADR-009](adr/009-cold-start-handling.md)).
+
+What the app does now:
+
+- **Direct wake ping from the browser.** nginx publishes the backend's public URL at `/runtime-config.json` (from `BACKEND_URL`). On page load and before every retry, the SPA sends a `no-cors` `GET {backend}/api/v1/health` straight to that URL (`frontend/src/api/coldStart.ts`, `wakeBackend`). The answer is never read; the request only has to arrive. At most one ping is in flight at a time.
+- **Retry through the proxy** (`client.ts`). The failed request is resent up to 14 times over about two minutes (2, 3, 5, 8 s, then 10 s steps; a `Retry-After` header can lengthen a step, up to 15 s) while the backend boots. After that the real error is shown.
   - Counted as cold-start symptoms: 502/503/504, a **429 that did not come from this API**, and "no response" network errors.
   - A 429 from this API's own limiter (`{"error": "Rate limit exceeded: ..."}`) is **not** retried, so lock-outs show up immediately.
   - Reads (GET/HEAD/OPTIONS) and login/refresh are always resent. Other writes (e.g. recording a payment) are resent only after **503 or a proxy 429**, where the request is known not to have been processed. After a 502/504 or a dropped connection the user retries by hand, because the first attempt might have been recorded.
-  - The token-refresh call gets the same patience, so a 502 during refresh does not log the user out.
+  - The token-refresh call gets the same treatment, so a 502 during refresh does not log the user out.
 - **Banner.** While retrying, `ServerWakingNotice` shows "Connecting to the server".
 - **nginx** (`frontend/nginx.conf*`) waits up to 120 s for the backend instead of failing at its 60 s default.
-- **Optional keep-alive.** `.github/workflows/keep-alive.yml` pings the backend every 10 minutes when the repository variable `KEEP_ALIVE_URL` is set. See [CI/CD](ci-cd.md#4-keep-alive-optional) for the caveats.
+- **Optional keep-alive.** `.github/workflows/keep-alive.yml` pings the backend every 10 minutes when the repository variable `KEEP_ALIVE_URL` is set, so it rarely sleeps at all. See [CI/CD](ci-cd.md#4-keep-alive-optional) for the caveats.
+
+Requirements and limits:
+
+- `BACKEND_URL` on the **frontend** service must be the backend's **public** `https://` URL. It is what the browser pings, and an internal Render address can neither be reached by the browser nor wake anything (free services also cannot receive private-network traffic).
+- If the browser cannot reach that URL (blocked by a network, ad blocker or extension), nothing wakes the backend and requests fail after about two minutes.
+- In local `docker compose` nginx does not publish `runtime-config.json`, so no wake ping is sent. The backend never sleeps there.
+- A cold start longer than the retry window still ends in an error; reloading tries again.
 
 **Background loops stop while the service sleeps.** The webhook retry and cycle-close scan ([Background tasks](#background-tasks)) run inside the web process, so while the service is asleep no `cycle.closed` events are detected and no webhooks are retried. After waking, each loop sleeps one full interval first (the scan waits an hour), so notifications arrive late. If those notifications matter, keep the backend awake (keep-alive workflow or a paid always-on instance).
 

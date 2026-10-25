@@ -60,7 +60,7 @@ Create separate **staging** and **production** pairs of services, each *Existing
 - Copy each service's **Deploy Hook** URL (Settings) into the matching GitHub environment secret. Treat them like passwords.
 
 ### 4. Keep-alive (optional)
-The app already copes with a sleeping backend by itself (retries and a wake-up ping; see [ADR-009](adr/009-cold-start-handling.md)). This workflow removes the wait altogether and keeps the in-process webhook/cycle loops running.
+The app already copes with a sleeping backend by itself (the browser wakes it directly and retries; see [ADR-009](adr/009-cold-start-handling.md)). This workflow removes the wait altogether and keeps the in-process webhook/cycle loops running. GitHub runs outside Render, so unlike the frontend's proxy its pings do wake the service.
 1. Settings → Secrets and variables → Actions → **Variables** → add `KEEP_ALIVE_URL` = `https://<your-backend>.onrender.com/api/v1/health`.
 2. Run **Keep backend awake** once from the Actions tab (`workflow_dispatch`) and check the log shows `HTTP 200`.
 

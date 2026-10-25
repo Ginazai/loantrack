@@ -125,7 +125,7 @@ Start with **[docs/architecture.md](docs/architecture.md)** for how interest is 
 
 ## Hosting on Render's free tier
 
-Idle services sleep, and the first request wakes them (30–60+ seconds). The app handles this itself: it pings the backend on load, retries failed requests for about a minute and shows a "Connecting to the server" banner, so you no longer have to open the backend URL by hand. Details and limits: [Architecture → Cold starts](docs/architecture.md#cold-starts-on-render). To avoid the wait entirely, enable the optional [keep-alive workflow](docs/ci-cd.md#4-keep-alive-optional) or use an always-on instance. Note that background webhook/cycle notifications pause while the backend sleeps.
+Idle services sleep, and starting one takes a minute or more. A sleeping backend is **not** woken by the frontend's own proxy (Render answers those requests with an instant 502), only by traffic from outside Render. So the browser pings the backend's public URL directly on load and before each retry, retries failed requests for about two minutes and shows a "Connecting to the server" banner. Set `BACKEND_URL` on the frontend service to the backend's **public** `https://` URL for this to work. Details and limits: [Architecture → Cold starts](docs/architecture.md#cold-starts-on-render). To avoid the wait entirely, enable the optional [keep-alive workflow](docs/ci-cd.md#4-keep-alive-optional) or use an always-on instance. Note that background webhook/cycle notifications pause while the backend sleeps.
 
 ## Environment Variables
 
