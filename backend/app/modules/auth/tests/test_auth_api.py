@@ -156,3 +156,75 @@ class TestMeAndUpdateMe:
             json={"email": "login-test@test.dev", "password": "NewPassword456!"},
         )
         assert relogin.status_code == 200
+
+
+class TestRegister:
+    """POST /auth/register must not be a public way to mint accounts.
+
+    Regression coverage for a privilege-escalation hole: the endpoint used to
+    be unauthenticated and honoured a caller-supplied ``role``, so anyone who
+    could reach the API could create an admin. It is now admin-only (the same
+    rule as POST /admin/users).
+    """
+
+    PAYLOAD = {
+        "email": "new-person@test.dev",
+        "password": "CorrectHorse123!",
+        "full_name": "New Person",
+    }
+
+    @pytest.mark.asyncio
+    async def test_anonymous_cannot_register_anyone(self, client):
+        res = await client.post("/api/v1/auth/register", json=self.PAYLOAD)
+        assert res.status_code in (401, 403), res.text
+
+    @pytest.mark.asyncio
+    async def test_anonymous_cannot_self_register_as_admin(self, client, db):
+        from sqlalchemy import select
+
+        from app.modules.users.models import User
+
+        res = await client.post("/api/v1/auth/register", json={**self.PAYLOAD, "role": "admin"})
+        assert res.status_code in (401, 403), res.text
+        created = await db.execute(select(User).where(User.email == self.PAYLOAD["email"]))
+        assert created.scalar_one_or_none() is None
+
+    @pytest.mark.asyncio
+    async def test_regular_user_cannot_register(self, user_client):
+        res = await user_client.post(
+            "/api/v1/auth/register", json={**self.PAYLOAD, "role": "admin"}
+        )
+        assert res.status_code == 403, res.text
+
+    @pytest.mark.asyncio
+    async def test_admin_can_register_and_choose_role(self, admin_client):
+        res = await admin_client.post(
+            "/api/v1/auth/register", json={**self.PAYLOAD, "role": "admin"}
+        )
+        assert res.status_code == 201, res.text
+        assert res.json()["role"] == "admin"
+
+    @pytest.mark.asyncio
+    async def test_admin_register_defaults_to_user_role(self, admin_client):
+        res = await admin_client.post("/api/v1/auth/register", json=self.PAYLOAD)
+        assert res.status_code == 201, res.text
+        assert res.json()["role"] == "user"
+
+
+class TestLoginRateLimit:
+    @pytest.mark.asyncio
+    async def test_login_limit_follows_AUTH_RATE_LIMIT_PER_MINUTE(self, client, db):
+        """The limit comes from settings, not a number hard-coded in the router."""
+        from app.core.config import get_settings
+
+        await _seed_user(db, email="rl@test.dev")
+        limit = get_settings().AUTH_RATE_LIMIT_PER_MINUTE
+        bad = {"email": "rl@test.dev", "password": "wrong"}
+
+        codes = [
+            (await client.post("/api/v1/auth/login", json=bad)).status_code
+            for _ in range(limit + 1)
+        ]
+
+        assert codes[:limit] == [401] * limit
+        assert codes[limit] == 429

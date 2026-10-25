@@ -1,5 +1,7 @@
 import axios, { AxiosError } from "axios";
 import { useAuthStore } from "../stores/authStore";
+import { useConnectionStore } from "../stores/connectionStore";
+import { MAX_COLD_RETRIES, retryDelayMs, shouldRetryColdStart, sleep } from "./coldStart";
 
 // VITE_API_BASE_URL is baked in at build time by Vite.
 // Falls back to relative path for local dev (docker-compose nginx proxy).
@@ -40,10 +42,51 @@ export function isAuthEndpoint(url: string | undefined): boolean {
   return !!url && AUTH_ENDPOINTS.some((path) => url.includes(path));
 }
 
+function clearWaking() {
+  if (useConnectionStore.getState().waking) useConnectionStore.getState().setWaking(false);
+}
+
+/**
+ * POST /auth/refresh with the same cold-start patience as every other request.
+ * It uses bare axios (to bypass the interceptors below), so it needs its own loop;
+ * otherwise a 502 while the backend wakes would be treated as "session expired"
+ * and log the user out.
+ */
+async function refreshWithColdStartRetry(refreshToken: string | null) {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await axios.post(`${BASE_URL}/auth/refresh`, { refresh_token: refreshToken });
+    } catch (e) {
+      if (!shouldRetryColdStart(e, attempt - 1, true)) {
+        clearWaking();
+        throw e;
+      }
+      useConnectionStore.getState().setWaking(true);
+      await sleep(retryDelayMs(attempt, (e as AxiosError).response?.headers?.["retry-after"]));
+    }
+  }
+}
+
 client.interceptors.response.use(
-  (res) => res,
+  (res) => {
+    clearWaking();
+    return res;
+  },
   async (error: AxiosError) => {
     const original = error.config as any;
+
+    // Backend asleep / waking (502/503/504, proxy 429, network error): wait and resend
+    // instead of failing, and tell the user why it is slow.
+    if (original) {
+      const retries: number = original._coldRetries ?? 0;
+      if (shouldRetryColdStart(error, retries, isAuthEndpoint(original.url))) {
+        original._coldRetries = retries + 1;
+        useConnectionStore.getState().setWaking(true);
+        await sleep(retryDelayMs(retries + 1, error.response?.headers?.["retry-after"]));
+        return client(original);
+      }
+      if (retries >= MAX_COLD_RETRIES) clearWaking(); // gave up: let the real error surface
+    }
 
     if (
       error.response?.status !== 401 ||
@@ -68,9 +111,7 @@ client.interceptors.response.use(
     const store = useAuthStore.getState();
 
     try {
-      const { data } = await axios.post(`${BASE_URL}/auth/refresh`, {
-        refresh_token: store.refreshToken,
-      });
+      const { data } = await refreshWithColdStartRetry(store.refreshToken);
       store.setTokens(data.access_token, data.refresh_token);
       queue.forEach((cb) => cb(data.access_token));
       queue = [];
@@ -85,5 +126,14 @@ client.interceptors.response.use(
     }
   }
 );
+
+/**
+ * Fire-and-forget request that starts waking a sleeping backend as soon as the app
+ * loads (the login page appears instantly, but the API behind it may not be up yet).
+ * Any failure is handled by the retry loop above; nothing is surfaced here.
+ */
+export function warmUpBackend(): void {
+  client.get("/health").catch(() => undefined);
+}
 
 export default client;

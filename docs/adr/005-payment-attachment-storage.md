@@ -105,3 +105,6 @@ infraestructura nueva.
   límite práctico de una columna `bytea` en Postgres (limitado por
   `TOAST`, del orden de 1 GB); no representa un riesgo técnico a esta
   escala.
+
+## Actualización (2026-10-24)
+El contexto asume un despliegue probable en Supabase. Lo que hoy documenta el repo (`docs/ci-cd.md`, [ADR-008](008-gitops-production-promotion.md)) es la aplicación en **Render** con una `DATABASE_URL` externa; el proveedor de la base de datos no queda registrado en el repo. La decisión (`bytea` en Postgres) no depende de ese dato, pero el cálculo de cuota de la sección *Consequences* sí: confirmar el proveedor real antes de usarlo.

@@ -9,6 +9,7 @@ import "@fontsource/ibm-plex-sans/600.css";
 import "@fontsource/ibm-plex-mono/400.css";
 import "@fontsource/ibm-plex-mono/600.css";
 import App from "./App";
+import { warmUpBackend } from "./api/client";
 import { applyTheme, normalizeTheme } from "./stores/uiStore";
 import "./styles/index.scss";
 
@@ -21,6 +22,9 @@ const stored = (() => {
   }
 })();
 applyTheme(normalizeTheme(stored?.state?.theme));
+
+// Start waking a sleeping backend (Render free tier) before the user has typed anything.
+warmUpBackend();
 
 const queryClient = new QueryClient({
   defaultOptions: {

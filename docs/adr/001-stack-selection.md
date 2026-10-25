@@ -19,3 +19,7 @@ FastAPI gives async-first API + auto-OpenAPI at minimal overhead. SQLAlchemy asy
 - No multi-tenancy. One DB, one deployment.
 - OpenAPI auto-generated at `/api/v1/openapi.json` — frontend types generated from it.
 - Swapping DB requires only changing `DATABASE_URL` + migration driver.
+
+## Update (2026-10-24)
+- The frontend is now **React 19** (Vite 7, React Router 7), not React 18; see `frontend/package.json`.
+- The DaisyUI sentence in *Rationale* is historical; styling was replaced by Carbon in [ADR-007](007-carbon-design-system.md).

@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { useAuthStore } from "./stores/authStore";
+import { ServerWakingNotice } from "./components/feedback";
 import { DashboardLayout } from "./components/layout/DashboardLayout";
 import { LoginPage } from "./features/auth/LoginPage";
 import { DashboardPage } from "./features/dashboard/DashboardPage";
@@ -29,26 +30,29 @@ function RootRedirect() {
 
 export default function App() {
   return (
-    <Routes>
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/" element={<RequireAuth><RootRedirect /></RequireAuth>} />
+    <>
+      <ServerWakingNotice />
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/" element={<RequireAuth><RootRedirect /></RequireAuth>} />
 
-      <Route element={<RequireAuth><DashboardLayout /></RequireAuth>}>
-        {/* Admin */}
-        <Route path="/dashboard" element={<RequireAdmin><DashboardPage /></RequireAdmin>} />
-        <Route path="/accounts" element={<RequireAdmin><AccountsPage /></RequireAdmin>} />
-        <Route path="/accounts/:id" element={<RequireAdmin><AccountDetailPage /></RequireAdmin>} />
-        <Route path="/admin/users" element={<RequireAdmin><UsersPage /></RequireAdmin>} />
-        <Route path="/admin/requests" element={<RequireAdmin><RequestsPage /></RequireAdmin>} />
-        <Route path="/admin/webhooks" element={<RequireAdmin><WebhooksAdminPage /></RequireAdmin>} />
-        <Route path="/admin/imports" element={<RequireAdmin><ImportsPage /></RequireAdmin>} />
+        <Route element={<RequireAuth><DashboardLayout /></RequireAuth>}>
+          {/* Admin */}
+          <Route path="/dashboard" element={<RequireAdmin><DashboardPage /></RequireAdmin>} />
+          <Route path="/accounts" element={<RequireAdmin><AccountsPage /></RequireAdmin>} />
+          <Route path="/accounts/:id" element={<RequireAdmin><AccountDetailPage /></RequireAdmin>} />
+          <Route path="/admin/users" element={<RequireAdmin><UsersPage /></RequireAdmin>} />
+          <Route path="/admin/requests" element={<RequireAdmin><RequestsPage /></RequireAdmin>} />
+          <Route path="/admin/webhooks" element={<RequireAdmin><WebhooksAdminPage /></RequireAdmin>} />
+          <Route path="/admin/imports" element={<RequireAdmin><ImportsPage /></RequireAdmin>} />
 
-        {/* User portal — all authenticated users */}
-        <Route path="/my-loans" element={<UserPortalPage />} />
-        <Route path="/my-requests" element={<MyRequestsPage />} />
-      </Route>
+          {/* User portal — all authenticated users */}
+          <Route path="/my-loans" element={<UserPortalPage />} />
+          <Route path="/my-requests" element={<MyRequestsPage />} />
+        </Route>
 
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </>
   );
 }
