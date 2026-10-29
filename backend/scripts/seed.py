@@ -7,9 +7,9 @@ Run via:
 Or directly (with DATABASE_URL set):
     python -m scripts.seed
 
-Environment variables (all optional, have safe defaults):
+Environment variables:
     SEED_ADMIN_EMAIL      default: admin@loantrack.dev
-    SEED_ADMIN_PASSWORD   default: ChangeMe123!
+    SEED_ADMIN_PASSWORD   REQUIRED (12+ chars); there is no default
     SEED_ADMIN_NAME       default: Admin User
 
 The script is idempotent: if a user with that email already exists it prints
@@ -32,8 +32,15 @@ if not DATABASE_URL:
     sys.exit(1)
 
 ADMIN_EMAIL    = os.environ.get("SEED_ADMIN_EMAIL",    "admin@loantrack.dev")
-ADMIN_PASSWORD = os.environ.get("SEED_ADMIN_PASSWORD", "ChangeMe123!")
+ADMIN_PASSWORD = os.environ.get("SEED_ADMIN_PASSWORD", "")
 ADMIN_NAME     = os.environ.get("SEED_ADMIN_NAME",     "Admin User")
+
+if len(ADMIN_PASSWORD) < 12 or ADMIN_PASSWORD == "ChangeMe123!":
+    print(
+        "ERROR: set SEED_ADMIN_PASSWORD to a unique password of at least 12 characters.",
+        file=sys.stderr,
+    )
+    sys.exit(1)
 
 # ── Async engine ──────────────────────────────────────────────────────────────
 
@@ -85,7 +92,7 @@ async def seed() -> None:
         existing = result.scalar_one_or_none()
 
         if existing:
-            _banner(f"Admin user already exists — no changes made")
+            _banner("Admin user already exists — no changes made")
             print(f"  Email : {existing.email}")
             print(f"  Name  : {existing.full_name}")
             print(f"  Role  : {existing.role}")
@@ -108,7 +115,7 @@ async def seed() -> None:
         _banner("Admin user created successfully")
         print(f"  ID       : {admin.id}")
         print(f"  Email    : {admin.email}")
-        print(f"  Password : {ADMIN_PASSWORD}  ← change this after first login!")
+        print("  Password : (the value of SEED_ADMIN_PASSWORD)")
         print(f"  Name     : {admin.full_name}")
         print(f"  Role     : {admin.role}")
         print()

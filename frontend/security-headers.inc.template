@@ -1,0 +1,14 @@
+# Security headers for everything nginx serves itself (the SPA shell and static assets).
+# Included from each location in default.conf.template, because nginx drops inherited
+# add_header directives as soon as a location declares its own (e.g. Cache-Control).
+# API responses are NOT given these here; the backend sets its own headers.
+#
+# connect-src lists ${BACKEND_URL} because the SPA talks to the backend directly to wake it
+# on cold start (src/api/coldStart.ts). style-src keeps 'unsafe-inline' for Carbon's
+# runtime-injected styles; scripts are same-origin only (no inline, no eval).
+add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' ${BACKEND_URL}; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'" always;
+add_header X-Content-Type-Options "nosniff" always;
+add_header X-Frame-Options "DENY" always;
+add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+add_header Strict-Transport-Security $hsts always;

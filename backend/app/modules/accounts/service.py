@@ -1,3 +1,4 @@
+import logging
 from datetime import date
 from uuid import UUID
 
@@ -21,6 +22,8 @@ from app.modules.accounts.schemas import (
 from app.modules.audit.service import AuditService
 from app.modules.payments.service import PaymentService
 from app.modules.webhooks.models import WebhookConfig, WebhookEvent
+
+logger = logging.getLogger(__name__)
 
 
 class LoanAccountService:
@@ -271,12 +274,18 @@ class LoanAccountService:
         payments = await self.payments.get_for_account(account.id)
         payment_tuples = [(p.payment_date, float(p.amount)) for p in payments]
 
-        current_balance = compute_current_balance(
-            float(account.borrow_amount),
-            float(account.rate),
-            account.start_date,
-            payment_tuples,
-        )
+        try:
+            current_balance = compute_current_balance(
+                float(account.borrow_amount),
+                float(account.rate),
+                account.start_date,
+                payment_tuples,
+            )
+        except ArithmeticError:
+            # Degenerate terms (e.g. runaway compounding) must not take down every list /
+            # export that touches this account — surface "unknown" for this one row only.
+            logger.warning("balance_overflow", extra={"account_id": str(account.id)})
+            current_balance = None
 
         last = payments[-1] if payments else None
         ndd = last.next_due_date if last else next_cycle_date(account.start_date)

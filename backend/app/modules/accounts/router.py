@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.dependencies import get_current_user
+from app.core.dependencies import get_current_user, require_admin
 from app.modules.accounts.schemas import (
     LoanAccountClose,
     LoanAccountCreate,
@@ -15,6 +15,9 @@ from app.modules.accounts.schemas import (
 )
 from app.modules.accounts.service import LoanAccountService
 
+# Mutations are admin-only (the lender sets terms). Borrowers can read their own accounts
+# and ask for a loan through /loan-requests (amount only); they never choose rate, status,
+# payments, or whether a loan is closed/purged.
 router = APIRouter(prefix="/accounts", tags=["accounts"])
 
 
@@ -36,7 +39,7 @@ async def list_accounts(
 async def create_account(
     request: Request,
     data: LoanAccountCreate,
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     svc = LoanAccountService(db)
@@ -65,7 +68,7 @@ async def update_account(
     request: Request,
     account_id: UUID,
     data: LoanAccountUpdate,
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     svc = LoanAccountService(db)
@@ -79,7 +82,7 @@ async def close_account(
     request: Request,
     account_id: UUID,
     data: LoanAccountClose,
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     svc = LoanAccountService(db)
@@ -93,7 +96,7 @@ async def purge_account(
     request: Request,
     account_id: UUID,
     force: bool = False,
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     svc = LoanAccountService(db)
@@ -103,7 +106,7 @@ async def purge_account(
         account_id,
         current_user.id,
         ip=ip,
-        force=is_admin and force,
+        force=force,
         is_admin=is_admin,
     )
 

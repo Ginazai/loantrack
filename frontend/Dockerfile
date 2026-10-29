@@ -16,7 +16,8 @@ COPY package.json package-lock.json* ./
 # Switch to `npm ci` once you have a committed package-lock.json
 #RUN --mount=type=cache,target=/root/.npm \
 #    npm install --no-audit --no-fund
-RUN npm install --no-audit --no-fund
+# Reproducible, lockfile-exact install; --ignore-scripts blocks dependency install hooks.
+RUN npm ci --ignore-scripts --no-audit --no-fund
 
 COPY . .
 
@@ -34,6 +35,8 @@ FROM nginxinc/nginx-unprivileged:1.31-alpine AS runtime
 # separate hosts/platforms (override BACKEND_URL with the backend's public URL,
 # no rebuild required). See nginx.conf.template for what gets proxied and why.
 COPY nginx.conf.template /etc/nginx/templates/default.conf.template
+COPY maps.conf.template /etc/nginx/templates/maps.conf.template
+COPY security-headers.inc.template /etc/nginx/templates/security-headers.inc.template
 
 # Default for docker-compose, where "backend" resolves via Docker's embedded
 # DNS on the shared network. Override at `docker run`/compose/platform level

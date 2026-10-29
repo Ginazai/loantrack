@@ -1,0 +1,6 @@
+# HSTS only when the client actually arrived over HTTPS (TLS is terminated upstream of this
+# container, so we go by X-Forwarded-Proto). An empty value makes nginx skip the header.
+map $http_x_forwarded_proto $hsts {
+    default "";
+    https   "max-age=31536000; includeSubDomains";
+}
