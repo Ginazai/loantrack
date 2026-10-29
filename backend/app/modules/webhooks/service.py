@@ -1,3 +1,4 @@
+import logging
 from datetime import date, datetime, timezone
 from uuid import UUID
 
@@ -9,12 +10,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import get_settings
 from app.core.repository import BaseRepository
 from app.core.security import generate_webhook_secret, sign_webhook_payload
+from app.core.url_safety import UnsafeURLError, avalidate_outbound_url
 from app.modules.accounts.interest_engine import get_cycle_dates, project_ledger
 from app.modules.accounts.models import LoanAccount
 from app.modules.webhooks.models import AccountCycleNotification, WebhookConfig, WebhookEvent
 from app.modules.webhooks.schemas import WebhookConfigCreate
 
 settings = get_settings()
+logger = logging.getLogger(__name__)
 
 
 class WebhookConfigService:
@@ -26,6 +29,10 @@ class WebhookConfigService:
         self, account_id: UUID, user_id: UUID, data: WebhookConfigCreate, is_admin: bool = False
     ) -> WebhookConfig:
         account = await self._get_account_or_404(account_id, user_id, is_admin)
+        try:
+            await avalidate_outbound_url(str(data.target_url))
+        except UnsafeURLError as exc:
+            raise HTTPException(422, f"Invalid target_url: {exc}")
         config = WebhookConfig(
             account_id=account.id,
             target_url=str(data.target_url),
@@ -83,7 +90,9 @@ class WebhookDeliveryService:
             )
         )
         events = list(result.scalars().all())
-        async with httpx.AsyncClient(timeout=settings.WEBHOOK_TIMEOUT_SECONDS) as client:
+        async with httpx.AsyncClient(
+            timeout=settings.WEBHOOK_TIMEOUT_SECONDS, follow_redirects=False
+        ) as client:
             for event in events:
                 await self._deliver(client, event)
 
@@ -99,6 +108,14 @@ class WebhookDeliveryService:
         signature = sign_webhook_payload(event.payload, config.secret_hash)
         event.attempt_count += 1
         event.last_attempt_at = datetime.now(timezone.utc)
+
+        # Re-check at send time: DNS may have changed since the webhook was created.
+        try:
+            await avalidate_outbound_url(str(config.target_url))
+        except UnsafeURLError:
+            event.status = "failed"
+            await self.db.flush()
+            return
 
         try:
             resp = await client.post(
@@ -153,7 +170,13 @@ class CycleCloseScanService:
 
         enqueued = 0
         for account in accounts:
-            enqueued += await self._scan_account(account, today)
+            # One bad account must not stop cycle.closed events for everyone else:
+            # isolate each in a savepoint so a failure rolls back only that account.
+            try:
+                async with self.db.begin_nested():
+                    enqueued += await self._scan_account(account, today)
+            except Exception:
+                logger.exception("cycle_scan_account_failed", extra={"account_id": str(account.id)})
         await self.db.flush()
         return enqueued
 

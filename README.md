@@ -1,6 +1,6 @@
 # LoanTrack — Internal Loan Ledger
 
-Single-tenant loan tracking tool for managing private loans, payment history, and interest that accrues on a fixed twice-monthly cycle (the 15th and the 30th). Admins manage everything (accounts, users, imports, webhooks, loan requests); regular users manage their own loans and can submit loan requests.
+Single-tenant loan tracking tool for managing private loans, payment history, and interest that accrues on a fixed twice-monthly cycle (the 15th and the 30th). Admins manage everything (accounts, users, imports, webhooks, loan requests); regular users (borrowers) can view their own loans and payments, upload payment proof, and submit loan requests for an amount; the lender (admin) sets the rate and creates the account.
 
 ## Stack
 
@@ -32,7 +32,7 @@ docker compose up --build
 
 App: http://localhost  
 API docs: http://localhost/api/v1/docs  
-pgAdmin: http://localhost:5050
+pgAdmin (optional, `docker compose --profile tools up`, needs `PGADMIN_PASSWORD`): http://localhost:5050 — bound to localhost only
 
 ### Admin user
 
@@ -40,7 +40,7 @@ On every start the backend container runs `alembic upgrade head` and then `backe
 
 There is no public sign-up: further users are created by an admin (Users page, or `POST /admin/users`).
 
-Default credentials: `admin@loantrack.dev` / `ChangeMe123!` — override with `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` / `SEED_ADMIN_NAME` in `.env` **before the first start**, and change the password after first login.
+There is no default admin password: set `SEED_ADMIN_PASSWORD` (12+ characters) and optionally `SEED_ADMIN_EMAIL` / `SEED_ADMIN_NAME` in `.env` **before the first start** — compose and the seed script refuse to run without it. `SECRET_KEY` must be 32+ random characters outside `DEBUG`.
 
 `docker compose run --rm seed` runs a second, manual script (`backend/scripts/seed.py`) that creates an admin with the configured email if that email doesn't exist yet. Use it to add an admin to a database that already has other users.
 
@@ -151,6 +151,6 @@ Worth knowing:
 | Role | Access |
 |------|--------|
 | `admin` | Everything: all accounts and payments, users, global webhooks, CSV imports/exports, loan-request review, force-purge of non-closed accounts |
-| `user` | Own accounts (create, edit, close, purge once closed), own payments and attachments, per-account webhooks, loan-request submission (max 3 active at once) |
+| `user` | Read-only access to own accounts and payments, upload/download own payment attachments, loan-request submission (amount only, max 3 active at once). Cannot create/edit/close/purge accounts, record payments, or manage webhooks |
 
 Full per-endpoint breakdown: [Architecture → API surface](docs/architecture.md#api-surface).

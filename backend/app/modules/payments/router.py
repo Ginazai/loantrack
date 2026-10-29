@@ -6,7 +6,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.dependencies import get_current_user
+from app.core.dependencies import get_current_user, require_admin
 from app.modules.payments.schemas import PaymentAttachmentOut, PaymentCreate, PaymentOut
 from app.modules.payments.service import PaymentService
 
@@ -30,7 +30,7 @@ async def add_payment(
     request: Request,
     account_id: UUID,
     data: PaymentCreate,
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     svc = PaymentService(db)

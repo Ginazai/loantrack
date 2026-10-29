@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.dependencies import get_current_user
+from app.core.dependencies import require_admin
 from app.modules.webhooks.schemas import WebhookConfigCreate, WebhookConfigOut
 from app.modules.webhooks.service import WebhookConfigService
 
@@ -14,7 +14,7 @@ router = APIRouter(prefix="/accounts/{account_id}/webhooks", tags=["webhooks"])
 @router.get("", response_model=list[WebhookConfigOut])
 async def list_webhooks(
     account_id: UUID,
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     svc = WebhookConfigService(db)
@@ -27,7 +27,7 @@ async def list_webhooks(
 async def create_webhook(
     account_id: UUID,
     data: WebhookConfigCreate,
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     svc = WebhookConfigService(db)
@@ -40,7 +40,7 @@ async def create_webhook(
 async def delete_webhook(
     account_id: UUID,
     webhook_id: UUID,
-    current_user=Depends(get_current_user),
+    current_user=Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     svc = WebhookConfigService(db)

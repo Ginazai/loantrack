@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.dependencies import get_current_user
 from app.core.security import generate_webhook_secret, hash_password
+from app.core.url_safety import UnsafeURLError, avalidate_outbound_url
 from app.modules.accounts.models import LoanAccount
 from app.modules.accounts.schemas import LoanAccountFilter
 from app.modules.accounts.service import LoanAccountService
@@ -132,6 +133,10 @@ async def create_global_webhook(
     _=Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
+    try:
+        await avalidate_outbound_url(str(data.target_url))
+    except UnsafeURLError as exc:
+        raise HTTPException(422, f"Invalid target_url: {exc}")
     config = WebhookConfig(
         account_id=None,  # global — not tied to any account
         target_url=str(data.target_url),

@@ -1,6 +1,7 @@
 from functools import lru_cache
 from pathlib import Path
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # backend/app/core/config.py -> backend/  (three .parent hops)
@@ -10,6 +11,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 # hardcoded defaults with no error) if uvicorn/pytest/alembic isn't started
 # from inside backend/ specifically.
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
+
+
+_PLACEHOLDER_SECRET = "change-this-secret-key-in-production"
+KNOWN_DEFAULT_SEED_PASSWORD = "ChangeMe123!"
 
 
 class Settings(BaseSettings):
@@ -31,7 +36,7 @@ class Settings(BaseSettings):
 
     DATABASE_URL: str = "postgresql+asyncpg://user:password@localhost:5432/interests_db"
 
-    SECRET_KEY: str = "change-this-secret-key-in-production"
+    SECRET_KEY: str = _PLACEHOLDER_SECRET
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
@@ -52,6 +57,19 @@ class Settings(BaseSettings):
     # How often the in-process cycle-close scan runs (ADR-006) — no worker,
     # just a second asyncio task alongside the webhook retry loop.
     CYCLE_SCAN_INTERVAL_SECONDS: int = 3600
+
+    @model_validator(mode="after")
+    def _reject_insecure_defaults(self) -> "Settings":
+        """Fail closed: refuse to boot outside DEBUG with a placeholder/short JWT secret
+        (anyone could forge tokens, including admin ones)."""
+        if not self.DEBUG:
+            if self.SECRET_KEY == _PLACEHOLDER_SECRET or len(self.SECRET_KEY) < 32:
+                raise ValueError(
+                    "SECRET_KEY must be set to a random value of at least 32 characters "
+                    "(e.g. `openssl rand -hex 32`). The built-in placeholder is only "
+                    "allowed when DEBUG=true."
+                )
+        return self
 
 
 @lru_cache

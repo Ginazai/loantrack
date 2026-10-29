@@ -6,7 +6,7 @@ import asyncio
 
 from sqlalchemy import select
 
-from app.core.config import get_settings
+from app.core.config import KNOWN_DEFAULT_SEED_PASSWORD, get_settings
 from app.core.database import AsyncSessionLocal
 from app.core.models_registry import *  # noqa: F401, F403 — registers all models with SQLAlchemy
 from app.core.security import hash_password
@@ -22,6 +22,14 @@ async def seed() -> None:
             print("seed: users already exist, skipping")
             return
 
+        if settings.SEED_ADMIN_PASSWORD == KNOWN_DEFAULT_SEED_PASSWORD or len(
+            settings.SEED_ADMIN_PASSWORD
+        ) < 12:
+            if not settings.DEBUG:
+                raise SystemExit(
+                    "seed: refusing to create the admin with the well-known default or a "
+                    "short password. Set SEED_ADMIN_PASSWORD (12+ chars) in your .env."
+                )
         admin = User(
             email=settings.SEED_ADMIN_EMAIL,
             password_hash=hash_password(settings.SEED_ADMIN_PASSWORD),
