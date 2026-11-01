@@ -5,6 +5,9 @@ import App from "./App";
 import { useAuthStore } from "./stores/authStore";
 import { makeAdmin, makeUser } from "./test/factories";
 import { LocationDisplay } from "./test/utils";
+import { restoreSession } from "./api/session";
+
+vi.mock("./api/session", () => ({ restoreSession: vi.fn() }));
 
 // Stub every screen: these tests are about routing and guards only.
 vi.mock("./components/layout/DashboardLayout", () => ({
@@ -34,11 +37,49 @@ const go = (route: string) =>
   );
 const path = () => screen.getByTestId("location").textContent;
 
-const logIn = (user = makeAdmin()) => useAuthStore.setState({ accessToken: "t", refreshToken: "r", user });
-const logOut = () => useAuthStore.setState({ accessToken: null, refreshToken: null, user: null });
+const logIn = (user = makeAdmin()) => useAuthStore.setState({ accessToken: "t", status: "authenticated", user });
+const logOut = () => useAuthStore.setState({ accessToken: null, user: null, status: "anonymous" });
 
 describe("App routing", () => {
-  beforeEach(logOut);
+  beforeEach(() => {
+    vi.clearAllMocks();
+    logOut();
+  });
+
+  describe("right after a page load (session not yet known)", () => {
+    beforeEach(() => useAuthStore.setState({ accessToken: null, user: null, status: "unknown" }));
+
+    it("asks the server to restore the session from the refresh cookie", () => {
+      go("/dashboard");
+      expect(restoreSession).toHaveBeenCalledTimes(1);
+    });
+
+    it("waits instead of bouncing a possibly-signed-in user to /login", () => {
+      go("/dashboard");
+      expect(screen.getByText("Restoring your session…")).toBeInTheDocument();
+      expect(path()).toBe("/dashboard");
+    });
+
+    it("lands on the page once the session is restored", () => {
+      go("/accounts");
+      useAuthStore.setState({ accessToken: "t", status: "authenticated", user: makeAdmin() });
+      // re-render is driven by the store subscription
+      return screen.findByText("accounts page");
+    });
+
+    it("sends the visitor to /login if there turns out to be no session", async () => {
+      go("/dashboard");
+      useAuthStore.getState().logout();
+      await screen.findByText("login page");
+      expect(path()).toBe("/login");
+    });
+  });
+
+  it("does not re-run restore when the session is already known", () => {
+    logIn();
+    go("/dashboard");
+    expect(restoreSession).not.toHaveBeenCalled();
+  });
 
   describe("signed out", () => {
     it("shows the login page at /login", () => {

@@ -26,14 +26,14 @@ import { useAuthStore } from "../../stores/authStore";
 import { getApiErrorMessage } from "../../utils/apiError";
 import { ConfirmDialog, Drawer, EmptyState, Notice, PageHeader, TableSkeleton } from "../../components/common";
 
+// Never opened for the signed-in admin's own row: admins manage other people here, and edit
+// themselves through Account Settings (which asks for their current password).
 function EditUserDrawer({
   user,
-  isSelf,
   onClose,
   onSaved,
 }: {
   user: User;
-  isSelf: boolean;
   onClose: () => void;
   onSaved: (u: User) => void;
 }) {
@@ -100,8 +100,6 @@ function EditUserDrawer({
         <Select
           id="edit-user-role"
           labelText="Role"
-          helperText={isSelf ? "You can't remove your own admin role." : undefined}
-          disabled={isSelf}
           value={form.role}
           onChange={(e) => setForm({ ...form, role: e.target.value as UserRole })}
         >
@@ -199,7 +197,6 @@ export default function UsersPage() {
   const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
   const [editUser, setEditUser] = useState<User | null>(null);
   const currentUserId = useAuthStore((s) => s.user?.id);
-  const setAuthUser = useAuthStore((s) => s.setUser);
 
   useEffect(() => {
     adminApi.listUsers().then(setUsers).finally(() => setLoading(false));
@@ -226,7 +223,7 @@ export default function UsersPage() {
   };
 
   return (
-    <div className="lt-page lt-stack lt-stack--loose">
+    <div className="lt-page lt-page--medium lt-stack lt-stack--loose">
       <PageHeader
         title="Users"
         subtitle="Manage borrower accounts and access"
@@ -263,7 +260,9 @@ export default function UsersPage() {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {users.map((user) => (
+                {users.map((user) => {
+                  const isSelf = user.id === currentUserId;
+                  return (
                   <Fragment key={user.id}>
                     <TableExpandRow
                       isExpanded={expandedUser === user.id}
@@ -271,7 +270,14 @@ export default function UsersPage() {
                       aria-label={`Show loans for ${user.full_name}`}
                     >
                       <TableCell>
-                        <div className="lt-link-list__name">{user.full_name}</div>
+                        <div className="lt-link-list__name">
+                          {user.full_name}
+                          {isSelf && (
+                            <Tag size="sm" type="outline" className="lt-ms-sm">
+                              You
+                            </Tag>
+                          )}
+                        </div>
                         <div className="lt-link-list__sub lt-mono">{user.email}</div>
                       </TableCell>
                       <TableCell>
@@ -286,35 +292,39 @@ export default function UsersPage() {
                       </TableCell>
                       <TableCell className="lt-tnum">{new Date(user.created_at).toLocaleDateString()}</TableCell>
                       <TableCell>
-                        <div className="lt-table-actions">
-                          <Toggle
-                            id={`active-${user.id}`}
-                            size="sm"
-                            hideLabel
-                            labelText=""
-                            aria-label={`${user.full_name} is ${user.is_active ? "active" : "inactive"}`}
-                            toggled={user.is_active}
-                            onToggle={() => toggleActive(user)}
-                          />
-                          <Button
-                            kind="ghost"
-                            size="md"
-                            hasIconOnly
-                            renderIcon={Edit}
-                            iconDescription="Edit user"
-                            tooltipPosition="left"
-                            onClick={() => setEditUser(user)}
-                          />
-                          <Button
-                            kind="danger--ghost"
-                            size="md"
-                            hasIconOnly
-                            renderIcon={TrashCan}
-                            iconDescription="Delete user"
-                            tooltipPosition="left"
-                            onClick={() => setDeleteUserId(user.id)}
-                          />
-                        </div>
+                        {isSelf ? (
+                          <p className="lt-field-note">Edit yourself in Account Settings</p>
+                        ) : (
+                          <div className="lt-table-actions">
+                            <Toggle
+                              id={`active-${user.id}`}
+                              size="sm"
+                              hideLabel
+                              labelText=""
+                              aria-label={`${user.full_name} is ${user.is_active ? "active" : "inactive"}`}
+                              toggled={user.is_active}
+                              onToggle={() => toggleActive(user)}
+                            />
+                            <Button
+                              kind="ghost"
+                              size="sm"
+                              hasIconOnly
+                              renderIcon={Edit}
+                              iconDescription="Edit user"
+                              tooltipPosition="left"
+                              onClick={() => setEditUser(user)}
+                            />
+                            <Button
+                              kind="danger--ghost"
+                              size="sm"
+                              hasIconOnly
+                              renderIcon={TrashCan}
+                              iconDescription="Delete user"
+                              tooltipPosition="left"
+                              onClick={() => setDeleteUserId(user.id)}
+                            />
+                          </div>
+                        )}
                       </TableCell>
                     </TableExpandRow>
                     {expandedUser === user.id && (
@@ -343,7 +353,8 @@ export default function UsersPage() {
                       </TableExpandedRow>
                     )}
                   </Fragment>
-                ))}
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
@@ -360,12 +371,8 @@ export default function UsersPage() {
       {editUser && (
         <EditUserDrawer
           user={editUser}
-          isSelf={editUser.id === currentUserId}
           onClose={() => setEditUser(null)}
-          onSaved={(u) => {
-            setUsers((prev) => prev.map((x) => (x.id === u.id ? u : x)));
-            if (u.id === currentUserId) setAuthUser(u);
-          }}
+          onSaved={(u) => setUsers((prev) => prev.map((x) => (x.id === u.id ? u : x)))}
         />
       )}
 

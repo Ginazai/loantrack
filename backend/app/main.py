@@ -1,4 +1,5 @@
 import asyncio
+import re
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -8,6 +9,7 @@ from slowapi.errors import RateLimitExceeded
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 
+from app.core.body_limit import BodyLimitRule, BodySizeLimitMiddleware
 from app.core.config import get_settings
 from app.core.database import AsyncSessionLocal
 from app.core.exceptions import register_exception_handlers
@@ -20,6 +22,7 @@ from app.modules.auth.router import router as auth_router
 from app.modules.imports.router import router as imports_router
 from app.modules.loan_requests.router import router as loan_requests_router
 from app.modules.payments.router import router as payments_router
+from app.modules.payments.schemas import MAX_ATTACHMENT_SIZE_BYTES
 from app.modules.webhooks.router import router as webhooks_router
 from app.modules.webhooks.service import CycleCloseScanService, WebhookDeliveryService
 
@@ -36,13 +39,15 @@ class _SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-        response.headers["Content-Security-Policy"] = (
+        # setdefault: a route may set a stricter policy of its own (attachment downloads do).
+        response.headers.setdefault(
+            "Content-Security-Policy",
             "default-src 'self'; "
             "script-src 'self' 'unsafe-inline'; "
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
             "font-src 'self' https://fonts.gstatic.com; "
             "img-src 'self' data:; "
-            "connect-src 'self'"
+            "connect-src 'self'",
         )
         return response
 
@@ -102,6 +107,26 @@ app.state.limiter = auth_limiter  # slowapi's 429 handler reads it from app.stat
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 register_exception_handlers(app)
 
+# Multipart framing adds a little to the file itself; allow for it so a file exactly at the
+# limit still gets through (the handlers then enforce the exact per-file limit).
+_MULTIPART_OVERHEAD = 64 * 1024
+_prefix = re.escape(settings.API_V1_PREFIX)
+# Added first = innermost, so its 413s still pass through the CORS middleware below.
+app.add_middleware(
+    BodySizeLimitMiddleware,
+    rules=[
+        BodyLimitRule(
+            "POST",
+            re.compile(rf"{_prefix}/accounts/[^/]+/payments/[^/]+/attachments/?"),
+            MAX_ATTACHMENT_SIZE_BYTES + _MULTIPART_OVERHEAD,
+        ),
+        BodyLimitRule(
+            "POST",
+            re.compile(rf"{_prefix}/admin/imports/preview/?"),
+            settings.MAX_IMPORT_SIZE_BYTES + _MULTIPART_OVERHEAD,
+        ),
+    ],
+)
 app.add_middleware(_SecurityHeadersMiddleware)
 app.add_middleware(
     CORSMiddleware,

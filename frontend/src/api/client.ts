@@ -13,9 +13,17 @@ import {
 // Falls back to relative path for local dev (docker-compose nginx proxy).
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api/v1";
 
+// The cookie-authenticated endpoints (/auth/refresh, /auth/logout) require this header. A
+// cross-site page can make the browser send our cookie but cannot add a custom header without
+// a CORS preflight, so its absence marks the request as not coming from our own code.
+const CSRF_HEADERS = { "X-Requested-With": "XMLHttpRequest" };
+
 const client = axios.create({
   baseURL: BASE_URL,
-  headers: { "Content-Type": "application/json" },
+  // Lets the httpOnly refresh cookie travel when the API is on another origin
+  // (VITE_API_BASE_URL); harmless when it is same-origin behind nginx.
+  withCredentials: true,
+  headers: { "Content-Type": "application/json", ...CSRF_HEADERS },
 });
 
 // Inject access token on every request
@@ -24,10 +32,6 @@ client.interceptors.request.use((config) => {
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
-
-// Auto-refresh on 401
-let refreshing = false;
-let queue: Array<(token: string) => void> = [];
 
 // A 401 from these endpoints is an expected, user-facing outcome (wrong
 // credentials, invalid/expired refresh token) — NOT a signal that a valid
@@ -56,12 +60,15 @@ function clearWaking() {
  * POST /auth/refresh with the same cold-start patience as every other request.
  * It uses bare axios (to bypass the interceptors below), so it needs its own loop;
  * otherwise a 502 while the backend wakes would be treated as "session expired"
- * and log the user out.
+ * and log the user out. There is no body: the refresh token is the httpOnly cookie.
  */
-async function refreshWithColdStartRetry(refreshToken: string | null) {
+async function refreshWithColdStartRetry() {
   for (let attempt = 1; ; attempt++) {
     try {
-      return await axios.post(`${BASE_URL}/auth/refresh`, { refresh_token: refreshToken });
+      return await axios.post<{ access_token: string }>(`${BASE_URL}/auth/refresh`, undefined, {
+        withCredentials: true,
+        headers: CSRF_HEADERS,
+      });
     } catch (e) {
       if (!shouldRetryColdStart(e, attempt - 1, true)) {
         clearWaking();
@@ -72,6 +79,38 @@ async function refreshWithColdStartRetry(refreshToken: string | null) {
       await sleep(retryDelayMs(attempt, (e as AxiosError).response?.headers?.["retry-after"]));
     }
   }
+}
+
+/**
+ * Run `fn` while holding a browser-wide lock, when the browser has one (Web Locks API).
+ *
+ * Refresh tokens rotate: each use spends the cookie and issues a new one. Two tabs refreshing
+ * at the same instant would both present the same cookie, and the server would see the second
+ * as a replay of a spent token. Serialising across tabs means the second tab runs after the
+ * first has stored the new cookie, so it presents that one instead.
+ */
+function withCrossTabLock<T>(fn: () => Promise<T>): Promise<T> {
+  const locks = typeof navigator !== "undefined" ? (navigator as any).locks : undefined;
+  return locks?.request ? locks.request("loantrack-refresh", fn) : fn();
+}
+
+let inFlight: Promise<string> | null = null;
+
+/**
+ * Exchange the refresh cookie for a new access token and keep it in memory. Concurrent callers
+ * (several requests that all got a 401, or session restore racing a request) share one call.
+ */
+export function refreshSession(): Promise<string> {
+  if (inFlight) return inFlight;
+  const run: Promise<string> = withCrossTabLock(async () => {
+    const { data } = await refreshWithColdStartRetry();
+    useAuthStore.getState().setAccessToken(data.access_token);
+    return data.access_token;
+  }).finally(() => {
+    if (inFlight === run) inFlight = null;
+  });
+  inFlight = run;
+  return run;
 }
 
 client.interceptors.response.use(
@@ -106,31 +145,14 @@ client.interceptors.response.use(
 
     original._retry = true;
 
-    if (refreshing) {
-      return new Promise((resolve) => {
-        queue.push((token) => {
-          original.headers.Authorization = `Bearer ${token}`;
-          resolve(client(original));
-        });
-      });
-    }
-
-    refreshing = true;
-    const store = useAuthStore.getState();
-
     try {
-      const { data } = await refreshWithColdStartRetry(store.refreshToken);
-      store.setTokens(data.access_token, data.refresh_token);
-      queue.forEach((cb) => cb(data.access_token));
-      queue = [];
-      original.headers.Authorization = `Bearer ${data.access_token}`;
+      const token = await refreshSession();
+      original.headers.Authorization = `Bearer ${token}`;
       return client(original);
     } catch {
-      store.logout();
+      useAuthStore.getState().logout();
       window.location.href = "/login";
       return Promise.reject(error);
-    } finally {
-      refreshing = false;
     }
   }
 );

@@ -10,7 +10,6 @@ import {
   nextCycleDate,
   upcomingCycleDates,
 } from "../../utils/dateUtils";
-import { CycleDates } from "../../components/ui";
 
 const schema = z.object({
   amount: z.coerce.number().positive("Must be greater than 0"),
@@ -123,22 +122,27 @@ export function PaymentForm({ account, onSubmit, onCancel, isLoading }: Props) {
       )}
 
       {/* Upcoming cycle preview */}
-      <CycleDates>
-        {upcoming.map((d) =>
-          method === "manual" ? (
-            <OperationalTag
-              key={d.toISOString()}
-              text={formatDate(d)}
-              size="md"
-              onClick={() => setValue("payment_date", d.toISOString().split("T")[0])}
-            />
-          ) : (
-            <Tag key={d.toISOString()} type="outline" size="md">
-              {formatDate(d)}
-            </Tag>
-          )
-        )}
-      </CycleDates>
+      <div>
+        <p className="lt-eyebrow">
+          Upcoming Cycles
+        </p>
+        <div className="lt-row">
+          {upcoming.map((d) =>
+            method === "manual" ? (
+              <OperationalTag
+                key={d.toISOString()}
+                text={formatDate(d)}
+                size="md"
+                onClick={() => setValue("payment_date", d.toISOString().split("T")[0])}
+              />
+            ) : (
+              <Tag key={d.toISOString()} type="outline" size="md">
+                {formatDate(d)}
+              </Tag>
+            )
+          )}
+        </div>
+      </div>
 
       <div className="lt-form__actions lt-form__actions--bleed">
         <Button type="button" kind="secondary" size="lg" onClick={onCancel}>

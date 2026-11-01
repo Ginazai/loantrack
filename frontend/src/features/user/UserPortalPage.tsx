@@ -135,7 +135,7 @@ export default function UserPortalPage() {
     .sort((a, b) => (a.next_due_date ?? "").localeCompare(b.next_due_date ?? ""))[0];
 
   return (
-    <div className="lt-page lt-stack lt-stack--loose">
+    <div className="lt-page lt-page--narrow lt-stack lt-stack--loose">
       <PageHeader
         title={`${user?.full_name?.split(" ")[0]}'s Loans`}
         subtitle={new Date().toLocaleDateString("en-US", {

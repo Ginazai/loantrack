@@ -18,7 +18,7 @@ const schema = z.object({
 
 export function LoginPage() {
   const navigate = useNavigate();
-  const { setTokens, setUser } = useAuthStore();
+  const { setAccessToken, setUser } = useAuthStore();
   const [error, setError] = useState("");
 
   const {
@@ -30,8 +30,8 @@ export function LoginPage() {
   const onSubmit = async (data: LoginFormData) => {
     setError("");
     try {
-      const tokens = await authApi.login(data);
-      setTokens(tokens.access_token, tokens.refresh_token);
+      const session = await authApi.login(data); // also sets the httpOnly refresh cookie
+      setAccessToken(session.access_token);
       const user = await authApi.me();
       setUser(user);
       navigate("/dashboard");

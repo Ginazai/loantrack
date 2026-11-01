@@ -20,6 +20,7 @@ import io
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 
+from app.core.csv_safety import restore_cell
 from app.modules.imports.parsers.base import (
     ImportParser,
     ParsedAccount,
@@ -144,11 +145,14 @@ class NativeCsvParser(ImportParser):
                         accounts.append(
                             ParsedAccount(
                                 source_ref=ref,
-                                suggested_account_name=row.get("account_name") or f"Cuenta {ref}",
+                                # Exports prefix formula-looking text with "'"; undo it so a
+                                # round trip returns the original name.
+                                suggested_account_name=restore_cell(row.get("account_name") or "")
+                                or f"Cuenta {ref}",
                                 borrow_amount=borrow_amount,
                                 start_date=start_date,
                                 rate=rate,
-                                borrower_name=row.get("borrower_name") or None,
+                                borrower_name=restore_cell(row.get("borrower_name") or "") or None,
                                 row_number=row_number,
                             )
                         )

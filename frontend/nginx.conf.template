@@ -6,6 +6,16 @@ server {
     root /usr/share/nginx/html;
     index index.html;
 
+    # If another proxy/load balancer sits IN FRONT of this nginx (Render, a cloud LB, a CDN),
+    # $remote_addr is that proxy, not the visitor. Name its address range in REAL_IP_FROM and
+    # nginx takes the real visitor from X-Forwarded-For, but only when the request really came
+    # from that range. The default (127.0.0.1) trusts nobody, which is right when clients
+    # connect to this nginx directly (docker compose). Use a single CIDR; for several, add more
+    # `set_real_ip_from` lines here. Never use 0.0.0.0/0: any client could then pick its address.
+    set_real_ip_from ${REAL_IP_FROM};
+    real_ip_header X-Forwarded-For;
+    real_ip_recursive on;
+
     gzip on;
     gzip_types text/plain text/css application/json application/javascript
                text/javascript image/svg+xml;
@@ -66,6 +76,9 @@ server {
 
         # Use the backend hostname selected by proxy_pass instead of the frontend host.
         proxy_set_header Host $proxy_host;
+        # The backend reads the visitor's address from the END of X-Forwarded-For, which is
+        # the part this line appends ($remote_addr: the real client after the real_ip step
+        # above). Anything the client sent itself stays to the left and is never trusted.
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
 

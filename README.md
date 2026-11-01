@@ -144,6 +144,9 @@ Required (root `.env.example`):
 Worth knowing:
 - `UVICORN_WORKERS` (default 2) — each worker process runs its own copy of the background loops; see [Architecture → Background tasks](docs/architecture.md#background-tasks).
 - `RATE_LIMIT_PER_MINUTE` is currently unused; `AUTH_RATE_LIMIT_PER_MINUTE` (default 5) limits logins per minute per client address.
+- `COOKIE_SECURE` (default `true`) — the refresh token is an httpOnly cookie. Browsers accept Secure cookies on `http://localhost`; set it to `false` only when opening the app over plain HTTP from another machine, never in production.
+- `TRUSTED_PROXIES` / `LOANTRACK_SUBNET` / `REAL_IP_FROM` — which proxies' `X-Forwarded-For` is believed, so the login rate limit is per visitor and not shared by everyone behind nginx. docker-compose sets this up for you; if you put another load balancer in front, read [Architecture → Known gaps](docs/architecture.md#known-gaps) first.
+- **Upgrading:** run the new migration (`007`, automatic with the Docker entrypoint). Everyone is signed out once, and clients that verified webhook signatures by re-serialising the JSON must switch to verifying the raw body (see [Webhooks](docs/architecture.md#request-format)).
 - `ALLOWED_ORIGINS` is hardcoded to `["http://localhost"]` in `docker-compose.yml`; change it there if you serve the app from another origin.
 
 ## Roles

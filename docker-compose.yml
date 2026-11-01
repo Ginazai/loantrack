@@ -72,6 +72,13 @@ services:
       SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:?SEED_ADMIN_PASSWORD is required (12+ chars)}
       SEED_ADMIN_NAME:     ${SEED_ADMIN_NAME:-Admin User}
       ALLOWED_ORIGINS: '["http://localhost"]'
+      # Refresh-token cookie. Secure cookies are accepted by browsers on http://localhost;
+      # set COOKIE_SECURE=false only for plain-HTTP access from another host (never in prod).
+      COOKIE_SECURE:   ${COOKIE_SECURE:-true}
+      # nginx (frontend) is the only thing that talks to this container; believe its
+      # X-Forwarded-For so each visitor gets their own login rate-limit bucket instead of
+      # all of them sharing nginx's address. Must cover the compose network below.
+      TRUSTED_PROXIES: '["${LOANTRACK_SUBNET:-10.254.250.0/24}"]'
       DEBUG:           ${DEBUG:-false}
       LOG_LEVEL:       ${LOG_LEVEL:-info}
       UVICORN_WORKERS: ${UVICORN_WORKERS:-2}
@@ -110,6 +117,8 @@ services:
       # platforms (see docs/adr for context); no rebuild needed either way,
       # this is substituted into nginx.conf at container start.
       BACKEND_URL: ${BACKEND_URL:-http://backend:8000}
+      # Range of any proxy in front of this nginx (none in this compose setup).
+      REAL_IP_FROM: ${REAL_IP_FROM:-127.0.0.1}
     ports:
       - "${APP_PORT:-80}:8080"
     healthcheck:
@@ -153,3 +162,8 @@ networks:
   loantrack:
     name: loantrack_network
     driver: bridge
+    # A fixed subnet so the backend can be told which peer is its trusted proxy
+    # (TRUSTED_PROXIES above). Change LOANTRACK_SUBNET in .env if it overlaps a network you use.
+    ipam:
+      config:
+        - subnet: ${LOANTRACK_SUBNET:-10.254.250.0/24}

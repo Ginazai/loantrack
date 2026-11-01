@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.dependencies import get_current_user, require_admin
+from app.core.http import content_disposition
 from app.modules.payments.schemas import PaymentAttachmentOut, PaymentCreate, PaymentOut
 from app.modules.payments.service import PaymentService
 
@@ -104,7 +105,16 @@ async def download_attachment(
     return StreamingResponse(
         io.BytesIO(attachment.content),
         media_type=attachment.content_type,
-        headers={"Content-Disposition": f'inline; filename="{attachment.original_filename}"'},
+        headers={
+            # attachment, never inline: a receipt is something to save, and rendering
+            # user-supplied files (a PDF, an SVG renamed to .png) inside our origin is how
+            # stored XSS happens. The name is encoded so it cannot break out of the header.
+            "Content-Disposition": content_disposition(attachment.original_filename),
+            "X-Content-Type-Options": "nosniff",
+            # Even if something did render it, it may load and run nothing.
+            "Content-Security-Policy": "default-src 'none'; sandbox",
+            "Cache-Control": "private, no-store",
+        },
     )
 
 
