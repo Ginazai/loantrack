@@ -234,7 +234,7 @@ export default function MyRequestsPage() {
   for (const r of requests) counts[r.status] = (counts[r.status] ?? 0) + 1;
 
   return (
-    <div className="lt-page lt-page--narrow lt-stack lt-stack--loose">
+    <div className="lt-page lt-stack lt-stack--loose">
       <PageHeader
         title="My Requests"
         subtitle={`${active.length} active · ${3 - active.length} slot${3 - active.length !== 1 ? "s" : ""} remaining`}

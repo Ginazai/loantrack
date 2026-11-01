@@ -81,9 +81,66 @@ html {
 }
 
 // ── App shell ───────────────────────────────────────────────────────────────
+// Carbon hard-codes a 3rem header in about eight places. One token drives all of them so
+// the bar can be a more comfortable touch size (especially on phones).
+$lt-header-h: 3.5rem;
+
+.cds--header {
+  block-size: $lt-header-h;
+}
+
+.cds--header__action {
+  block-size: $lt-header-h;
+  inline-size: $lt-header-h;
+}
+
+a.cds--header__name {
+  font-size: 1.125rem;
+  line-height: 1.5rem;
+  letter-spacing: 0;
+}
+
+.cds--header ~ .cds--content,
+div:has(.cds--header) ~ .cds--content {
+  margin-block-start: $lt-header-h;
+}
+
+.cds--side-nav--ux,
+.cds--side-nav__overlay {
+  inset-block-start: $lt-header-h;
+}
+
+.cds--header-panel {
+  inset-block-start: $lt-header-h;
+}
+
 .lt-shell-main {
-  min-block-size: calc(100dvh - 3rem);
+  min-block-size: calc(100dvh - #{$lt-header-h});
   background: $background;
+}
+
+// Side nav: 3rem rows, 16px labels and 20px icons (Carbon's 14px/16px is hard to hit and read).
+.cds--side-nav .cds--side-nav__link {
+  block-size: 3rem;
+  padding-inline: 0.875rem $spacing-05;
+}
+
+.cds--side-nav .cds--side-nav__link > .cds--side-nav__link-text {
+  font-size: 1rem;
+  letter-spacing: 0;
+}
+
+.cds--side-nav .cds--side-nav__icon {
+  flex: 0 0 1.25rem;
+}
+
+.cds--side-nav .cds--side-nav__icon:not(.cds--side-nav__submenu-chevron) {
+  margin-inline-end: $spacing-05;
+}
+
+.cds--side-nav .cds--side-nav__icon > svg {
+  block-size: 1.25rem;
+  inline-size: 1.25rem;
 }
 
 // Carbon's rail reserves 3rem; on small screens the nav is an overlay, so no margin.
@@ -100,17 +157,9 @@ html {
 }
 
 .lt-page {
-  // Every page shares one left edge (flush with the nav); only the measure differs.
+  // One measure and one left edge for every screen, so navigating never changes the frame.
   max-inline-size: 99rem;
   margin-inline: 0;
-
-  &--narrow {
-    max-inline-size: 64rem;
-  }
-
-  &--medium {
-    max-inline-size: 80rem;
-  }
 }
 
 .lt-header-user {
@@ -188,7 +237,8 @@ html {
     align-items: center;
     gap: $spacing-03;
 
-    .cds--btn:not(.cds--btn--icon-only) {
+    // Ghost buttons ("Payload") stay content-sized so they sit next to the primary action.
+    .cds--btn:not(.cds--btn--icon-only):not(.cds--btn--ghost) {
       min-inline-size: 10rem;
     }
 
@@ -317,6 +367,12 @@ html {
     min-block-size: 0;
     gap: $spacing-03;
   }
+
+  // Tiles inside drawers and previews are narrow; a 28px value would wrap ("Nov 14, / 2026").
+  &--compact .lt-kpi__value {
+    @include type-style('productive-heading-03');
+    font-weight: 300;
+  }
 }
 
 .lt-kpi {
@@ -376,7 +432,7 @@ html {
   }
 
   &__desc {
-    @include type-style('helper-text-01');
+    @include type-style('body-compact-01');
     color: $text-secondary;
     margin-block-start: $spacing-02;
   }
@@ -516,7 +572,7 @@ html {
   }
 
   &__sub {
-    @include type-style('helper-text-01');
+    @include type-style('body-compact-01');
     color: $text-secondary;
   }
 
@@ -611,6 +667,12 @@ html {
   flex-direction: column;
   gap: $spacing-06;
 
+  // Carbon sets `flex: 1 1 auto` on every form item. In a tall drawer that makes each field
+  // grow to soak up the spare height, which reads as huge gaps between fields.
+  .cds--form-item {
+    flex: 0 0 auto;
+  }
+
   &__grid {
     display: grid;
     gap: $spacing-06;
@@ -654,7 +716,7 @@ html {
   }
 
   &__desc {
-    @include type-style('helper-text-01');
+    @include type-style('body-compact-01');
     color: $text-secondary;
     margin-inline-start: 1.5rem;
   }
@@ -690,7 +752,7 @@ html {
   }
 
   dt {
-    @include type-style('label-01');
+    @include type-style('label-02');
     color: $text-secondary;
   }
 
@@ -824,7 +886,7 @@ html {
   @include type-style('body-compact-01');
 
   &__label {
-    @include type-style('label-01');
+    @include type-style('label-02');
     color: $text-secondary;
     margin-block-end: $spacing-02;
   }
@@ -870,7 +932,7 @@ html {
   }
 
   &__meta {
-    @include type-style('helper-text-01');
+    @include type-style('body-compact-01');
     color: $text-secondary;
     margin-block-start: $spacing-02;
   }
@@ -894,7 +956,7 @@ html {
 
 .lt-figure {
   &__label {
-    @include type-style('label-01');
+    @include type-style('label-02');
     color: $text-secondary;
   }
 
@@ -979,7 +1041,7 @@ html {
     flex-wrap: wrap;
     gap: $spacing-01 $spacing-05;
     margin-block-start: $spacing-02;
-    @include type-style('helper-text-01');
+    @include type-style('body-compact-01');
     color: $text-secondary;
     font-variant-numeric: tabular-nums;
   }
@@ -1002,7 +1064,7 @@ html {
   padding: $spacing-04 $spacing-05;
 
   &__label {
-    @include type-style('label-01');
+    @include type-style('label-02');
     color: $text-secondary;
     margin-block-end: $spacing-02;
   }
@@ -1116,7 +1178,7 @@ html {
   }
 
   &__foot-note {
-    @include type-style('label-01');
+    @include type-style('label-02');
     color: $text-secondary;
     margin-block-start: $spacing-09;
   }
@@ -1227,7 +1289,7 @@ dl.lt-kpis dd {
 
 // ── Side nav group label (only meaningful when the rail is expanded) ────────
 .lt-nav-label {
-  @include type-style('label-01');
+  @include type-style('label-02');
   color: $text-secondary;
   padding: $spacing-05 $spacing-05 $spacing-02;
 }
@@ -1400,6 +1462,21 @@ dl.lt-kpis dd {
 
 .lt-panel .cds--file__drop-container,
 .lt-panel .cds--file-browse-btn {
+  inline-size: 100%;
+  max-inline-size: none;
+}
+
+// Drop zone: Carbon top-left aligns the label; centre it in a roomier target.
+.lt-panel .cds--file__drop-container {
+  align-items: center;
+  justify-content: center;
+  min-block-size: 8rem;
+  padding: $spacing-06;
+  text-align: center;
+}
+
+// Carbon caps multi-line snippets at 768px, which leaves a dead strip beside them in a panel.
+.lt-panel .cds--snippet {
   inline-size: 100%;
   max-inline-size: none;
 }

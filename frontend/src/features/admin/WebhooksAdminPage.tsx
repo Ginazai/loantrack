@@ -126,7 +126,7 @@ export default function WebhooksAdminPage() {
   };
 
   return (
-    <div className="lt-page lt-page--narrow lt-stack lt-stack--loose">
+    <div className="lt-page lt-stack lt-stack--loose">
       <PageHeader
         title="Global Webhooks"
         subtitle="Fire for all accounts — invite emails, CRM sync, audit pipelines."
@@ -210,7 +210,7 @@ export default function WebhooksAdminPage() {
                   />
                   <Button
                     kind="danger--ghost"
-                    size="sm"
+                    size="md"
                     hasIconOnly
                     renderIcon={TrashCan}
                     iconDescription="Delete webhook"

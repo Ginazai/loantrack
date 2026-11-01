@@ -285,7 +285,7 @@ export function AccountDetailPage() {
                 <div className="lt-panel__header">
                   <h2 className="lt-panel__title">Payment Ledger</h2>
                   {canAddPayment && (
-                    <Button size="sm" renderIcon={Add} onClick={() => setShowPayment(true)}>
+                    <Button size="md" renderIcon={Add} onClick={() => setShowPayment(true)}>
                       Record payment
                     </Button>
                   )}
@@ -346,7 +346,7 @@ export function AccountDetailPage() {
                                 <div className="lt-table-actions lt-table-actions--start">
                                   <Button
                                     kind="ghost"
-                                    size="sm"
+                                    size="md"
                                     hasIconOnly
                                     renderIcon={Attachment}
                                     iconDescription="Comprobantes"
@@ -364,7 +364,7 @@ export function AccountDetailPage() {
                                 <TableCell>
                                   <Button
                                     kind="danger--ghost"
-                                    size="sm"
+                                    size="md"
                                     hasIconOnly
                                     renderIcon={TrashCan}
                                     iconDescription="Delete payment"
@@ -382,7 +382,7 @@ export function AccountDetailPage() {
                       <div className="lt-table-footer">
                         <Button
                           kind="ghost"
-                          size="sm"
+                          size="md"
                           renderIcon={Download}
                           onClick={() => adminApi.exportAccountFullCsv(id!)}
                         >
@@ -436,7 +436,7 @@ export function AccountDetailPage() {
                             </Tag>
                             <Button
                               kind="danger--ghost"
-                              size="sm"
+                              size="md"
                               hasIconOnly
                               renderIcon={TrashCan}
                               iconDescription="Delete webhook"
