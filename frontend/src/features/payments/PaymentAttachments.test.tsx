@@ -27,12 +27,12 @@ describe("PaymentAttachmentsModal", () => {
   it("shows a skeleton while loading", () => {
     api.list.mockReturnValue(new Promise(() => {}));
     render();
-    expect(screen.queryByText("Sin comprobantes adjuntos.")).toBeNull();
+    expect(screen.queryByText("No receipts attached.")).toBeNull();
   });
 
   it("shows the empty state when there are no receipts", async () => {
     render();
-    expect(await screen.findByText("Sin comprobantes adjuntos.")).toBeInTheDocument();
+    expect(await screen.findByText("No receipts attached.")).toBeInTheDocument();
     expect(api.list).toHaveBeenCalledWith("acc-1", "pay-1");
   });
 
@@ -51,14 +51,14 @@ describe("PaymentAttachmentsModal", () => {
   it("downloads a receipt", async () => {
     api.list.mockResolvedValue([makeAttachment({ id: "att-9", original_filename: "r.pdf" })]);
     render();
-    await userEvent.setup().click(await screen.findByRole("button", { name: "Descargar" }));
+    await userEvent.setup().click(await screen.findByRole("button", { name: "Download" }));
     expect(api.download).toHaveBeenCalledWith("acc-1", "pay-1", "att-9", "r.pdf");
   });
 
   it("lets admins delete a receipt", async () => {
     api.list.mockResolvedValue([makeAttachment({ id: "att-9" })]);
     render(true);
-    await userEvent.setup().click(await screen.findByRole("button", { name: "Eliminar" }));
+    await userEvent.setup().click(await screen.findByRole("button", { name: "Delete" }));
     await waitFor(() => expect(api.delete).toHaveBeenCalled());
     expect(api.delete.mock.calls[0].slice(0, 3)).toEqual(["acc-1", "pay-1", "att-9"]);
   });
@@ -67,21 +67,21 @@ describe("PaymentAttachmentsModal", () => {
     api.list.mockResolvedValue([makeAttachment()]);
     render(false);
     await screen.findByText("receipt.pdf");
-    expect(screen.queryByRole("button", { name: "Eliminar" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Delete" })).toBeNull();
   });
 
   describe("uploading", () => {
     it("opens the file picker from the upload button", async () => {
       const click = vi.spyOn(HTMLInputElement.prototype, "click").mockImplementation(() => {});
       render();
-      await userEvent.setup().click(await screen.findByRole("button", { name: "Subir comprobante" }));
+      await userEvent.setup().click(await screen.findByRole("button", { name: "Upload receipt" }));
       expect(click).toHaveBeenCalled();
       click.mockRestore();
     });
 
     it("uploads an allowed file", async () => {
       render();
-      await screen.findByText("Sin comprobantes adjuntos.");
+      await screen.findByText("No receipts attached.");
       const file = new File(["x"], "r.png", { type: "image/png" });
       pick(file);
       await waitFor(() => expect(api.upload).toHaveBeenCalled());
@@ -90,25 +90,25 @@ describe("PaymentAttachmentsModal", () => {
 
     it("rejects a disallowed file type without calling the API", async () => {
       render();
-      await screen.findByText("Sin comprobantes adjuntos.");
+      await screen.findByText("No receipts attached.");
       pick(new File(["x"], "notes.txt", { type: "text/plain" }));
-      expect(await screen.findByText(/Tipo de archivo no permitido/)).toBeInTheDocument();
+      expect(await screen.findByText(/File type not allowed/)).toBeInTheDocument();
       expect(api.upload).not.toHaveBeenCalled();
     });
 
     it("rejects a file over 10 MB without calling the API", async () => {
       render();
-      await screen.findByText("Sin comprobantes adjuntos.");
+      await screen.findByText("No receipts attached.");
       const big = new File(["x"], "big.pdf", { type: "application/pdf" });
       Object.defineProperty(big, "size", { value: 10 * 1024 * 1024 + 1 });
       pick(big);
-      expect(await screen.findByText("El archivo supera el límite de 10 MB.")).toBeInTheDocument();
+      expect(await screen.findByText("The file exceeds the 10 MB limit.")).toBeInTheDocument();
       expect(api.upload).not.toHaveBeenCalled();
     });
 
     it("accepts a file of exactly 10 MB", async () => {
       render();
-      await screen.findByText("Sin comprobantes adjuntos.");
+      await screen.findByText("No receipts attached.");
       const edge = new File(["x"], "edge.pdf", { type: "application/pdf" });
       Object.defineProperty(edge, "size", { value: 10 * 1024 * 1024 });
       pick(edge);
@@ -117,7 +117,7 @@ describe("PaymentAttachmentsModal", () => {
 
     it("ignores an empty selection", async () => {
       render();
-      await screen.findByText("Sin comprobantes adjuntos.");
+      await screen.findByText("No receipts attached.");
       fireEvent.change(fileInput(), { target: { files: [] } });
       expect(api.upload).not.toHaveBeenCalled();
     });
@@ -125,14 +125,14 @@ describe("PaymentAttachmentsModal", () => {
     it("shows the server's message when the upload fails", async () => {
       api.upload.mockRejectedValue({ response: { data: { detail: "Almacenamiento lleno" } } });
       render();
-      await screen.findByText("Sin comprobantes adjuntos.");
+      await screen.findByText("No receipts attached.");
       pick(new File(["x"], "r.png", { type: "image/png" }));
       expect(await screen.findByText("Almacenamiento lleno")).toBeInTheDocument();
     });
 
     it("refreshes the list after a successful upload", async () => {
       render();
-      await screen.findByText("Sin comprobantes adjuntos.");
+      await screen.findByText("No receipts attached.");
       pick(new File(["x"], "r.png", { type: "image/png" }));
       await waitFor(() => expect(api.list).toHaveBeenCalledTimes(2));
     });
@@ -141,7 +141,7 @@ describe("PaymentAttachmentsModal", () => {
   it("calls onClose from the drawer's close button", async () => {
     const onClose = vi.fn();
     render(true, onClose);
-    await screen.findByText("Sin comprobantes adjuntos.");
+    await screen.findByText("No receipts attached.");
     await userEvent.setup().click(screen.getByRole("button", { name: /close/i }));
     expect(onClose).toHaveBeenCalled();
   });

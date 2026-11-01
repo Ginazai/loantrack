@@ -7,11 +7,11 @@ import {
   Receipt,
   WarningAltFilled,
 } from "@carbon/icons-react";
-import { Button, DataTableSkeleton, SkeletonText } from "@carbon/react";
+import { Button } from "@carbon/react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
 import { accountsApi } from "../../api";
-import { EmptyState, PageHeader, StatCard } from "../../components/common";
+import { EmptyState, PageHeader, StatCard, StatCardSkeleton, TableSkeleton } from "../../components/common";
 import { useAuthStore } from "../../stores/authStore";
 import { formatCurrency, formatDate, isOverdue } from "../../utils/dateUtils";
 import { AccountsTable } from "../accounts/AccountsTable";
@@ -49,10 +49,7 @@ export function DashboardPage() {
       {isLoading ? (
         <div className="lt-kpis" aria-busy="true" aria-label="Loading summary">
           {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="lt-kpi">
-              <SkeletonText width="40%" />
-              <SkeletonText heading width="60%" />
-            </div>
+            <StatCardSkeleton key={i} />
           ))}
         </div>
       ) : (
@@ -129,13 +126,7 @@ export function DashboardPage() {
         </div>
 
         {isLoading ? (
-          <DataTableSkeleton
-            columnCount={5}
-            rowCount={5}
-            showHeader={false}
-            showToolbar={false}
-            aria-label="Loading accounts"
-          />
+          <TableSkeleton columns={5} rows={6} label="Loading accounts" />
         ) : accounts.length === 0 ? (
           <EmptyState
             Icon={Receipt}

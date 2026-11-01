@@ -1,7 +1,6 @@
 import { Add, Edit, TrashCan, UserMultiple } from "@carbon/icons-react";
 import {
   Button,
-  DataTableSkeleton,
   InlineLoading,
   PasswordInput,
   Select,
@@ -25,7 +24,7 @@ import { adminApi } from "../../api";
 import type { User, UserCreateFormData, UserRole, UserUpdateData } from "../../types";
 import { useAuthStore } from "../../stores/authStore";
 import { getApiErrorMessage } from "../../utils/apiError";
-import { ConfirmDialog, Drawer, EmptyState, Notice, PageHeader } from "../../components/common";
+import { ConfirmDialog, Drawer, EmptyState, Notice, PageHeader, TableSkeleton } from "../../components/common";
 
 function EditUserDrawer({
   user,
@@ -110,8 +109,8 @@ function EditUserDrawer({
           <SelectItem value="admin" text="Admin" />
         </Select>
         <div className="lt-form__actions lt-form__actions--bleed">
-          <Button type="button" kind="secondary" size="xl" onClick={onClose}>Cancel</Button>
-          <Button type="submit" size="xl" disabled={saving}>
+          <Button type="button" kind="secondary" size="lg" onClick={onClose}>Cancel</Button>
+          <Button type="submit" size="lg" disabled={saving}>
             {saving ? <InlineLoading description="Saving…" /> : "Save changes"}
           </Button>
         </div>
@@ -181,8 +180,8 @@ function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreate
           <SelectItem value="admin" text="Admin" />
         </Select>
         <div className="lt-form__actions lt-form__actions--bleed">
-          <Button type="button" kind="secondary" size="xl" onClick={onClose}>Cancel</Button>
-          <Button type="submit" size="xl" disabled={saving}>
+          <Button type="button" kind="secondary" size="lg" onClick={onClose}>Cancel</Button>
+          <Button type="submit" size="lg" disabled={saving}>
             {saving ? <InlineLoading description="Creating…" /> : "Create user"}
           </Button>
         </div>
@@ -240,7 +239,7 @@ export default function UsersPage() {
 
       <section className="lt-panel" aria-label="Users">
         {loading ? (
-          <DataTableSkeleton columnCount={5} rowCount={5} showHeader={false} showToolbar={false} aria-label="Loading users" />
+          <TableSkeleton columns={5} rows={5} label="Loading users" />
         ) : users.length === 0 ? (
           <EmptyState
             Icon={UserMultiple}

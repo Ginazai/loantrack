@@ -33,6 +33,11 @@ type ColKey =
   | "start_date";
 
 const NUMERIC: ColKey[] = ["borrow_amount", "current_balance", "rate"];
+// Dates and status tags must never wrap onto two lines.
+const NOWRAP: ColKey[] = ["next_due_date", "start_date", "status"];
+
+const cellClass = (key: ColKey) =>
+  NUMERIC.includes(key) ? "lt-num" : NOWRAP.includes(key) ? "lt-nowrap" : undefined;
 
 const FULL_COLS: { key: ColKey; header: string }[] = [
   { key: "account_name", header: "Account" },
@@ -166,7 +171,7 @@ export function AccountsTable({ accounts, variant = "full", pageSize = 20 }: Pro
                       <TableHeader
                         key={h.key}
                         {...headerProps}
-                        className={NUMERIC.includes(h.key) ? "lt-num" : undefined}
+                        className={cellClass(h.key)}
                       >
                         {h.header}
                       </TableHeader>
@@ -188,7 +193,7 @@ export function AccountsTable({ accounts, variant = "full", pageSize = 20 }: Pro
                       {row.cells.map((cell: { id: string; info: { header: ColKey } }) => (
                         <TableCell
                           key={cell.id}
-                          className={NUMERIC.includes(cell.info.header) ? "lt-num" : undefined}
+                          className={cellClass(cell.info.header)}
                         >
                           {renderCell(cell.info.header, a)}
                         </TableCell>

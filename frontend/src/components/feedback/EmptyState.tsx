@@ -5,12 +5,12 @@ interface Props {
   title: string;
   description?: string;
   action?: ReactNode;
-  /** Center in the container (single-column pages) or left-align (inside panels). */
+  /** Centred by default; pass `false` to left-align in a tight container. */
   center?: boolean;
 }
 
 /** A composed empty view: what's missing, why it matters, and the next step. */
-export function EmptyState({ Icon, title, description, action, center = false }: Props) {
+export function EmptyState({ Icon, title, description, action, center = true }: Props) {
   return (
     <div className={`lt-empty${center ? " lt-empty--center" : ""}`} role="status">
       <Icon className="lt-empty__icon" size={48} aria-hidden="true" />

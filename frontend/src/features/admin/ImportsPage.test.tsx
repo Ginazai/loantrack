@@ -40,19 +40,19 @@ const chooseFile = (name = "ledger.csv") => {
   fireEvent.change(input, { target: { files: [new File(["a,b"], name, { type: "text/csv" })] } });
 };
 const mappingRow = (ref: string) => screen.getByText(ref, { selector: "span.lt-mono" }).closest("tr")! as HTMLElement;
-const commitBtn = () => screen.getByRole("button", { name: "Confirmar importación" });
+const commitBtn = () => screen.getByRole("button", { name: "Confirm import" });
 
 /** Uploads the fixture and waits for the mapping table. */
 async function uploadAndPreview(p: ImportPreview = previewFixture()) {
   imports.preview.mockResolvedValue(p);
   renderWithProviders(<ImportsPage />);
-  await screen.findByText("Sin importaciones aún.");
+  await screen.findByText("No imports yet.");
   chooseFile();
-  await screen.findByRole("table", { name: "Mapeo de cuentas" });
+  await screen.findByRole("table", { name: "Account mapping" });
 }
 /** Makes the fixture "ready": REF1 gets a user (rate is prefilled to 5). */
 async function completeMapping(user: ReturnType<typeof userEvent.setup>) {
-  await user.selectOptions(within(mappingRow("REF1")).getByLabelText("Usuario para REF1"), "user-1");
+  await user.selectOptions(within(mappingRow("REF1")).getByLabelText("User for REF1"), "user-1");
 }
 
 describe("ImportsPage", () => {
@@ -66,43 +66,43 @@ describe("ImportsPage", () => {
   describe("upload step", () => {
     it("prompts for a CSV and shows an empty history", async () => {
       renderWithProviders(<ImportsPage />);
-      expect(await screen.findByText("Sin importaciones aún.")).toBeInTheDocument();
-      expect(screen.getByText(/Sube un archivo CSV/)).toBeInTheDocument();
+      expect(await screen.findByText("No imports yet.")).toBeInTheDocument();
+      expect(screen.getByText(/Upload a CSV file/)).toBeInTheDocument();
     });
 
     it("lists past imports", async () => {
       imports.list.mockResolvedValue([batch(), batch({ id: "b2", source_filename: "draft.csv", status: "previewed" })]);
       renderWithProviders(<ImportsPage />);
-      const table = await screen.findByRole("table", { name: "Historial de importaciones" });
+      const table = await screen.findByRole("table", { name: "Import history" });
       expect(await within(table).findByText("ledger.csv")).toBeInTheDocument();
       expect(within(table).getByText("committed")).toBeInTheDocument();
       expect(within(table).getByText("previewed")).toBeInTheDocument();
-      expect(screen.queryByText("Sin importaciones aún.")).toBeNull();
+      expect(screen.queryByText("No imports yet.")).toBeNull();
     });
 
     it("shows a reading indicator while the file is parsed", async () => {
       imports.preview.mockReturnValue(new Promise(() => {}));
       renderWithProviders(<ImportsPage />);
-      await screen.findByText("Sin importaciones aún.");
+      await screen.findByText("No imports yet.");
       chooseFile();
-      expect(await screen.findByText("Leyendo…")).toBeInTheDocument();
+      expect(await screen.findByText("Reading…")).toBeInTheDocument();
     });
 
     it("shows the server's message when the file can't be read", async () => {
-      imports.preview.mockRejectedValue({ response: { data: { detail: "Columnas inválidas" } } });
+      imports.preview.mockRejectedValue({ response: { data: { detail: "Invalid columns" } } });
       renderWithProviders(<ImportsPage />);
-      await screen.findByText("Sin importaciones aún.");
+      await screen.findByText("No imports yet.");
       chooseFile();
-      expect(await screen.findByText("Columnas inválidas")).toBeInTheDocument();
-      expect(screen.getByText(/Sube un archivo CSV/)).toBeInTheDocument();
+      expect(await screen.findByText("Invalid columns")).toBeInTheDocument();
+      expect(screen.getByText(/Upload a CSV file/)).toBeInTheDocument();
     });
 
     it("falls back to a generic message when there is no server detail", async () => {
       imports.preview.mockRejectedValue(new Error("boom"));
       renderWithProviders(<ImportsPage />);
-      await screen.findByText("Sin importaciones aún.");
+      await screen.findByText("No imports yet.");
       chooseFile();
-      expect(await screen.findByText("No se pudo leer el archivo")).toBeInTheDocument();
+      expect(await screen.findByText("Could not read the file")).toBeInTheDocument();
     });
   });
 
@@ -110,10 +110,10 @@ describe("ImportsPage", () => {
     it("summarises what was detected", async () => {
       await uploadAndPreview(previewFixture({ error_count: 2, total_payments_parsed: 4 }));
       const kpi = (label: string) => screen.getByText(label, { selector: "dt" }).nextElementSibling!;
-      expect(kpi("Formato")).toHaveTextContent("legacy_ledger_csv");
-      expect(kpi("Cuentas detectadas")).toHaveTextContent("2");
-      expect(kpi("Pagos detectados")).toHaveTextContent("4");
-      expect(kpi("Filas con error")).toHaveTextContent("2");
+      expect(kpi("Format")).toHaveTextContent("legacy_ledger_csv");
+      expect(kpi("Accounts detected")).toHaveTextContent("2");
+      expect(kpi("Payments detected")).toHaveTextContent("4");
+      expect(kpi("Rows with errors")).toHaveTextContent("2");
     });
 
     it("warns about payment references with no matching disbursement", async () => {
@@ -127,27 +127,27 @@ describe("ImportsPage", () => {
         error_count: 2,
         errors: [{ row_number: 3, message: "bad date" }, { row_number: null, message: "orphan" }],
       }));
-      await user.click(screen.getByRole("button", { name: "Ver 2 fila(s) con error" }));
-      expect(screen.getByText("Fila 3: bad date")).toBeInTheDocument();
-      expect(screen.getByText("Fila ?: orphan")).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "View 2 row(s) with errors" }));
+      expect(screen.getByText("Row 3: bad date")).toBeInTheDocument();
+      expect(screen.getByText("Row ?: orphan")).toBeInTheDocument();
     });
 
     it("hides the error accordion when the file parsed cleanly", async () => {
       await uploadAndPreview();
-      expect(screen.queryByText(/fila\(s\) con error/)).toBeNull();
+      expect(screen.queryByText(/row\(s\) with errors/)).toBeNull();
     });
 
     it("pre-fills mappings from the file: create for new refs, existing for matches", async () => {
       await uploadAndPreview();
       const r1 = mappingRow("REF1");
-      expect(within(r1).getByLabelText("Acción para REF1")).toHaveValue("create");
-      expect(within(r1).getByLabelText("Nombre de cuenta para REF1")).toHaveValue("Ledger One");
-      expect(within(r1).getByLabelText("Prestatario para REF1")).toHaveValue("Ann");
-      expect(within(r1).getByLabelText("Tasa % para REF1")).toHaveValue("5");
+      expect(within(r1).getByLabelText("Action for REF1")).toHaveValue("create");
+      expect(within(r1).getByLabelText("Account name for REF1")).toHaveValue("Ledger One");
+      expect(within(r1).getByLabelText("Borrower for REF1")).toHaveValue("Ann");
+      expect(within(r1).getByLabelText("Rate % for REF1")).toHaveValue("5");
 
       const r2 = mappingRow("REF2");
-      expect(within(r2).getByLabelText("Acción para REF2")).toHaveValue("existing");
-      expect(within(r2).getByLabelText("Cuenta destino para REF2")).toHaveValue("acc-9");
+      expect(within(r2).getByLabelText("Action for REF2")).toHaveValue("existing");
+      expect(within(r2).getByLabelText("Target account for REF2")).toHaveValue("acc-9");
       expect(within(r2).getByText("Home Loan (Regular User)")).toBeInTheDocument();
     });
 
@@ -158,13 +158,13 @@ describe("ImportsPage", () => {
       const p = previewFixture();
       p.accounts[0].rate = "0.07";
       await uploadAndPreview(p);
-      expect(within(mappingRow("REF1")).getByLabelText("Tasa % para REF1")).toHaveValue("7");
+      expect(within(mappingRow("REF1")).getByLabelText("Rate % for REF1")).toHaveValue("7");
     });
 
     it("blocks confirmation until every new account has a user, and says why", async () => {
       await uploadAndPreview();
       expect(commitBtn()).toBeDisabled();
-      expect(screen.getByText(/Completa el mapeo de todas las cuentas/)).toBeInTheDocument();
+      expect(screen.getByText(/Complete the mapping for every account/)).toBeInTheDocument();
     });
 
     it("blocks confirmation when a new account has no rate", async () => {
@@ -172,7 +172,7 @@ describe("ImportsPage", () => {
       await uploadAndPreview();
       await completeMapping(user);
       expect(commitBtn()).toBeEnabled();
-      await user.clear(within(mappingRow("REF1")).getByLabelText("Tasa % para REF1"));
+      await user.clear(within(mappingRow("REF1")).getByLabelText("Rate % for REF1"));
       expect(commitBtn()).toBeDisabled();
     });
 
@@ -180,31 +180,31 @@ describe("ImportsPage", () => {
       const user = userEvent.setup();
       await uploadAndPreview();
       await completeMapping(user);
-      await user.selectOptions(within(mappingRow("REF2")).getByLabelText("Cuenta destino para REF2"), "");
+      await user.selectOptions(within(mappingRow("REF2")).getByLabelText("Target account for REF2"), "");
       expect(commitBtn()).toBeDisabled();
     });
 
     it("lets a ref be skipped, which needs no extra details", async () => {
       const user = userEvent.setup();
       await uploadAndPreview();
-      await user.selectOptions(within(mappingRow("REF1")).getByLabelText("Acción para REF1"), "skip");
-      expect(within(mappingRow("REF1")).queryByLabelText("Usuario para REF1")).toBeNull();
+      await user.selectOptions(within(mappingRow("REF1")).getByLabelText("Action for REF1"), "skip");
+      expect(within(mappingRow("REF1")).queryByLabelText("User for REF1")).toBeNull();
       expect(commitBtn()).toBeEnabled();
     });
 
     it("switching a ref to 'existing' reveals the account picker", async () => {
       const user = userEvent.setup();
       await uploadAndPreview();
-      await user.selectOptions(within(mappingRow("REF1")).getByLabelText("Acción para REF1"), "existing");
-      expect(within(mappingRow("REF1")).getByLabelText("Cuenta destino para REF1")).toHaveValue("");
+      await user.selectOptions(within(mappingRow("REF1")).getByLabelText("Action for REF1"), "existing");
+      expect(within(mappingRow("REF1")).getByLabelText("Target account for REF1")).toHaveValue("");
     });
 
-    it("Cancelar discards the preview and returns to the upload step", async () => {
+    it("Cancel discards the preview and returns to the upload step", async () => {
       const user = userEvent.setup();
       await uploadAndPreview();
-      await user.click(screen.getByRole("button", { name: "Cancelar" }));
-      expect(screen.queryByRole("table", { name: "Mapeo de cuentas" })).toBeNull();
-      expect(screen.getByText(/Sube un archivo CSV/)).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Cancel" }));
+      expect(screen.queryByRole("table", { name: "Account mapping" })).toBeNull();
+      expect(screen.getByText(/Upload a CSV file/)).toBeInTheDocument();
     });
   });
 
@@ -229,9 +229,9 @@ describe("ImportsPage", () => {
       const user = userEvent.setup();
       await uploadAndPreview();
       await completeMapping(user);
-      await user.clear(within(mappingRow("REF1")).getByLabelText("Nombre de cuenta para REF1"));
-      await user.clear(within(mappingRow("REF1")).getByLabelText("Prestatario para REF1"));
-      await user.selectOptions(within(mappingRow("REF2")).getByLabelText("Acción para REF2"), "skip");
+      await user.clear(within(mappingRow("REF1")).getByLabelText("Account name for REF1"));
+      await user.clear(within(mappingRow("REF1")).getByLabelText("Borrower for REF1"));
+      await user.selectOptions(within(mappingRow("REF2")).getByLabelText("Action for REF2"), "skip");
       await user.click(commitBtn());
 
       await waitFor(() => expect(imports.commit).toHaveBeenCalled());
@@ -248,23 +248,23 @@ describe("ImportsPage", () => {
       await completeMapping(user);
       await user.click(commitBtn());
 
-      expect(await screen.findByRole("heading", { name: "Importación completada" })).toBeInTheDocument();
+      expect(await screen.findByRole("heading", { name: "Import complete" })).toBeInTheDocument();
       expect(screen.getByText("created accounts").nextElementSibling).toHaveTextContent("1");
       expect(screen.getByText("payments imported").nextElementSibling).toHaveTextContent("3");
-      expect(screen.queryByRole("table", { name: "Mapeo de cuentas" })).toBeNull();
+      expect(screen.queryByRole("table", { name: "Account mapping" })).toBeNull();
 
-      await user.click(screen.getByRole("button", { name: "Importar otro archivo" }));
-      expect(screen.getByText(/Sube un archivo CSV/)).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Import another file" }));
+      expect(screen.getByText(/Upload a CSV file/)).toBeInTheDocument();
     });
 
     it("shows an error and keeps the mapping when the import fails", async () => {
-      imports.commit.mockRejectedValue({ response: { data: { detail: "Cuenta duplicada" } } });
+      imports.commit.mockRejectedValue({ response: { data: { detail: "Duplicate account" } } });
       const user = userEvent.setup();
       await uploadAndPreview();
       await completeMapping(user);
       await user.click(commitBtn());
-      expect(await screen.findByText("Cuenta duplicada")).toBeInTheDocument();
-      expect(screen.getByRole("table", { name: "Mapeo de cuentas" })).toBeInTheDocument();
+      expect(await screen.findByText("Duplicate account")).toBeInTheDocument();
+      expect(screen.getByRole("table", { name: "Account mapping" })).toBeInTheDocument();
       expect(commitBtn()).toBeEnabled();
     });
 
@@ -274,7 +274,7 @@ describe("ImportsPage", () => {
       await uploadAndPreview();
       await completeMapping(user);
       await user.click(commitBtn());
-      expect(await screen.findByText("La importación falló")).toBeInTheDocument();
+      expect(await screen.findByText("Import failed")).toBeInTheDocument();
     });
 
     it("disables the button and shows progress while importing", async () => {
@@ -283,7 +283,7 @@ describe("ImportsPage", () => {
       await uploadAndPreview();
       await completeMapping(user);
       await user.click(commitBtn());
-      expect(await screen.findByText("Importando…")).toBeInTheDocument();
+      expect(await screen.findByText("Importing…")).toBeInTheDocument();
     });
   });
 });

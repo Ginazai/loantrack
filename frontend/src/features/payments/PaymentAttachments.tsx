@@ -57,11 +57,11 @@ export function PaymentAttachmentsModal({ accountId, paymentId, isAdmin, onClose
   const handleFile = (file: File | undefined) => {
     if (!file) return;
     if (!ALLOWED_TYPES.includes(file.type)) {
-      setError(`Tipo de archivo no permitido. Permitidos: jpg, png, webp, pdf.`);
+      setError(`File type not allowed. Allowed: jpg, png, webp, pdf.`);
       return;
     }
     if (file.size > MAX_SIZE_BYTES) {
-      setError("El archivo supera el límite de 10 MB.");
+      setError("The file exceeds the 10 MB limit.");
       return;
     }
     upload.mutate(file);
@@ -73,7 +73,7 @@ export function PaymentAttachmentsModal({ accountId, paymentId, isAdmin, onClose
         {isLoading ? (
           <SkeletonText paragraph lineCount={3} />
         ) : attachments.length === 0 ? (
-          <EmptyState Icon={Document} title="Sin comprobantes adjuntos." />
+          <EmptyState Icon={Document} title="No receipts attached." />
         ) : (
           <ul className="lt-link-list lt-attachments">
             {attachments.map((a) => (
@@ -91,7 +91,7 @@ export function PaymentAttachmentsModal({ accountId, paymentId, isAdmin, onClose
                       size="md"
                       hasIconOnly
                       renderIcon={Download}
-                      iconDescription="Descargar"
+                      iconDescription="Download"
                       tooltipPosition="left"
                       onClick={() => attachmentsApi.download(accountId, paymentId, a.id, a.original_filename)}
                     />
@@ -101,7 +101,7 @@ export function PaymentAttachmentsModal({ accountId, paymentId, isAdmin, onClose
                         size="md"
                         hasIconOnly
                         renderIcon={TrashCan}
-                        iconDescription="Eliminar"
+                        iconDescription="Delete"
                         tooltipPosition="left"
                         onClick={() => remove.mutate(a.id)}
                         disabled={remove.isPending}
@@ -135,9 +135,9 @@ export function PaymentAttachmentsModal({ accountId, paymentId, isAdmin, onClose
           onClick={() => fileInputRef.current?.click()}
           disabled={upload.isPending}
         >
-          {upload.isPending ? <InlineLoading description="Subiendo…" /> : "Subir comprobante"}
+          {upload.isPending ? <InlineLoading description="Uploading…" /> : "Upload receipt"}
         </Button>
-        <p className="lt-field-note">JPG, PNG, WebP o PDF · máximo 10 MB</p>
+        <p className="lt-field-note">JPG, PNG, WebP or PDF · max 10 MB</p>
       </div>
     </Drawer>
   );

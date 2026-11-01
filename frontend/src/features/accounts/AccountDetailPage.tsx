@@ -30,6 +30,7 @@ import {
   Notice,
   PageHeader,
   StatCard,
+  StatCardSkeleton,
   StatusBadge,
 } from "../../components/common";
 import {
@@ -161,10 +162,7 @@ export function AccountDetailPage() {
         <SkeletonText heading width="30%" />
         <div className="lt-kpis">
           {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="lt-kpi">
-              <SkeletonText width="40%" />
-              <SkeletonText heading width="60%" />
-            </div>
+            <StatCardSkeleton key={i} />
           ))}
         </div>
         <SkeletonText paragraph lineCount={4} />
@@ -345,7 +343,7 @@ export function AccountDetailPage() {
                                 </Tag>
                               </TableCell>
                               <TableCell>
-                                <div className="lt-table-actions" style={{ justifyContent: "flex-start" }}>
+                                <div className="lt-table-actions lt-table-actions--start">
                                   <Button
                                     kind="ghost"
                                     size="sm"
@@ -402,7 +400,7 @@ export function AccountDetailPage() {
           <TabPanel className="lt-tab-panel">
             {tab === "webhooks" && (
               <div className="lt-stack">
-                <div className="lt-row" style={{ justifyContent: "space-between" }}>
+                <div className="lt-row lt-row--between">
                   <p className="lt-muted">Post real-time events to n8n, Pipedream, or any HTTP endpoint.</p>
                   <Button size="md" renderIcon={Add} onClick={() => setShowWebhook(true)}>
                     Add webhook
@@ -424,7 +422,7 @@ export function AccountDetailPage() {
                         <div className="lt-item__top">
                           <div className="lt-item__main">
                             <p className="lt-item__url">{wh.target_url}</p>
-                            <div className="lt-row" style={{ gap: "0.25rem" }}>
+                            <div className="lt-row lt-row--tight">
                               {wh.events.map((ev) => (
                                 <Tag key={ev} size="sm" type="outline">
                                   {ev}
@@ -494,7 +492,7 @@ export function AccountDetailPage() {
             isLoading={addPayment.isPending}
           />
           {addPayment.isError && (
-            <div style={{ marginBlockStart: "1rem" }}>
+            <div className="lt-mt-md">
               <Notice kind="error" title="Couldn’t record payment">
                 {getApiErrorMessage(addPayment.error, "Failed to record payment")}
               </Notice>
@@ -526,7 +524,7 @@ export function AccountDetailPage() {
           onRequestClose={() => setShowClose(false)}
           onSecondarySubmit={() => setShowClose(false)}
         >
-          <p style={{ marginBlockEnd: "1.5rem" }}>
+          <p className="lt-mb-lg">
             This will mark the account as closed. You can optionally add a reason.
           </p>
           <TextArea

@@ -157,7 +157,7 @@ export function AccountForm({ account, onSubmit, onCancel, isLoading }: Props) {
                 {showNewUser && (
                   <div className="lt-form">
                     <p className="lt-eyebrow">
-                      <UserFollow size={16} style={{ verticalAlign: "-3px", marginInlineEnd: "0.5rem" }} aria-hidden="true" />
+                      <UserFollow size={16} className="lt-icon-inline" aria-hidden="true" />
                       New User Details
                     </p>
 
@@ -191,7 +191,7 @@ export function AccountForm({ account, onSubmit, onCancel, isLoading }: Props) {
                       </div>
                     </div>
 
-                    <div className="lt-row" style={{ justifyContent: "flex-end" }}>
+                    <div className="lt-row lt-row--end">
                       <Button
                         type="button"
                         kind="ghost"
@@ -285,7 +285,7 @@ export function AccountForm({ account, onSubmit, onCancel, isLoading }: Props) {
 
       {!isEdit && (
         <div className="lt-form__section">
-          <p className="lt-eyebrow" style={{ marginBlockEnd: "0.75rem" }}>
+          <p className="lt-eyebrow">
             Upcoming Cycle Dates
           </p>
           <div className="lt-row">
@@ -299,8 +299,8 @@ export function AccountForm({ account, onSubmit, onCancel, isLoading }: Props) {
       )}
 
       <div className="lt-form__actions lt-form__actions--bleed">
-        <Button type="button" kind="secondary" size="xl" onClick={onCancel}>Cancel</Button>
-        <Button type="submit" size="xl" disabled={isLoading}>
+        <Button type="button" kind="secondary" size="lg" onClick={onCancel}>Cancel</Button>
+        <Button type="submit" size="lg" disabled={isLoading}>
           {isLoading ? (
             <InlineLoading description={isEdit ? "Saving…" : "Creating…"} />
           ) : isEdit ? (
