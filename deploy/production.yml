@@ -6,4 +6,4 @@
 # come from a merged PR with an approving review.
 #
 # `none` = nothing promoted yet; the first merged promotion PR replaces it.
-image_tag: sha-7fdd6f3
+image_tag: sha-f7ab680
