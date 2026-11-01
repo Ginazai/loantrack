@@ -30,7 +30,7 @@ function renderLoginPage() {
 describe("LoginPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useAuthStore.setState({ accessToken: null, refreshToken: null, user: null });
+    useAuthStore.setState({ accessToken: null, user: null, status: "anonymous" });
   });
 
   it("renders the sign-in form", () => {
@@ -43,7 +43,6 @@ describe("LoginPage", () => {
     const user = userEvent.setup();
     (authApi.login as any).mockResolvedValue({
       access_token: "access-123",
-      refresh_token: "refresh-456",
     });
     (authApi.me as any).mockResolvedValue({
       id: "u1",
@@ -62,6 +61,9 @@ describe("LoginPage", () => {
 
     await waitFor(() => expect(navigateMock).toHaveBeenCalledWith("/dashboard"));
     expect(useAuthStore.getState().accessToken).toBe("access-123");
+    expect(useAuthStore.getState().status).toBe("authenticated");
+    // Nothing from the login response is persisted to browser storage.
+    expect(JSON.stringify({ ...localStorage })).not.toContain("access-123");
   });
 
   it("shows a plain-string error message on wrong credentials, without crashing", async () => {

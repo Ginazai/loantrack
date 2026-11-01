@@ -45,6 +45,7 @@ import { BalanceChart, InterestChart } from "./Charts";
 import { PaymentForm } from "../payments/PaymentForm";
 import { PaymentAttachmentsModal } from "../payments/PaymentAttachments";
 import { WebhookForm } from "../webhooks/WebhookForm";
+import { WebhookSecretDrawer } from "../webhooks/WebhookSecretDrawer";
 import { useAuthStore } from "../../stores/authStore";
 import { getApiErrorMessage } from "../../utils/apiError";
 
@@ -70,6 +71,13 @@ export function AccountDetailPage() {
   const [showClose, setShowClose] = useState(false);
   const [showPurge, setShowPurge] = useState(false);
   const [showWebhook, setShowWebhook] = useState(false);
+  // Signing secret to reveal once (after create or rotate), and the webhook awaiting rotate-confirm.
+  const [secretReveal, setSecretReveal] = useState<{
+    secret: string;
+    targetUrl: string;
+    rotated: boolean;
+  } | null>(null);
+  const [rotateId, setRotateId] = useState<string | null>(null);
   const [closeReason, setCloseReason] = useState("");
   const [deletePaymentId, setDeletePaymentId] = useState<string | null>(null);
   const [attachmentsPaymentId, setAttachmentsPaymentId] = useState<string | null>(null);
@@ -143,9 +151,18 @@ export function AccountDetailPage() {
 
   const addWebhook = useMutation({
     mutationFn: (data: WebhookFormData) => webhooksApi.create(id!, data),
-    onSuccess: () => {
+    onSuccess: (created) => {
       qc.invalidateQueries({ queryKey: ["webhooks", id] });
       setShowWebhook(false);
+      setSecretReveal({ secret: created.secret, targetUrl: created.target_url, rotated: false });
+    },
+  });
+
+  const rotateWebhook = useMutation({
+    mutationFn: (wid: string) => webhooksApi.rotateSecret(id!, wid),
+    onSuccess: (rotated) => {
+      setRotateId(null);
+      setSecretReveal({ secret: rotated.secret, targetUrl: rotated.target_url, rotated: true });
     },
   });
 
@@ -285,7 +302,7 @@ export function AccountDetailPage() {
                 <div className="lt-panel__header">
                   <h2 className="lt-panel__title">Payment Ledger</h2>
                   {canAddPayment && (
-                    <Button size="md" renderIcon={Add} onClick={() => setShowPayment(true)}>
+                    <Button size="sm" renderIcon={Add} onClick={() => setShowPayment(true)}>
                       Record payment
                     </Button>
                   )}
@@ -346,7 +363,7 @@ export function AccountDetailPage() {
                                 <div className="lt-table-actions lt-table-actions--start">
                                   <Button
                                     kind="ghost"
-                                    size="md"
+                                    size="sm"
                                     hasIconOnly
                                     renderIcon={Attachment}
                                     iconDescription="Comprobantes"
@@ -364,7 +381,7 @@ export function AccountDetailPage() {
                                 <TableCell>
                                   <Button
                                     kind="danger--ghost"
-                                    size="md"
+                                    size="sm"
                                     hasIconOnly
                                     renderIcon={TrashCan}
                                     iconDescription="Delete payment"
@@ -382,7 +399,7 @@ export function AccountDetailPage() {
                       <div className="lt-table-footer">
                         <Button
                           kind="ghost"
-                          size="md"
+                          size="sm"
                           renderIcon={Download}
                           onClick={() => adminApi.exportAccountFullCsv(id!)}
                         >
@@ -435,8 +452,15 @@ export function AccountDetailPage() {
                               {wh.is_active ? "active" : "inactive"}
                             </Tag>
                             <Button
+                              kind="ghost"
+                              size="sm"
+                              onClick={() => setRotateId(wh.id)}
+                            >
+                              Rotate secret
+                            </Button>
+                            <Button
                               kind="danger--ghost"
-                              size="md"
+                              size="sm"
                               hasIconOnly
                               renderIcon={TrashCan}
                               iconDescription="Delete webhook"
@@ -581,6 +605,21 @@ export function AccountDetailPage() {
             isLoading={addWebhook.isPending}
           />
         </Drawer>
+      )}
+
+      {secretReveal && (
+        <WebhookSecretDrawer {...secretReveal} onClose={() => setSecretReveal(null)} />
+      )}
+
+      {rotateId && (
+        <ConfirmDialog
+          title="Rotate signing secret"
+          message="A new secret is generated and the current one stops verifying immediately. Update your receiving workflow right after."
+          confirmLabel="Rotate secret"
+          dangerous
+          onConfirm={() => rotateWebhook.mutate(rotateId)}
+          onCancel={() => setRotateId(null)}
+        />
       )}
     </div>
   );

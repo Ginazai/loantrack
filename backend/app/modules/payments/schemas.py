@@ -46,6 +46,24 @@ ALLOWED_ATTACHMENT_CONTENT_TYPES = {
 MAX_ATTACHMENT_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB
 
 
+def sniff_attachment_type(data: bytes) -> str | None:
+    """Content type according to the file's own first bytes, or None if it isn't one we accept.
+
+    The client-declared Content-Type and the filename extension are whatever the uploader
+    typed; only the bytes say what the file is. Everything stored and later served is typed
+    by this, never by the declaration.
+    """
+    if data.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg"
+    if data.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png"
+    if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+        return "image/webp"
+    if data.startswith(b"%PDF-"):
+        return "application/pdf"
+    return None
+
+
 def validate_attachment(content_type: str, size_bytes: int) -> None:
     """Pure validation (no DB, no I/O) — raises ValueError on a bad
     attachment so it's testable in isolation from PaymentService."""

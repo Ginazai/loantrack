@@ -3,6 +3,7 @@
 import pytest
 
 URL = "/api/v1/admin/users"
+CSRF = {"X-Requested-With": "XMLHttpRequest"}
 
 
 @pytest.mark.asyncio
@@ -63,6 +64,23 @@ async def test_admin_cannot_demote_self(admin_client, admin_user):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"full_name": "Me, Renamed"},
+        {"email": "elsewhere@test.dev"},
+        {"password": "AnotherPass99!"},
+        {"is_active": False},
+        {"role": "admin"},  # even a no-op role "change" is refused: use Account Settings
+    ],
+)
+async def test_admin_cannot_edit_self_here(admin_client, admin_user, body):
+    res = await admin_client.patch(f"{URL}/{admin_user.id}", json=body)
+    assert res.status_code == 409, res.text
+    assert "Account Settings" in res.json()["detail"]
+
+
+@pytest.mark.asyncio
 async def test_unknown_user_is_404(admin_client):
     res = await admin_client.patch(
         f"{URL}/00000000-0000-0000-0000-000000000000", json={"full_name": "x"}
@@ -119,9 +137,9 @@ async def test_password_reset_revokes_refresh_tokens(admin_client, regular_user,
     login = await client.post(
         "/api/v1/auth/login", json={"email": regular_user.email, "password": "TestPassword123!"}
     )
-    refresh = login.json()["refresh_token"]
+    assert login.status_code == 200
     await admin_client.patch(f"{URL}/{regular_user.id}", json={"password": "BrandNewPass99!"})
-    res = await client.post("/api/v1/auth/refresh", json={"refresh_token": refresh})
+    res = await client.post("/api/v1/auth/refresh", headers=CSRF)
     assert res.status_code == 401
 
 
@@ -130,7 +148,7 @@ async def test_non_password_edit_keeps_refresh_tokens_valid(admin_client, regula
     login = await client.post(
         "/api/v1/auth/login", json={"email": regular_user.email, "password": "TestPassword123!"}
     )
-    refresh = login.json()["refresh_token"]
+    assert login.status_code == 200
     await admin_client.patch(f"{URL}/{regular_user.id}", json={"full_name": "Renamed"})
-    res = await client.post("/api/v1/auth/refresh", json={"refresh_token": refresh})
+    res = await client.post("/api/v1/auth/refresh", headers=CSRF)
     assert res.status_code == 200

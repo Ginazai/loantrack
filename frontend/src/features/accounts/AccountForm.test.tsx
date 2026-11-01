@@ -53,7 +53,7 @@ const sampleAccount: LoanAccount = {
 describe("AccountForm", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useAuthStore.setState({ accessToken: "x", refreshToken: "y", user: regularUser });
+    useAuthStore.setState({ accessToken: "x", status: "authenticated", user: regularUser });
   });
 
   it("renders the base fields for a non-admin user creating an account", () => {
@@ -104,7 +104,7 @@ describe("AccountForm", () => {
 
   describe("admin creating an account for another user", () => {
     beforeEach(() => {
-      useAuthStore.setState({ accessToken: "x", refreshToken: "y", user: adminUser });
+      useAuthStore.setState({ accessToken: "x", status: "authenticated", user: adminUser });
       (adminApi.listUsers as any).mockResolvedValue([regularUser]);
     });
 

@@ -21,7 +21,10 @@ from fastapi import HTTPException, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import get_settings
+from app.core.http import sanitize_filename
 from app.core.repository import BaseRepository
+from app.core.uploads import read_upload_capped
 from app.modules.accounts.interest_engine import get_next_due_date
 from app.modules.accounts.models import LoanAccount
 from app.modules.audit.service import AuditService
@@ -72,7 +75,7 @@ class ImportService:
         raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Unknown import format")
 
     async def preview(self, file: UploadFile, user_id: UUID) -> ImportPreviewOut:
-        raw = await file.read()
+        raw = await read_upload_capped(file, get_settings().MAX_IMPORT_SIZE_BYTES)
         if not raw:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "Archivo vacío")
 
@@ -80,7 +83,7 @@ class ImportService:
         parsed = parser.parse(raw)
 
         batch = ImportBatch(
-            source_filename=file.filename or "import.csv",
+            source_filename=sanitize_filename(file.filename, default="import.csv"),
             format=parsed.format_name,
             raw_content=raw,
             status="previewed",

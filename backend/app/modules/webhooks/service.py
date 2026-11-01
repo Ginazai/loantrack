@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.repository import BaseRepository
-from app.core.security import generate_webhook_secret, sign_webhook_payload
+from app.core.security import generate_webhook_secret, sign_webhook_body, webhook_body
 from app.core.url_safety import UnsafeURLError, avalidate_outbound_url
 from app.modules.accounts.interest_engine import get_cycle_dates, project_ledger
 from app.modules.accounts.models import LoanAccount
@@ -49,6 +49,20 @@ class WebhookConfigService:
             select(WebhookConfig).where(WebhookConfig.account_id == account_id)
         )
         return list(result.scalars().all())
+
+    async def rotate_secret(
+        self, account_id: UUID, webhook_id: UUID, user_id: UUID, is_admin: bool = False
+    ) -> WebhookConfig:
+        await self._get_account_or_404(account_id, user_id, is_admin)
+        config = await self.repo.get_by_id(webhook_id)
+        # Scoped to the account in the URL: a webhook of another account (or a global one)
+        # is "not found" here, not rotatable by guessing its id.
+        if not config or config.account_id != account_id:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Webhook not found")
+        config.secret_hash = generate_webhook_secret()
+        await self.db.flush()
+        await self.db.refresh(config)
+        return config
 
     async def delete(self, webhook_id: UUID, user_id: UUID, is_admin: bool = False) -> None:
         config = await self.repo.get_by_id(webhook_id)
@@ -105,7 +119,10 @@ class WebhookDeliveryService:
             event.status = "failed"
             return
 
-        signature = sign_webhook_payload(event.payload, config.secret_hash)
+        # Sign the exact bytes we send. (Signing one serialisation and letting the HTTP client
+        # produce another meant a receiver verifying the raw body could never match.)
+        body = webhook_body(event.payload)
+        signature = sign_webhook_body(body, config.secret_hash)
         event.attempt_count += 1
         event.last_attempt_at = datetime.now(timezone.utc)
 
@@ -120,10 +137,12 @@ class WebhookDeliveryService:
         try:
             resp = await client.post(
                 str(config.target_url),
-                json=event.payload,
+                content=body,
                 headers={
                     "X-Webhook-Signature": signature,
                     "X-Webhook-Event": event.event_type,
+                    # Stable across retries: receivers can use it to de-duplicate.
+                    "X-Webhook-Id": str(event.id),
                     "Content-Type": "application/json",
                 },
             )

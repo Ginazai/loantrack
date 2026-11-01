@@ -12,6 +12,9 @@ import pytest
 
 from app.core.security import hash_password
 
+# The refresh/logout endpoints are cookie-authenticated and demand this header (CSRF defence).
+CSRF = {"X-Requested-With": "XMLHttpRequest"}
+
 
 async def _seed_user(db, *, email="login-test@test.dev", password="CorrectHorse123!", role="user"):
     import uuid
@@ -42,7 +45,10 @@ class TestLogin:
         )
         assert res.status_code == 200, res.text
         body = res.json()
-        assert "access_token" in body and "refresh_token" in body
+        assert "access_token" in body
+        # The refresh token must never be readable by page JavaScript.
+        assert "refresh_token" not in body
+        assert "lt_refresh" in res.headers["set-cookie"]
 
     @pytest.mark.asyncio
     async def test_wrong_password_returns_clean_401(self, client, db):
@@ -86,48 +92,56 @@ class TestLogin:
 
 
 class TestRefreshAndLogout:
-    @pytest.mark.asyncio
-    async def test_refresh_rotates_token(self, client, db):
-        await _seed_user(db)
-        login = await client.post(
+    @staticmethod
+    async def _login(client):
+        res = await client.post(
             "/api/v1/auth/login",
             json={"email": "login-test@test.dev", "password": "CorrectHorse123!"},
         )
-        old_refresh = login.json()["refresh_token"]
+        assert res.status_code == 200, res.text
+        return res
 
-        refreshed = await client.post("/api/v1/auth/refresh", json={"refresh_token": old_refresh})
+    @pytest.mark.asyncio
+    async def test_refresh_rotates_token(self, client, db):
+        await _seed_user(db)
+        await self._login(client)
+        old_refresh = client.cookies.get("lt_refresh")
+
+        refreshed = await client.post("/api/v1/auth/refresh", headers=CSRF)
         assert refreshed.status_code == 200
-        assert refreshed.json()["refresh_token"] != old_refresh
+        assert "refresh_token" not in refreshed.json()
+        assert client.cookies.get("lt_refresh") != old_refresh
 
-        # Old refresh token is revoked — reusing it must fail. (Not
-        # asserting the *access* token differs from the original: it's a
-        # JWT of {sub, role, exp} with no nonce, so re-issuing it for the
-        # same user within the same second is legitimately byte-identical
-        # — that's an artifact of deterministic signing, not a bug.)
-        reused = await client.post("/api/v1/auth/refresh", json={"refresh_token": old_refresh})
+        # Old refresh token is spent — presenting it again must fail.
+        client.cookies.set("lt_refresh", old_refresh, path="/api/v1/auth")
+        reused = await client.post("/api/v1/auth/refresh", headers=CSRF)
         assert reused.status_code == 401
 
     @pytest.mark.asyncio
     async def test_refresh_with_garbage_token_returns_401_not_500(self, client):
-        res = await client.post("/api/v1/auth/refresh", json={"refresh_token": "garbage"})
+        client.cookies.set("lt_refresh", "garbage", path="/api/v1/auth")
+        res = await client.post("/api/v1/auth/refresh", headers=CSRF)
+        assert res.status_code == 401
+
+    @pytest.mark.asyncio
+    async def test_refresh_without_cookie_returns_401(self, client):
+        res = await client.post("/api/v1/auth/refresh", headers=CSRF)
         assert res.status_code == 401
 
     @pytest.mark.asyncio
     async def test_logout_revokes_refresh_token(self, client, db):
         await _seed_user(db)
-        login = await client.post(
-            "/api/v1/auth/login",
-            json={"email": "login-test@test.dev", "password": "CorrectHorse123!"},
-        )
+        login = await self._login(client)
         access = login.json()["access_token"]
-        refresh = login.json()["refresh_token"]
+        refresh = client.cookies.get("lt_refresh")
 
         logout_res = await client.post(
-            "/api/v1/auth/logout", headers={"Authorization": f"Bearer {access}"}
+            "/api/v1/auth/logout", headers={**CSRF, "Authorization": f"Bearer {access}"}
         )
         assert logout_res.status_code == 204
 
-        after_logout = await client.post("/api/v1/auth/refresh", json={"refresh_token": refresh})
+        client.cookies.set("lt_refresh", refresh, path="/api/v1/auth")
+        after_logout = await client.post("/api/v1/auth/refresh", headers=CSRF)
         assert after_logout.status_code == 401
 
 
@@ -146,7 +160,7 @@ class TestMeAndUpdateMe:
         token = create_access_token(str(user.id), user.role)
         update = await client.patch(
             "/api/v1/auth/me",
-            json={"password": "NewPassword456!"},
+            json={"current_password": "CorrectHorse123!", "new_password": "NewPassword456!"},
             headers={"Authorization": f"Bearer {token}"},
         )
         assert update.status_code == 200

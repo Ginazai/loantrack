@@ -35,8 +35,12 @@ Interest logic is pure and lives in `backend/app/modules/accounts/interest_engin
 
 ## Auth and permissions
 
-- Login returns an access JWT (15 min, `type=access`, carries `role`) and a refresh JWT (7 days). Refresh tokens are stored **hashed** (SHA-256) and can be revoked; `POST /auth/logout` revokes **all** of the caller's unrevoked refresh tokens (every session, not just the current one).
-- The frontend keeps both tokens in `localStorage` (Zustand `persist`, key `auth`). The axios interceptor in `frontend/src/api/client.ts` refreshes once on a 401 and redirects to login if that fails ([ADR-002](adr/002-auth-strategy.md)).
+- Login returns an access JWT (15 min, `type=access`, carries `role`) in the response body, and sets a refresh JWT (7 days) as an **httpOnly cookie** (`lt_refresh`; `Secure`, `SameSite=lax`, path `/api/v1/auth`). The refresh token never appears in a response body. Refresh tokens are stored **hashed** (SHA-256).
+- The frontend keeps the access token **in memory only**; nothing is written to `localStorage`/`sessionStorage`. On page load the SPA calls `POST /auth/refresh` (the browser attaches the cookie) to get a new access token, and the axios interceptor in `frontend/src/api/client.ts` does the same once on a 401 ([ADR-002](adr/002-auth-strategy.md)). Concurrent refreshes share one call, and a Web Lock serialises them across tabs.
+- `POST /auth/refresh` and `POST /auth/logout` are cookie-authenticated, so they require an `X-Requested-With: XMLHttpRequest` header (CSRF defence in addition to `SameSite`). `logout` does not need a valid access token: the cookie identifies the session, and the cookie is cleared.
+- **Rotation and reuse detection.** Every refresh spends the presented token and issues a new one in the same *family* (one family per login). If a token that was already rotated is presented again more than `REFRESH_REUSE_GRACE_SECONDS` (10) later, the whole family is revoked and a `reuse_detected` audit row is written: whoever replays it and the real holder both have to sign in again. Inside the grace window (two tabs, a retried request) the replay just gets a 401 and the session survives. Logout, password change and deactivation revoke tokens with their own reason and are *not* treated as reuse.
+- **Sessions end when they should.** Deactivating a user (admin) or changing/resetting a password revokes that user's refresh tokens immediately; a refresh by a deactivated user is refused. Access tokens already issued die on their own within 15 minutes (`get_current_user` also checks `is_active` on every request, so a deactivated user is locked out at once).
+- `PATCH /auth/me` takes a closed schema: `full_name`, and `current_password` + `new_password` together. Anything else (role, email, `is_active`…) is a 422. A wrong `current_password` is a 403 (not 401, which the SPA reads as "token expired"). Changing the password signs out every other session and keeps the current device signed in. Admins cannot edit **their own** account through `PATCH /admin/users/{id}` (409): they use Account Settings, which asks for the current password.
 - Roles are `admin` and `user`. Admin-only routes use the `require_admin` dependency; everything else scopes data by owner (`user_id`) unless the caller is an admin.
 - `POST /auth/register` requires an **admin** token (it is equivalent to `POST /admin/users`) and its body includes `role` (`admin` or `user`, default `user`). There is no self-service sign-up. Until 2026-10-24 this endpoint was public and trusted the `role` in the body, so anyone who could reach the API could create an admin.
 
@@ -81,14 +85,16 @@ Amounts are decimal **strings**. Payments created by CSV import never emit `paym
 `POST` with a JSON body and these headers:
 
 - `X-Webhook-Event`: the event name
-- `X-Webhook-Signature`: hex HMAC-SHA256 of the body, keyed with the webhook's secret. The signed string is the payload serialized as `json.dumps(payload, separators=(",", ":"), sort_keys=True)`: compact, keys sorted. A receiver must re-serialize the parsed JSON that way; hashing the raw bytes it received can differ.
+- `X-Webhook-Signature`: hex HMAC-SHA256 of the **raw request body**, keyed with the webhook's secret. The body sent is exactly the bytes that were signed (compact JSON, keys sorted), so a receiver can verify what it received without re-serialising anything.
+- `X-Webhook-Id`: the event's id, stable across retries; use it to ignore a delivery you already handled.
+
+The secret (`whsec_…`) is returned **once**, in the response to creating the webhook (`POST /accounts/{id}/webhooks`, `POST /admin/webhooks`), and shown once in the UI. List/get responses never include it. A lost secret is replaced with `POST …/webhooks/{id}/rotate-secret` (admin), which invalidates the old one immediately. It is stored in the `secret_hash` column in plaintext, because the HMAC needs the key itself; the name is a leftover.
 
 ```python
-import hashlib, hmac, json
+import hashlib, hmac
 
-def verify(payload: dict, secret: str, signature: str) -> bool:
-    body = json.dumps(payload, separators=(",", ":"), sort_keys=True)
-    expected = hmac.new(secret.encode(), body.encode(), hashlib.sha256).hexdigest()
+def verify(raw_body: bytes, secret: str, signature: str) -> bool:
+    expected = hmac.new(secret.encode(), raw_body, hashlib.sha256).hexdigest()
     return hmac.compare_digest(expected, signature)
 ```
 
@@ -163,8 +169,8 @@ Requirements and limits:
 
 Things the code does today that the docs elsewhere might lead you to assume otherwise.
 
-1. **Rate limiting is partial.** Only `register` (10/min), `login` (`AUTH_RATE_LIMIT_PER_MINUTE`, default 5/min) and `refresh` (20/min) are limited. `RATE_LIMIT_PER_MINUTE` is **unused**: a global per-IP limit would count every user behind the shared proxy address together. Counters are in memory per worker process, so with 2 workers the effective limit can be up to double. Behind the nginx proxy the client address the backend sees may be the proxy's rather than the real client's *(from code reading: uvicorn only trusts forwarded headers from 127.0.0.1 unless `FORWARDED_ALLOW_IPS` is set)*, in which case all users share one login bucket. Only set `FORWARDED_ALLOW_IPS` if the backend is reachable solely through proxies you trust, otherwise clients can spoof their address.
-2. **Webhook secrets are never shown.** A signing secret is generated on creation and stored in `secret_hash` (it is the HMAC key, so it is not actually a hash), but no API response or UI includes it, so receivers cannot verify signatures without reading the database.
+1. **Rate limiting is partial.** Only `register` (10/min), `login` (`AUTH_RATE_LIMIT_PER_MINUTE`, default 5/min), `refresh` (20/min) and `PATCH /auth/me` (10/min) are limited. `RATE_LIMIT_PER_MINUTE` is **unused**. Counters are in memory per worker process, so with 2 workers the effective limit can be up to double, and the limit is per address, not per account (a distributed attack on one account is not slowed).
+2. **The login limit is per real client only if `TRUSTED_PROXIES` is right.** The key is the client address resolved by `app/core/client_ip.py`: the TCP peer, unless the peer is in `TRUSTED_PROXIES`, in which case the rightmost `X-Forwarded-For` entry that is not itself a trusted proxy. `docker-compose.yml` sets it to the compose network (nginx is the only way in). Empty (the default) trusts no one, which behind a proxy puts all users in one bucket. Never include a catch-all range (startup refuses `0.0.0.0/0`). uvicorn runs with `--no-proxy-headers`, so this is the only place forwarded headers are interpreted. If another load balancer sits in front of the frontend nginx (e.g. Render), set the frontend's `REAL_IP_FROM` to that balancer's address range so nginx sees the visitor instead of the balancer; I could not verify Render's ranges from the repo, so that value is deployment-specific.
 3. **ADR-002's CSP mitigation covers API responses only.** The CSP header is set by FastAPI; the nginx container serving the SPA sets none. The policy also allows `'unsafe-inline'` scripts.
 4. **Duplicate engine file.** `backend/app/core/interest_engine.py` is byte-identical to `backend/app/modules/accounts/interest_engine.py` and nothing imports it. Edits made to it have no effect.
 5. **Unused dependencies** in `pyproject.toml` / `requirements.in`: `sendgrid`, `twilio`, `azure-storage-blob`, and a direct `cryptography` pin (a comment mentions a HubSpot integration and AES per-record encryption; no such code exists). The two files also disagree on version ranges (e.g. `fastapi <0.160` vs `<0.112`), and CI installs from the hashed `requirements-ci.txt`, compiled from `requirements.in`.
