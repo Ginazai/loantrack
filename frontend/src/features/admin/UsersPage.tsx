@@ -226,7 +226,7 @@ export default function UsersPage() {
   };
 
   return (
-    <div className="lt-page lt-page--medium lt-stack lt-stack--loose">
+    <div className="lt-page lt-stack lt-stack--loose">
       <PageHeader
         title="Users"
         subtitle="Manage borrower accounts and access"
@@ -298,7 +298,7 @@ export default function UsersPage() {
                           />
                           <Button
                             kind="ghost"
-                            size="sm"
+                            size="md"
                             hasIconOnly
                             renderIcon={Edit}
                             iconDescription="Edit user"
@@ -307,7 +307,7 @@ export default function UsersPage() {
                           />
                           <Button
                             kind="danger--ghost"
-                            size="sm"
+                            size="md"
                             hasIconOnly
                             renderIcon={TrashCan}
                             iconDescription="Delete user"

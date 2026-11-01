@@ -18,6 +18,7 @@ import type { LoanAccount, AccountFormData, User, UserCreateFormData } from "../
 import { upcomingCycleDates, formatDate } from "../../utils/dateUtils";
 import { adminApi } from "../../api";
 import { Notice } from "../../components/feedback";
+import { CycleDates } from "../../components/ui";
 import { useAuthStore } from "../../stores/authStore";
 import { getApiErrorMessage } from "../../utils/apiError";
 
@@ -284,18 +285,13 @@ export function AccountForm({ account, onSubmit, onCancel, isLoading }: Props) {
       </div>
 
       {!isEdit && (
-        <div className="lt-form__section">
-          <p className="lt-eyebrow">
-            Upcoming Cycle Dates
-          </p>
-          <div className="lt-row">
-            {preview.map((d) => (
-              <Tag key={d.toISOString()} type="outline" size="md">
-                {formatDate(d)}
-              </Tag>
-            ))}
-          </div>
-        </div>
+        <CycleDates>
+          {preview.map((d) => (
+            <Tag key={d.toISOString()} type="outline" size="md">
+              {formatDate(d)}
+            </Tag>
+          ))}
+        </CycleDates>
       )}
 
       <div className="lt-form__actions lt-form__actions--bleed">
