@@ -1,9 +1,9 @@
 import { Add, Download, Receipt, SearchLocate } from "@carbon/icons-react";
-import { Button, DataTableSkeleton, MenuButton, MenuItem, Search, SelectableTag } from "@carbon/react";
+import { Button, MenuButton, MenuItem, Search, SelectableTag } from "@carbon/react";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { accountsApi, adminApi } from "../../api";
-import { Drawer, EmptyState, Notice, PageHeader } from "../../components/common";
+import { Drawer, EmptyState, Notice, PageHeader, TableSkeleton } from "../../components/common";
 import type { AccountFormData, AccountStatus } from "../../types";
 import { AccountForm } from "./AccountForm";
 import { AccountsTable } from "./AccountsTable";
@@ -75,7 +75,7 @@ export function AccountsPage() {
               <SelectableTag
                 key={f.value}
                 text={f.label}
-                size="md"
+                size="lg"
                 selected={on}
                 onChange={() => (isAll ? setSelectedStatuses([]) : toggleStatus(f.value as AccountStatus))}
               />
@@ -98,13 +98,7 @@ export function AccountsPage() {
         </p>
 
         {isLoading ? (
-          <DataTableSkeleton
-            columnCount={8}
-            rowCount={8}
-            showHeader={false}
-            showToolbar={false}
-            aria-label="Loading accounts"
-          />
+          <TableSkeleton columns={5} rows={8} label="Loading accounts" />
         ) : accounts.length === 0 ? (
           filtered ? (
             <EmptyState
@@ -150,7 +144,7 @@ export function AccountsPage() {
             isLoading={createMutation.isPending}
           />
           {createMutation.isError && (
-            <div style={{ marginBlockStart: "1rem" }}>
+            <div className="lt-mt-md">
               <Notice kind="error" title="Couldn’t create account">
                 {getApiErrorMessage(createMutation.error, "Failed to create account")}
               </Notice>

@@ -148,7 +148,7 @@ export function DashboardLayout() {
             >
               {theme === "light" ? <Asleep size={20} /> : <Light size={20} />}
             </HeaderGlobalAction>
-            <div ref={panelWrapRef} style={{ display: "contents" }}>
+            <div ref={panelWrapRef} className="lt-contents">
               <HeaderGlobalAction
                 aria-label="Account"
                 aria-expanded={panelOpen}

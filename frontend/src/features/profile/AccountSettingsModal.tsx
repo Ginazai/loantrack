@@ -89,8 +89,8 @@ export function AccountSettingsModal({ onClose }: Props) {
         </FormGroup>
 
         <div className="lt-form__actions lt-form__actions--bleed">
-          <Button type="button" kind="secondary" size="xl" onClick={onClose}>Cancel</Button>
-          <Button type="submit" size="xl" disabled={saving}>
+          <Button type="button" kind="secondary" size="lg" onClick={onClose}>Cancel</Button>
+          <Button type="submit" size="lg" disabled={saving}>
             {saving ? <InlineLoading description="Saving…" /> : "Save changes"}
           </Button>
         </div>

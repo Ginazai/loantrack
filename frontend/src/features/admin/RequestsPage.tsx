@@ -106,20 +106,22 @@ export default function RequestsPage() {
         title="Loan Requests"
         subtitle={
           pending > 0
-            ? `${pending} request${pending !== 1 ? "s" : ""} need attention`
+            ? `${pending} request${pending !== 1 ? "s need" : " needs"} attention`
             : "All requests reviewed"
         }
       />
 
-      <ContentSwitcher
-        size="md"
-        selectedIndex={FILTERS.indexOf(filter)}
-        onChange={({ name }) => setFilter(name as Filter)}
-      >
-        {FILTERS.map((s) => (
-          <Switch key={s} name={s} text={s === "all" ? "All" : STATUS_LABEL[s]} />
-        ))}
-      </ContentSwitcher>
+      <div className="lt-filter-switcher">
+        <ContentSwitcher
+          size="md"
+          selectedIndex={FILTERS.indexOf(filter)}
+          onChange={({ name }) => setFilter(name as Filter)}
+        >
+          {FILTERS.map((s) => (
+            <Switch key={s} name={s} text={s === "all" ? "All" : STATUS_LABEL[s]} />
+          ))}
+        </ContentSwitcher>
+      </div>
 
       {loading ? (
         <div aria-busy="true" aria-label="Loading requests">
@@ -167,7 +169,7 @@ export default function RequestsPage() {
                     <span>Submitted {formatDate(req.created_at)}</span>
                   </div>
                 </div>
-                <div className="lt-row" style={{ flexWrap: "nowrap" }}>
+                <div className="lt-item__actions">
                   <Button
                     kind="ghost"
                     size="md"
@@ -254,7 +256,7 @@ export default function RequestsPage() {
 
                         {formError[req.id] && <Notice kind="error">{formError[req.id]}</Notice>}
 
-                        <div className="lt-row" style={{ justifyContent: "flex-end", gap: 0 }}>
+                        <div className="lt-row lt-row--end lt-row--flush">
                           <Button
                             kind="danger"
                             renderIcon={Close}

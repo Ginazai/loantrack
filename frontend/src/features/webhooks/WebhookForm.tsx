@@ -87,7 +87,7 @@ export function WebhookForm({ onSubmit, onCancel, isLoading }: Props) {
                 );
               })}
             </div>
-            {errors.events && <p className="cds--form-requirement" style={{ display: "block", maxBlockSize: "none" }}>{errors.events.message}</p>}
+            {errors.events && <p className="cds--form-requirement lt-form-error">{errors.events.message}</p>}
           </fieldset>
         )}
       />
@@ -99,10 +99,10 @@ export function WebhookForm({ onSubmit, onCancel, isLoading }: Props) {
       </Notice>
 
       <div className="lt-form__actions lt-form__actions--bleed">
-        <Button type="button" kind="secondary" size="xl" onClick={onCancel}>
+        <Button type="button" kind="secondary" size="lg" onClick={onCancel}>
           Cancel
         </Button>
-        <Button type="submit" size="xl" disabled={isLoading}>
+        <Button type="submit" size="lg" disabled={isLoading}>
           {isLoading ? <InlineLoading description="Saving…" /> : "Save webhook"}
         </Button>
       </div>

@@ -41,19 +41,20 @@ export function ConfirmDialog({
     >
       <p>{message}</p>
       {confirmWord && (
-        <TextInput
-          id="confirm-word"
-          style={{ marginBlockStart: "1.5rem" }}
-          labelText={
-            <>
-              Type <strong>{confirmWord}</strong> to confirm
-            </>
-          }
-          placeholder={confirmWord}
-          value={typed}
-          autoComplete="off"
-          onChange={(e) => setTyped(e.target.value)}
-        />
+        <div className="lt-mt-lg">
+          <TextInput
+            id="confirm-word"
+            labelText={
+              <>
+                Type <strong>{confirmWord}</strong> to confirm
+              </>
+            }
+            placeholder={confirmWord}
+            value={typed}
+            autoComplete="off"
+            onChange={(e) => setTyped(e.target.value)}
+          />
+        </div>
       )}
     </Modal>
   );

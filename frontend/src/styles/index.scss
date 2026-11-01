@@ -50,6 +50,11 @@ html {
 .cds--data-table td.lt-num,
 .cds--data-table th.lt-num {
   text-align: end;
+  white-space: nowrap;
+}
+
+.lt-nowrap {
+  white-space: nowrap;
 }
 
 .cds--data-table th.lt-num .cds--table-header-label,
@@ -95,8 +100,9 @@ html {
 }
 
 .lt-page {
+  // Every page shares one left edge (flush with the nav); only the measure differs.
   max-inline-size: 99rem;
-  margin-inline: auto;
+  margin-inline: 0;
 
   &--narrow {
     max-inline-size: 64rem;
@@ -161,6 +167,12 @@ html {
     @include type-style('productive-heading-05');
     color: $text-primary;
     margin: 0;
+    overflow-wrap: anywhere;
+    text-wrap: balance;
+
+    @include breakpoint-down('md') {
+      @include type-style('productive-heading-04');
+    }
   }
 
   &__subtitle {
@@ -175,10 +187,45 @@ html {
     flex-wrap: wrap;
     align-items: center;
     gap: $spacing-03;
+
+    .cds--btn:not(.cds--btn--icon-only) {
+      min-inline-size: 10rem;
+    }
+
+    // Phones: actions share the row equally instead of ragged left-aligned boxes.
+    @include breakpoint-down('md') {
+      inline-size: 100%;
+
+      > * {
+        flex: 1 1 auto;
+      }
+
+      .cds--btn {
+        white-space: nowrap;
+      }
+
+      .cds--menu-button,
+      .cds--btn {
+        inline-size: 100%;
+        max-inline-size: none;
+      }
+    }
   }
 
   .cds--breadcrumb {
     margin-block-end: $spacing-04;
+    flex-wrap: wrap;
+  }
+
+  .cds--breadcrumb-item {
+    min-inline-size: 0;
+    max-inline-size: 100%;
+    white-space: normal;
+
+    .cds--link {
+      white-space: normal;
+      overflow-wrap: anywhere;
+    }
   }
 }
 
@@ -192,9 +239,18 @@ html {
   margin: 0 0 $spacing-05;
 }
 
+// Small label for a group of fields inside a form. Never use it for a real heading.
 .lt-eyebrow {
   @include type-style('label-01');
   color: $text-secondary;
+  margin: 0 0 $spacing-03;
+}
+
+// Sub-section heading inside a page or card (below the 20px container titles).
+.lt-subhead {
+  @include type-style('productive-heading-02');
+  color: $text-primary;
+  margin: 0 0 $spacing-04;
 }
 
 .lt-stack {
@@ -239,6 +295,10 @@ html {
     grid-template-columns: minmax(0, 1fr);
   }
 
+  &--2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   &--3 {
     grid-template-columns: repeat(3, minmax(0, 1fr));
 
@@ -246,17 +306,33 @@ html {
       grid-template-columns: minmax(0, 1fr);
     }
   }
+
+  // Auto-fitting row for variable numbers of summary figures (e.g. import results).
+  &--auto {
+    grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  }
+
+  // Dense variant for forms and previews: no minimum height, tight gap.
+  &--compact .lt-kpi {
+    min-block-size: 0;
+    gap: $spacing-03;
+  }
 }
 
 .lt-kpi {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  gap: $spacing-07;
-  min-block-size: 8.5rem;
+  gap: $spacing-05;
+  min-block-size: 7rem;
   padding: $spacing-05;
   background: $layer-01;
   color: $text-primary;
+
+  @include breakpoint-down('md') {
+    min-block-size: 0;
+    gap: $spacing-04;
+  }
 
   &__head {
     display: flex;
@@ -280,6 +356,23 @@ html {
     font-weight: 300;
     margin: 0;
     overflow-wrap: break-word;
+  }
+
+  // Skeleton parts mirror the real tile so nothing shifts when data arrives.
+  &__sk-icon {
+    inline-size: 1.25rem;
+    block-size: 1.25rem;
+    flex-shrink: 0;
+  }
+
+  .cds--skeleton__text,
+  .cds--skeleton__placeholder {
+    margin: 0;
+  }
+
+  // Mirrors the gap between value and description in the real tile.
+  .cds--skeleton__text + .cds--skeleton__text {
+    margin-block-start: $spacing-03;
   }
 
   &__desc {
@@ -341,6 +434,9 @@ html {
 // Wide tables scroll inside their panel rather than crushing their columns on small screens.
 .lt-table-wrap {
   overflow-x: auto;
+  // Establish a containing block: without it `position: absolute` children (the
+  // visually-hidden spans, popovers, toggles) escape the scroller and widen the page.
+  position: relative;
 
   .cds--data-table {
     min-inline-size: 40rem;
@@ -404,6 +500,17 @@ html {
     }
   }
 
+  a > :first-child {
+    min-inline-size: 0;
+    overflow-wrap: anywhere;
+  }
+
+  a > :last-child:not(:first-child) {
+    flex-shrink: 0;
+    text-align: end;
+    white-space: nowrap;
+  }
+
   &__name {
     @include type-style('productive-heading-01');
   }
@@ -421,12 +528,47 @@ html {
 }
 
 // ── Empty and loading states ────────────────────────────────────────────────
+// Carbon's DataTableSkeleton gives each column a fixed 64px bar plus padding, so
+// five columns can never be narrower than ~480px. Make it fluid so placeholders
+// can never overflow their panel.
+.lt-table-skeleton {
+  overflow: hidden;
+
+  .cds--data-table.cds--skeleton {
+    inline-size: 100%;
+    table-layout: fixed;
+  }
+
+  .cds--data-table.cds--skeleton th,
+  .cds--data-table.cds--skeleton td {
+    overflow: hidden;
+    padding-inline-end: $spacing-05;
+  }
+
+  .cds--data-table.cds--skeleton th span,
+  .cds--data-table.cds--skeleton td span {
+    inline-size: 100%;
+    max-inline-size: 5rem;
+  }
+
+  // The first column carries the name, so it is the widest in the real tables too.
+  .cds--data-table.cds--skeleton th:first-child,
+  .cds--data-table.cds--skeleton td:first-child {
+    inline-size: 34%;
+  }
+
+  .cds--data-table.cds--skeleton th:first-child span,
+  .cds--data-table.cds--skeleton td:first-child span {
+    max-inline-size: 12rem;
+  }
+}
+
 .lt-empty {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: $spacing-03;
-  padding: $spacing-09 $spacing-06;
+  padding: $spacing-08 $spacing-06;
 
   &--center {
     align-items: center;
@@ -442,6 +584,7 @@ html {
     @include type-style('productive-heading-03');
     color: $text-primary;
     margin: 0;
+    text-wrap: balance;
   }
 
   &__body {
@@ -656,9 +799,10 @@ html {
 .lt-chart {
   background: $layer-01;
   padding: $spacing-05;
+  margin: 0;
 
   &__title {
-    @include type-style('productive-heading-02');
+    @include type-style('productive-heading-03');
     margin: 0 0 $spacing-05;
   }
 
@@ -696,6 +840,11 @@ html {
     inline-size: 0.5rem;
     block-size: 0.5rem;
     flex-shrink: 0;
+  }
+
+  &__value {
+    margin-inline-start: auto;
+    padding-inline-start: $spacing-04;
   }
 }
 
@@ -800,19 +949,29 @@ html {
 
   &__top {
     display: flex;
+    flex-wrap: wrap;
     align-items: flex-start;
     justify-content: space-between;
-    gap: $spacing-05;
+    gap: $spacing-03 $spacing-05;
   }
 
   &__main {
-    flex: 1;
+    flex: 1 1 14rem;
     min-inline-size: 0;
+  }
+
+  &__actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: nowrap;
+    gap: 0;
+    margin-inline-start: auto;
   }
 
   &__title {
     @include type-style('productive-heading-02');
     margin: 0;
+    overflow-wrap: anywhere;
   }
 
   &__meta {
@@ -963,7 +1122,84 @@ html {
   }
 }
 
+// ContentSwitcher used as a filter: labels never truncate, the strip scrolls on phones.
+.lt-filter-switcher {
+  overflow-x: auto;
+  position: relative;
+
+  .cds--content-switcher {
+    inline-size: 100%;
+    min-inline-size: max-content;
+  }
+
+  // Must match Carbon's own specificity (it sets `inline-size: 100%` on every segment).
+  .cds--content-switcher:not(.cds--content-switcher--icon-only) .cds--content-switcher-btn {
+    flex: 1 0 auto;
+    inline-size: auto;
+    padding-inline: $spacing-05;
+    white-space: nowrap;
+  }
+}
+
+// ── Buttons ─────────────────────────────────────────────────────────────────
+// Carbon reserves ~4rem on the trailing edge for an icon, so a text-only button
+// reads as an off-centre label in an oversized box. Centre it and balance the padding.
+.cds--btn:not(.cds--btn--icon-only):not(:has(.cds--btn__icon)) {
+  justify-content: center;
+  padding-inline: $spacing-06;
+}
+
+// Carbon's modal footer is a fixed 64px with the label pinned to the top. Bring it down
+// to the same 48px as the drawer/form footers and centre the label vertically.
+.cds--modal-footer {
+  block-size: 3rem;
+}
+
+.cds--modal-footer .cds--btn {
+  block-size: 3rem;
+  align-items: center;
+}
+
+.cds--modal-footer .cds--btn:not(.cds--skeleton) {
+  padding-block: 0;
+}
+
 // ── Utilities ───────────────────────────────────────────────────────────────
+// Spacing helpers on the Carbon scale (replace one-off inline margins).
+.lt-mt-xs { margin-block-start: $spacing-03; }
+.lt-mt-sm { margin-block-start: $spacing-04; }
+.lt-mt-md { margin-block-start: $spacing-05; }
+.lt-mt-lg { margin-block-start: $spacing-06; }
+.lt-mb-md { margin-block-end: $spacing-05; }
+.lt-mb-lg { margin-block-end: $spacing-06; }
+
+.lt-text-end { text-align: end; }
+.lt-contents { display: contents; }
+
+.lt-row--tight { gap: $spacing-02; }
+.lt-row--flush { gap: 0; }
+.lt-row--end { justify-content: flex-end; }
+.lt-row--between { justify-content: space-between; }
+
+.lt-section-title--flush { margin: 0; }
+
+.lt-table-actions--start { justify-content: flex-start; }
+
+.lt-icon-inline {
+  vertical-align: -3px;
+  margin-inline-end: $spacing-03;
+}
+
+// Carbon hides `.cds--form-requirement` until its field is invalid; this one is shown on demand.
+.lt-form-error {
+  display: block;
+  max-block-size: none;
+}
+
+// <dl> summary tiles: reset the browser's default <dd> indent.
+dl.lt-kpis dd {
+  margin: 0;
+}
 .lt-visually-hidden {
   position: absolute;
   inline-size: 1px;
@@ -1026,6 +1262,11 @@ html {
 .lt-toolbar-search {
   inline-size: 18rem;
   max-inline-size: 100%;
+
+  @include breakpoint-down('md') {
+    margin-inline-start: 0;
+    inline-size: 100%;
+  }
 }
 
 .lt-count {

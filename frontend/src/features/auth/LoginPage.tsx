@@ -81,7 +81,7 @@ export function LoginPage() {
           <p className="lt-login__lede">Access your loan ledger</p>
 
           {error && (
-            <div style={{ marginBlockEnd: "1.5rem" }}>
+            <div className="lt-mb-lg">
               <Notice kind="error" title="Sign-in failed">
                 {error}
               </Notice>

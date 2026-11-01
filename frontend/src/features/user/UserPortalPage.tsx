@@ -14,7 +14,7 @@ import { accountsApi, paymentsApi } from "../../api";
 import { useAuthStore } from "../../stores/authStore";
 import { formatCurrency, formatDate, formatRate, isOverdue } from "../../utils/dateUtils";
 import type { LoanAccount, Payment } from "../../types";
-import { EmptyState, PageHeader, StatCard, StatusBadge } from "../../components/common";
+import { EmptyState, PageHeader, StatCard, StatCardSkeleton, StatusBadge } from "../../components/common";
 import { BalanceChart } from "../accounts/Charts";
 
 function LoanCard({ account }: { account: LoanAccount }) {
@@ -91,7 +91,7 @@ function LoanCard({ account }: { account: LoanAccount }) {
             <BalanceChart payments={payments} borrowAmount={account.borrow_amount} />
           )}
           <div>
-            <h3 className="lt-eyebrow" style={{ marginBlockEnd: "0.5rem" }}>Payment History</h3>
+            <h3 className="lt-subhead">Payment History</h3>
             {payments.length === 0 ? (
               <p className="lt-muted">No payments yet.</p>
             ) : (
@@ -104,7 +104,7 @@ function LoanCard({ account }: { account: LoanAccount }) {
                         {formatDate(p.payment_date)} · Interest: {formatCurrency(Number(p.interests_accrued))}
                       </p>
                     </div>
-                    <div style={{ textAlign: "end" }}>
+                    <div className="lt-text-end">
                       <p className="lt-link-list__sub">Balance after</p>
                       <p className="lt-link-list__name">{formatCurrency(Number(p.balance_after))}</p>
                     </div>
@@ -146,6 +146,14 @@ export default function UserPortalPage() {
         })}
       />
 
+      {isLoading && (
+        <div className="lt-kpis lt-kpis--3" aria-busy="true" aria-label="Loading summary">
+          {[0, 1, 2].map((i) => (
+            <StatCardSkeleton key={i} />
+          ))}
+        </div>
+      )}
+
       {!isLoading && open.length > 0 && (
         <section className="lt-kpis lt-kpis--3" aria-label="Loan summary">
           <StatCard title="Total Balance" value={formatCurrency(totalBalance)} Icon={Currency} />
@@ -176,7 +184,7 @@ export default function UserPortalPage() {
           {open.map((a) => <LoanCard key={a.id} account={a} />)}
           {closed.length > 0 && (
             <>
-              <h2 className="lt-eyebrow" style={{ marginBlockStart: "1.5rem" }}>Closed / Paid</h2>
+              <h2 className="lt-subhead lt-mt-lg">Closed / Paid</h2>
               {closed.map((a) => <LoanCard key={a.id} account={a} />)}
             </>
           )}

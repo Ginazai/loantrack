@@ -67,12 +67,12 @@ export function PaymentForm({ account, onSubmit, onCancel, isLoading }: Props) {
   return (
     <form onSubmit={handleSubmit(handleFormSubmit)} noValidate className="lt-form">
       {/* Balance summary */}
-      <div className="lt-kpis" style={{ gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}>
-        <div className="lt-kpi" style={{ minBlockSize: 0, gap: "0.5rem" }}>
+      <div className="lt-kpis lt-kpis--2 lt-kpis--compact">
+        <div className="lt-kpi">
           <span className="lt-kpi__label">Current Balance</span>
           <p className="lt-kpi__value">{formatCurrency(currentBalance)}</p>
         </div>
-        <div className="lt-kpi" style={{ minBlockSize: 0, gap: "0.5rem" }}>
+        <div className="lt-kpi">
           <span className="lt-kpi__label">Next Due</span>
           <p className="lt-kpi__value">{formatDate(nextDue)}</p>
         </div>
@@ -103,7 +103,7 @@ export function PaymentForm({ account, onSubmit, onCancel, isLoading }: Props) {
           <Switch name="auto" text="Auto" />
           <Switch name="manual" text="Manual" />
         </ContentSwitcher>
-        <p className="lt-field-note" style={{ marginBlockStart: "0.5rem" }}>
+        <p className="lt-field-note lt-mt-xs">
           {method === "auto"
             ? "Date is automatically set to the next cycle date."
             : "Pick any date — interest still applies per the cycle schedule."}
@@ -123,7 +123,7 @@ export function PaymentForm({ account, onSubmit, onCancel, isLoading }: Props) {
 
       {/* Upcoming cycle preview */}
       <div>
-        <p className="lt-eyebrow" style={{ marginBlockEnd: "0.5rem" }}>
+        <p className="lt-eyebrow">
           Upcoming Cycles
         </p>
         <div className="lt-row">
@@ -145,10 +145,10 @@ export function PaymentForm({ account, onSubmit, onCancel, isLoading }: Props) {
       </div>
 
       <div className="lt-form__actions lt-form__actions--bleed">
-        <Button type="button" kind="secondary" size="xl" onClick={onCancel}>
+        <Button type="button" kind="secondary" size="lg" onClick={onCancel}>
           Cancel
         </Button>
-        <Button type="submit" size="xl" disabled={isLoading}>
+        <Button type="submit" size="lg" disabled={isLoading}>
           {isLoading ? <InlineLoading description="Recording…" /> : "Record payment"}
         </Button>
       </div>

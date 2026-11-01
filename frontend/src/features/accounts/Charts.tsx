@@ -78,7 +78,7 @@ function ChartTooltip({
         <div key={p.dataKey} className="lt-chart-tooltip__row">
           <span className="lt-chart-tooltip__swatch" style={{ background: p.color }} aria-hidden="true" />
           <span>{names[p.dataKey] ?? p.dataKey}</span>
-          <strong style={{ marginInlineStart: "auto", paddingInlineStart: "1rem" }}>
+          <strong className="lt-chart-tooltip__value">
             {formatCurrency(p.value)}
           </strong>
         </div>
@@ -100,7 +100,7 @@ export function BalanceChart({
   const ticks = niceTicks(Math.max(...data.map((d) => d.balance)));
 
   return (
-    <figure className="lt-chart" style={{ margin: 0 }}>
+    <figure className="lt-chart">
       <figcaption className="lt-chart__title">Balance Over Time</figcaption>
       <ResponsiveContainer width="100%" height={240}>
         <AreaChart data={data} margin={{ top: 5, right: 16, left: 0, bottom: 5 }}>
@@ -147,7 +147,7 @@ export function InterestChart({ payments }: { payments: Payment[] }) {
   const ticks = niceTicks(Math.max(...data.map((d) => Math.max(d.interest, d.payment))));
 
   return (
-    <figure className="lt-chart" style={{ margin: 0 }}>
+    <figure className="lt-chart">
       <figcaption className="lt-chart__title">Interest & Payments per Cycle</figcaption>
       <ResponsiveContainer width="100%" height={240}>
         <BarChart data={data} margin={{ top: 5, right: 16, left: 0, bottom: 5 }} barGap={2}>

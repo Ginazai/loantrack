@@ -109,8 +109,8 @@ function RequestLoanModal({ onClose, onSuccess }: { onClose: () => void; onSucce
           onChange={(e) => setForm({ ...form, reason: e.target.value })}
         />
         <div className="lt-form__actions lt-form__actions--bleed">
-          <Button type="button" kind="secondary" size="xl" onClick={onClose}>Cancel</Button>
-          <Button type="submit" size="xl" disabled={saving}>
+          <Button type="button" kind="secondary" size="lg" onClick={onClose}>Cancel</Button>
+          <Button type="submit" size="lg" disabled={saving}>
             {saving ? <InlineLoading description="Submitting…" /> : "Submit request"}
           </Button>
         </div>
@@ -155,7 +155,7 @@ function RequestCard({ req, onCancel }: { req: LoanRequest; onCancel: (id: strin
             <span>Submitted {formatDate(req.created_at)}</span>
           </div>
         </div>
-        <div className="lt-row" style={{ flexWrap: "nowrap", gap: 0 }}>
+        <div className="lt-item__actions">
           {(req.reason || req.rejection_reason) && (
             <Button
               kind="ghost"
@@ -245,19 +245,21 @@ export default function MyRequestsPage() {
         }
       />
 
-      <ContentSwitcher
-        size="md"
-        selectedIndex={FILTERS.indexOf(filter)}
-        onChange={({ name }) => setFilter(name as Filter)}
-      >
-        {FILTERS.map((s) => (
-          <Switch
-            key={s}
-            name={s}
-            text={`${FILTER_LABEL[s]}${counts[s] > 0 ? ` (${counts[s]})` : ""}`}
-          />
-        ))}
-      </ContentSwitcher>
+      <div className="lt-filter-switcher">
+        <ContentSwitcher
+          size="md"
+          selectedIndex={FILTERS.indexOf(filter)}
+          onChange={({ name }) => setFilter(name as Filter)}
+        >
+          {FILTERS.map((s) => (
+            <Switch
+              key={s}
+              name={s}
+              text={`${FILTER_LABEL[s]}${counts[s] > 0 ? ` (${counts[s]})` : ""}`}
+            />
+          ))}
+        </ContentSwitcher>
+      </div>
 
       {isLoading ? (
         <div aria-busy="true" aria-label="Loading requests">

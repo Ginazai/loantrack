@@ -93,8 +93,8 @@ function CreateWebhookModal({ onClose, onCreated }: { onClose: () => void; onCre
           </div>
         </fieldset>
         <div className="lt-form__actions lt-form__actions--bleed">
-          <Button type="button" kind="secondary" size="xl" onClick={onClose}>Cancel</Button>
-          <Button type="submit" size="xl" disabled={saving}>
+          <Button type="button" kind="secondary" size="lg" onClick={onClose}>Cancel</Button>
+          <Button type="submit" size="lg" disabled={saving}>
             {saving ? <InlineLoading description="Creating…" /> : "Create webhook"}
           </Button>
         </div>
@@ -150,7 +150,7 @@ export default function WebhooksAdminPage() {
       {showPayload && (
         <section className="lt-panel lt-panel__body" aria-labelledby="payload-heading">
           <h2 className="lt-section-title" id="payload-heading">Sample Payload</h2>
-          <p className="lt-muted" style={{ marginBlockEnd: "1rem" }}>
+          <p className="lt-muted lt-mb-md">
             Every event POST contains the full account snapshot plus event metadata.
           </p>
           <Layer>
@@ -187,14 +187,14 @@ export default function WebhooksAdminPage() {
                     <Tag size="sm" type="outline">global</Tag>
                   </div>
                   <p className="lt-item__url lt-mono">{wh.target_url}</p>
-                  <div className="lt-row" style={{ gap: "0.25rem" }}>
+                  <div className="lt-row lt-row--tight">
                     {wh.events.map((ev) => (
                       <Tag key={ev} size="sm" type="outline">
                         <span className="lt-mono">{ev}</span>
                       </Tag>
                     ))}
                   </div>
-                  <p className="lt-field-note" style={{ marginBlockStart: "0.75rem" }}>
+                  <p className="lt-field-note lt-mt-sm">
                     Created {new Date(wh.created_at).toLocaleDateString()}
                   </p>
                 </div>
