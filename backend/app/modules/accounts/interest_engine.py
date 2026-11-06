@@ -164,15 +164,12 @@ def ledger_anchor(payments) -> Anchor | None:
     balance. The recorded ``balance_after`` of the *last imported payment* is therefore
     taken as fact and replay continues from there under the normal rules.
 
-<<<<<<< Updated upstream
-=======
     The imported row's interest belongs to the *nearest* cycle, so the anchor date is
     that cycle when it is not before the payment: a Sep 26 import anchors at Sep 30 and
     replay resumes at Oct 15 rather than charging Sep 30 a second time. When the nearest
     cycle is the earlier one (Sep 20 → Sep 15) the anchor stays on the payment's own
     date, so the next cycle (Sep 30) is charged on the recorded balance.
 
->>>>>>> Stashed changes
     ``payments`` is any iterable of objects with ``payment_date``, ``method`` and
     ``balance_after`` (ORM rows or query rows), in chronological order. Payments dated
     on or before the anchor are considered already reflected in it.
@@ -183,11 +180,7 @@ def ledger_anchor(payments) -> Anchor | None:
             last = p
     if last is None:
         return None
-<<<<<<< Updated upstream
-    return (last.payment_date, last.balance_after)
-=======
     return (max(last.payment_date, nearest_cycle_date(last.payment_date)), last.balance_after)
->>>>>>> Stashed changes
 
 
 def project_ledger(
@@ -209,14 +202,8 @@ def project_ledger(
     With an *anchor* ``(date, balance)`` replay starts from that recorded balance
     instead of from ``borrow_amount`` at ``start_date``. Interest through the anchor
     date is already inside the balance, so the first row is the first cycle strictly
-<<<<<<< Updated upstream
-    after it, and payments dated on or before it are ignored. (An off-cycle anchor
-    means the next cycle charges interest on the post-payment balance: imported
-    history does not say what the period opened at.)
-=======
     after it, and payments dated on or before it are ignored. (``ledger_anchor`` rounds an
     import to its nearest cycle, so the interest of that cycle is never charged twice.)
->>>>>>> Stashed changes
     """
     if until is None:
         until = date.today()

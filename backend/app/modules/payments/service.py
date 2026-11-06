@@ -114,11 +114,7 @@ class PaymentService:
             # inside it would have no defined place in the ledger.
             raise HTTPException(
                 422,
-<<<<<<< Updated upstream
-                f"Payment date must be after the last imported payment ({anchor[0]})",
-=======
                 f"Payment date must be after the last imported cycle ({anchor[0]})",
->>>>>>> Stashed changes
             )
 
         # ── Correct interest calculation ──────────────────────────────────────
@@ -336,11 +332,7 @@ class PaymentService:
             running = balance_after
             final_balance = balance_after
             if payment.method == "import":
-<<<<<<< Updated upstream
-                anchor = (payment.payment_date, balance_after)
-=======
                 anchor = ledger_anchor([payment])
->>>>>>> Stashed changes
 
         if account.status != "closed":
             account.status = "paid" if final_balance <= Decimal("0.00") else "active"

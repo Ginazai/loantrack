@@ -11,10 +11,7 @@ from app.modules.accounts.interest_engine import (
     get_cycle_dates,
     get_next_due_date,
     ledger_anchor,
-<<<<<<< Updated upstream
-=======
     nearest_cycle_date,
->>>>>>> Stashed changes
     next_cycle_date,
     project_ledger,
     upcoming_cycle_dates,
@@ -328,8 +325,6 @@ class TestAnchoredLedger:
         assert plain != Decimal("551.25")
 
 
-<<<<<<< Updated upstream
-=======
 @pytest.mark.parametrize(
     "d, expected",
     [
@@ -348,7 +343,6 @@ def test_nearest_cycle_date(d, expected):
     assert nearest_cycle_date(d) == expected
 
 
->>>>>>> Stashed changes
 class _P:
     def __init__(self, d, method, after):
         self.payment_date, self.method, self.balance_after = d, method, after
@@ -366,8 +360,6 @@ class TestLedgerAnchor:
             _P(date(2025, 3, 15), "manual", Decimal("70.00")),
         ]
         assert ledger_anchor(ps) == (date(2025, 2, 15), Decimal("80.00"))
-<<<<<<< Updated upstream
-=======
 
     def test_import_nearer_the_later_cycle_is_anchored_at_that_cycle(self):
         # Sep 26 is closer to Sep 30 than Sep 15, and the imported row's balance_after
@@ -402,4 +394,3 @@ class TestLedgerAnchor:
         assert rows[0].opening_balance == Decimal("410.00")
         assert rows[0].interests_accrued == Decimal("20.50")
         assert rows[0].closing_balance == Decimal("410.00")
->>>>>>> Stashed changes
