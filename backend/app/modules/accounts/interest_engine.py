@@ -147,7 +147,8 @@ def project_ledger(
 
     Each CycleRow represents one billing cycle. Payments are bucketed into
     the period whose cycle_date is the first cycle date >= payment_date.
-    A payment that falls exactly on a cycle date is attributed to that cycle.
+    A payment that falls exactly on a cycle date is attributed to that cycle,
+    and a payment on *start_date* is attributed to the first cycle.
     """
     if until is None:
         until = date.today()
@@ -167,8 +168,15 @@ def project_ledger(
     for i, cycle_date in enumerate(cycle_dates):
         prev = prev_boundaries[i]
 
+        # Periods are (prev, cycle_date]. The first one starts at start_date itself, so
+        # it is closed on the left: a payment made on the disbursement date belongs to
+        # it. Otherwise it would match no period at all and vanish from the balance.
         period_payments = _dec(
-            sum(amt for pdate, amt in sorted_payments if prev < pdate <= cycle_date)
+            sum(
+                amt
+                for pdate, amt in sorted_payments
+                if (prev <= pdate if i == 0 else prev < pdate) and pdate <= cycle_date
+            )
         )
 
         interest = _round2(balance * _dec(rate))

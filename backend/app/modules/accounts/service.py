@@ -1,5 +1,6 @@
 import logging
 from datetime import date
+from decimal import Decimal
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -288,7 +289,21 @@ class LoanAccountService:
             current_balance = None
 
         last = payments[-1] if payments else None
-        ndd = last.next_due_date if last else next_cycle_date(account.start_date)
+
+        # A settled account owes nothing and has nothing coming due. Without this the
+        # stale next_due_date of its final payment drifts into the past and the
+        # account shows as overdue forever.
+        if account.status in ("paid", "closed"):
+            ndd = None
+        else:
+            ndd = last.next_due_date if last else next_cycle_date(account.start_date)
+
+        # For a paid account the recorded ledger is authoritative (ADR-003): its last
+        # snapshot is what the detail page shows. The projection above applies today's
+        # `rate` per cycle, which for imported history (historical interest amounts)
+        # does not reproduce the ledger and keeps compounding after payoff.
+        if account.status == "paid" and last is not None:
+            current_balance = max(Decimal(str(last.balance_after)), Decimal("0.00"))
 
         result = {
             **account.__dict__,

@@ -132,3 +132,51 @@ class TestFullSampleShape:
         assert len(parsed.accounts) == 2
         assert len(parsed.payments) == 2
         assert parsed.errors == []
+
+
+class TestNoSilentPaymentLoss:
+    """Every payment row in the file must reach the parsed ledger (or be
+    reported as an error) — a row must never just vanish. These guard the two
+    ways it used to: grouping by (Referencia, Fecha) overwrote instead of
+    accumulating, and a same-day-as-disbursement payment was discarded."""
+
+    def test_payment_on_the_disbursement_date_is_kept(self):
+        raw = _csv(
+            '21,31/08/2025,"Prestamo de $25 otorgado",25,',
+            '21,31/08/2025,"pago por $5 realizado",,5',
+        )
+        parsed = LegacyLedgerCsvParser.parse(raw)
+        assert len(parsed.accounts) == 1
+        assert [(p.payment_date, p.amount) for p in parsed.payments] == [
+            (date(2025, 8, 31), Decimal("5"))
+        ]
+        assert parsed.errors == []
+
+    def test_two_payments_on_the_same_date_are_summed(self):
+        raw = _csv(
+            '7,01/01/2026,"Prestamo de $100 otorgado",100,',
+            '7,20/01/2026,"pago por $10 realizado",,10',
+            '7,20/01/2026,"pago por $15 realizado",,15',
+        )
+        parsed = LegacyLedgerCsvParser.parse(raw)
+        assert len(parsed.payments) == 1
+        assert parsed.payments[0].amount == Decimal("25")
+
+    def test_two_interest_rows_on_the_same_date_are_summed(self):
+        raw = _csv(
+            '7,01/01/2026,"Prestamo de $100 otorgado",100,',
+            '7,31/01/2026,"Intereses acomulados en la cuenta",3,',
+            '7,31/01/2026,"Intereses acomulados en la cuenta",2,',
+            '7,31/01/2026,"pago por $20 realizado",,20',
+        )
+        parsed = LegacyLedgerCsvParser.parse(raw)
+        assert parsed.payments[0].interests_accrued == Decimal("5")
+
+    def test_disbursement_day_interest_without_payment_is_reported_not_dropped(self):
+        raw = _csv(
+            '7,01/01/2026,"Prestamo de $100 otorgado",100,',
+            '7,01/01/2026,"Intereses acomulados en la cuenta",3,',
+        )
+        parsed = LegacyLedgerCsvParser.parse(raw)
+        assert parsed.payments == []
+        assert len(parsed.errors) == 1

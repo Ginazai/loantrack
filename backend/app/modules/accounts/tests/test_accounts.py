@@ -156,6 +156,30 @@ class TestProjectLedger:
 # ── compute_current_balance ───────────────────────────────────────────────────
 
 
+class TestPaymentOnStartDate:
+    def test_payment_on_the_start_date_reduces_the_balance(self):
+        # Start on a cycle date and pay the same day: the payment belongs to the
+        # first period. It used to fall outside every period (prev < pdate was
+        # false for the first one) and was silently ignored.
+        rows = project_ledger(
+            100.0, 0.0, date(2026, 1, 15), [(date(2026, 1, 15), 30.0)], until=date(2026, 1, 30)
+        )
+        assert rows[0].payments_in_period == Decimal("30")
+        assert rows[-1].closing_balance == Decimal("70.00")
+
+    def test_payment_on_start_date_off_cycle_counts_toward_first_cycle(self):
+        rows = project_ledger(
+            100.0, 0.0, date(2026, 1, 3), [(date(2026, 1, 3), 30.0)], until=date(2026, 1, 15)
+        )
+        assert rows[-1].closing_balance == Decimal("70.00")
+
+    def test_payment_is_not_counted_twice_across_periods(self):
+        rows = project_ledger(
+            100.0, 0.0, date(2026, 1, 15), [(date(2026, 1, 15), 30.0)], until=date(2026, 3, 15)
+        )
+        assert sum(r.payments_in_period for r in rows) == Decimal("30")
+
+
 class TestComputeCurrentBalance:
     def test_no_payments_returns_principal_when_no_cycles(self):
         # compute_current_balance has no explicit `until` — it always
