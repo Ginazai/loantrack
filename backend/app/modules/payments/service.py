@@ -102,8 +102,10 @@ class PaymentService:
         payment_date = data.payment_date
         if payment_date is None or data.method == "auto":
             ref = last_cycle if last_cycle else account.start_date
+            if anchor is not None:
+                ref = max(ref, anchor[0])  # the imported cycle is already settled
             payment_date = next_cycle_date(ref)
-            if payment_date <= (last_cycle or account.start_date):
+            if payment_date <= ref:
                 payment_date = advance_cycle(payment_date)
 
         if anchor is not None and payment_date <= anchor[0]:
@@ -112,7 +114,7 @@ class PaymentService:
             # inside it would have no defined place in the ledger.
             raise HTTPException(
                 422,
-                f"Payment date must be after the last imported payment ({anchor[0]})",
+                f"Payment date must be after the last imported cycle ({anchor[0]})",
             )
 
         # ── Correct interest calculation ──────────────────────────────────────
@@ -330,7 +332,7 @@ class PaymentService:
             running = balance_after
             final_balance = balance_after
             if payment.method == "import":
-                anchor = (payment.payment_date, balance_after)
+                anchor = ledger_anchor([payment])
 
         if account.status != "closed":
             account.status = "paid" if final_balance <= Decimal("0.00") else "active"
