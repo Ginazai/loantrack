@@ -144,3 +144,47 @@ class TestImportCommit:
 
         single = await admin_client.get(f"/api/v1/admin/imports/{batch_id}")
         assert single.json()["id"] == batch_id
+
+
+SAME_DAY_CSV = (
+    "Referencia,Fecha,Descripcion,Debito,Credito\n"
+    '21,31/08/2025,"Prestamo de $25 otorgado",25,\n'
+    '21,31/08/2025,"pago por $5 realizado",,5\n'
+    '21,15/09/2025,"pago por $4 realizado",,4\n'
+    '21,15/09/2025,"pago por $6 realizado",,6\n'
+)
+
+
+class TestImportKeepsEveryPayment:
+    @pytest.mark.asyncio
+    async def test_same_day_and_same_date_payments_all_reach_the_linked_account(
+        self, admin_client, admin_user
+    ):
+        files = {"file": ("ledger.csv", io.BytesIO(SAME_DAY_CSV.encode()), "text/csv")}
+        preview = await admin_client.post("/api/v1/admin/imports/preview", files=files)
+        batch_id = preview.json()["batch_id"]
+        commit = await admin_client.post(
+            f"/api/v1/admin/imports/{batch_id}/commit",
+            json={
+                "mappings": [
+                    {
+                        "source_ref": "21",
+                        "action": "create",
+                        "account_name": "Same-day loan",
+                        "linked_user_id": str(admin_user.id),
+                        "rate": 0.001,
+                    }
+                ]
+            },
+        )
+        assert commit.status_code == 200, commit.text
+
+        accounts = (await admin_client.get("/api/v1/accounts")).json()
+        acct = next(a for a in accounts if a["account_name"] == "Same-day loan")
+        assert acct["status"] == "active"  # had payments, so no longer "open"
+
+        payments = (await admin_client.get(f"/api/v1/accounts/{acct['id']}/payments")).json()
+        assert [(p["payment_date"], float(p["amount"])) for p in payments] == [
+            ("2025-08-31", 5.0),
+            ("2025-09-15", 10.0),  # 4 + 6, not just the last row
+        ]

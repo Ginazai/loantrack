@@ -152,13 +152,16 @@ class LegacyLedgerCsvParser(ImportParser):
                 if debito is None:
                     errors.append(ParseError(row_number, "Interés sin monto en Debito", dict(row)))
                     continue
-                groups[key]["interest"] = debito
+                # Accumulate: several interest rows can share a (ref, date).
+                groups[key]["interest"] = (groups[key]["interest"] or Decimal("0")) + debito
 
             elif _PAYMENT_RE.search(desc):
                 if credito is None:
                     errors.append(ParseError(row_number, "Pago sin monto en Credito", dict(row)))
                     continue
-                groups[key]["payment"] = credito
+                # Accumulate: several payments can share a (ref, date); overwriting
+                # would silently lose all but the last one.
+                groups[key]["payment"] = (groups[key]["payment"] or Decimal("0")) + credito
 
             else:
                 errors.append(
@@ -167,8 +170,9 @@ class LegacyLedgerCsvParser(ImportParser):
 
         payments: list[ParsedPayment] = []
         for (ref, fecha_iso), info in groups.items():
-            if info["disbursement"] is not None:
-                continue  # disbursement rows become the account, not a payment
+            # The disbursement row itself becomes the account. A payment (or interest)
+            # sharing its date is still a real ledger event and must not be dropped
+            # just because the group also contains the disbursement.
             if info["payment"] is None:
                 if info["interest"] is not None:
                     errors.append(
