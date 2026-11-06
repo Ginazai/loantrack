@@ -60,11 +60,12 @@ describe("App routing", () => {
       expect(path()).toBe("/dashboard");
     });
 
-    it("lands on the page once the session is restored", () => {
+    it("lands on the page once the session is restored", async () => {
       go("/accounts");
       useAuthStore.setState({ accessToken: "t", status: "authenticated", user: makeAdmin() });
       // re-render is driven by the store subscription
-      return screen.findByText("accounts page");
+      expect(await screen.findByText("accounts page")).toBeInTheDocument();
+      expect(path()).toBe("/accounts");
     });
 
     it("sends the visitor to /login if there turns out to be no session", async () => {

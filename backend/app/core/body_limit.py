@@ -26,6 +26,15 @@ class BodyLimitRule:
     max_bytes: int
 
 
+@dataclass
+class _BodyState:
+    """Per-request progress, shared by the receive/send wrappers (attributes, not nonlocals)."""
+
+    received: int = 0
+    exceeded: bool = False
+    replied: bool = False
+
+
 class BodySizeLimitMiddleware:
     def __init__(self, app, rules: list[BodyLimitRule]) -> None:
         self.app = app
@@ -64,33 +73,36 @@ class BodySizeLimitMiddleware:
             await self._send_413(send)
             return
 
-        received = 0
-        exceeded = False
-        replied = False
+        state = _BodyState()
 
         async def limited_receive() -> Message:
-            nonlocal received, exceeded
-            if exceeded:
+            if state.exceeded:
                 return {"type": "http.request", "body": b"", "more_body": False}
             message = await receive()
             if message["type"] == "http.request":
-                received += len(message.get("body", b""))
-                if received > limit:
+                state.received += len(message.get("body", b""))
+                if state.received > limit:
                     # Stop feeding the app. It sees a truncated body and fails on its own;
                     # whatever it answers is replaced by the 413 below.
-                    exceeded = True
+                    state.exceeded = True
                     return {"type": "http.request", "body": b"", "more_body": False}
             return message
 
         async def limited_send(message: Message) -> None:
-            nonlocal replied
-            if not exceeded:
+            if not state.exceeded:
                 await send(message)
                 return
-            if not replied:
-                replied = True
+            if not state.replied:
+                state.replied = True
                 await self._send_413(send)
 
-        await self.app(scope, limited_receive, limited_send)
-        if exceeded and not replied:
+        try:
+            await self.app(scope, limited_receive, limited_send)
+        except Exception:
+            # The app choked on the truncated body: that is our 413, not a 500.
+            if not state.exceeded:
+                raise
+
+        if state.exceeded and not state.replied:
+            state.replied = True
             await self._send_413(send)
