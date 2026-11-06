@@ -3,12 +3,18 @@
 from datetime import date
 from decimal import Decimal
 
+import pytest
+
 from app.modules.accounts.interest_engine import (
     advance_cycle,
     compute_current_balance,
     get_cycle_dates,
     get_next_due_date,
     ledger_anchor,
+<<<<<<< Updated upstream
+=======
+    nearest_cycle_date,
+>>>>>>> Stashed changes
     next_cycle_date,
     project_ledger,
     upcoming_cycle_dates,
@@ -322,6 +328,27 @@ class TestAnchoredLedger:
         assert plain != Decimal("551.25")
 
 
+<<<<<<< Updated upstream
+=======
+@pytest.mark.parametrize(
+    "d, expected",
+    [
+        (date(2026, 9, 11), date(2026, 9, 15)),
+        (date(2026, 9, 15), date(2026, 9, 15)),  # on a cycle date
+        (date(2026, 9, 20), date(2026, 9, 15)),
+        (date(2026, 9, 26), date(2026, 9, 30)),
+        (date(2026, 10, 31), date(2026, 10, 30)),  # past the 30th, still nearest to it
+        (date(2026, 1, 3), date(2025, 12, 30)),  # year wrap: Dec 30 is 4 days away, Jan 15 is 12
+        (date(2026, 2, 7), date(2026, 2, 15)),  # Jan 30 / Feb 15 tie goes to the later cycle
+        (date(2026, 2, 6), date(2026, 1, 30)),
+        (date(2026, 3, 2), date(2026, 2, 28)),  # short month: Feb 28 is its "30th"
+    ],
+)
+def test_nearest_cycle_date(d, expected):
+    assert nearest_cycle_date(d) == expected
+
+
+>>>>>>> Stashed changes
 class _P:
     def __init__(self, d, method, after):
         self.payment_date, self.method, self.balance_after = d, method, after
@@ -339,3 +366,40 @@ class TestLedgerAnchor:
             _P(date(2025, 3, 15), "manual", Decimal("70.00")),
         ]
         assert ledger_anchor(ps) == (date(2025, 2, 15), Decimal("80.00"))
+<<<<<<< Updated upstream
+=======
+
+    def test_import_nearer_the_later_cycle_is_anchored_at_that_cycle(self):
+        # Sep 26 is closer to Sep 30 than Sep 15, and the imported row's balance_after
+        # already carries that cycle's interest.
+        ps = [_P(date(2026, 9, 26), "import", Decimal("410.00"))]
+        assert ledger_anchor(ps) == (date(2026, 9, 30), Decimal("410.00"))
+
+    def test_import_nearer_the_earlier_cycle_keeps_its_own_date(self):
+        # Sep 20 is closer to Sep 15; anchoring at Sep 15 would re-apply the payment, so
+        # the anchor stays on Sep 20 and Sep 30 is the next cycle charged.
+        ps = [_P(date(2026, 9, 20), "import", Decimal("410.00"))]
+        assert ledger_anchor(ps) == (date(2026, 9, 20), Decimal("410.00"))
+        rows = project_ledger(
+            410.0, 0.05, date(2026, 1, 1), [], until=date(2026, 9, 30), anchor=ledger_anchor(ps)
+        )
+        assert [(r.cycle_date, r.interests_accrued) for r in rows] == [
+            (date(2026, 9, 30), Decimal("20.50"))
+        ]
+
+    def test_off_cycle_import_does_not_charge_its_cycle_twice(self):
+        # Regression: Oct 15 opened at 430.50 and charged 21.53 instead of 410 / 20.50.
+        anchor = ledger_anchor([_P(date(2026, 9, 26), "import", Decimal("410.00"))])
+        rows = project_ledger(
+            410.0,
+            0.05,
+            date(2026, 1, 1),
+            [(date(2026, 10, 15), 20.5)],
+            until=date(2026, 10, 15),
+            anchor=anchor,
+        )
+        assert [r.cycle_date for r in rows] == [date(2026, 10, 15)]
+        assert rows[0].opening_balance == Decimal("410.00")
+        assert rows[0].interests_accrued == Decimal("20.50")
+        assert rows[0].closing_balance == Decimal("410.00")
+>>>>>>> Stashed changes

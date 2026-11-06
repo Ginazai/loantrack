@@ -138,8 +138,14 @@ export function DashboardPage() {
               </Button>
             }
           />
+        ) : active.length === 0 ? (
+          <EmptyState
+            Icon={Receipt}
+            title="No active accounts"
+            description="Every account is settled or closed. View all to see them."
+          />
         ) : (
-          <AccountsTable accounts={accounts.slice(0, 8)} variant="summary" />
+          <AccountsTable accounts={active.slice(0, 8)} variant="summary" />
         )}
       </section>
     </div>
