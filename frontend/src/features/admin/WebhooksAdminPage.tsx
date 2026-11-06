@@ -3,9 +3,15 @@ import { Button, CodeSnippet, Checkbox, InlineLoading, Layer, SkeletonText, Tag,
 import { TrashCan } from "@carbon/icons-react";
 import { useEffect, useState } from "react";
 import { adminApi } from "../../api";
-import type { WebhookConfig, WebhookFormData, WebhookEventType } from "../../types";
+import type {
+  WebhookConfig,
+  WebhookConfigCreated,
+  WebhookEventType,
+  WebhookFormData,
+} from "../../types";
 import { getApiErrorMessage } from "../../utils/apiError";
 import { ConfirmDialog, Drawer, EmptyState, Notice, PageHeader } from "../../components/common";
+import { WebhookSecretDrawer } from "../webhooks/WebhookSecretDrawer";
 
 const ALL_EVENTS: { value: WebhookEventType; label: string; desc: string }[] = [
   { value: "account.created", label: "Account Created", desc: "Fires when any new loan account is opened" },
@@ -31,7 +37,7 @@ const PAYLOAD_SAMPLE = {
   next_due_date: "2026-06-30",
 };
 
-function CreateWebhookModal({ onClose, onCreated }: { onClose: () => void; onCreated: (wh: WebhookConfig) => void }) {
+function CreateWebhookModal({ onClose, onCreated }: { onClose: () => void; onCreated: (wh: WebhookConfigCreated) => void }) {
   const [form, setForm] = useState<WebhookFormData>({ target_url: "", events: [] });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -109,6 +115,13 @@ export default function WebhooksAdminPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [showPayload, setShowPayload] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [rotateId, setRotateId] = useState<string | null>(null);
+  // The signing secret is shown once, right after create / rotate, and never again.
+  const [secretReveal, setSecretReveal] = useState<{
+    secret: string;
+    targetUrl: string;
+    rotated: boolean;
+  } | null>(null);
 
   useEffect(() => {
     adminApi.listGlobalWebhooks().then(setWebhooks).finally(() => setLoading(false));
@@ -120,13 +133,19 @@ export default function WebhooksAdminPage() {
     setDeleteId(null);
   };
 
+  const handleRotate = async (id: string) => {
+    const rotated = await adminApi.rotateGlobalWebhookSecret(id);
+    setRotateId(null);
+    setSecretReveal({ secret: rotated.secret, targetUrl: rotated.target_url, rotated: true });
+  };
+
   const handleToggle = async (wh: WebhookConfig) => {
     const updated = await adminApi.toggleGlobalWebhook(wh.id, !wh.is_active);
     setWebhooks((prev) => prev.map((w) => (w.id === updated.id ? updated : w)));
   };
 
   return (
-    <div className="lt-page lt-stack lt-stack--loose">
+    <div className="lt-page lt-page--narrow lt-stack lt-stack--loose">
       <PageHeader
         title="Global Webhooks"
         subtitle="Fire for all accounts — invite emails, CRM sync, audit pipelines."
@@ -208,9 +227,12 @@ export default function WebhooksAdminPage() {
                     toggled={wh.is_active}
                     onToggle={() => handleToggle(wh)}
                   />
+                  <Button kind="ghost" size="sm" onClick={() => setRotateId(wh.id)}>
+                    Rotate secret
+                  </Button>
                   <Button
                     kind="danger--ghost"
-                    size="md"
+                    size="sm"
                     hasIconOnly
                     renderIcon={TrashCan}
                     iconDescription="Delete webhook"
@@ -227,7 +249,26 @@ export default function WebhooksAdminPage() {
       {showCreate && (
         <CreateWebhookModal
           onClose={() => setShowCreate(false)}
-          onCreated={(wh) => setWebhooks((prev) => [wh, ...prev])}
+          onCreated={(wh) => {
+            const { secret, ...config } = wh;
+            setWebhooks((prev) => [config, ...prev]); // the list never keeps the secret
+            setSecretReveal({ secret, targetUrl: wh.target_url, rotated: false });
+          }}
+        />
+      )}
+
+      {secretReveal && (
+        <WebhookSecretDrawer {...secretReveal} onClose={() => setSecretReveal(null)} />
+      )}
+
+      {rotateId && (
+        <ConfirmDialog
+          title="Rotate signing secret"
+          message="A new secret is generated and the current one stops verifying immediately. Update your receiving workflow right after."
+          confirmLabel="Rotate secret"
+          dangerous
+          onConfirm={() => handleRotate(rotateId)}
+          onCancel={() => setRotateId(null)}
         />
       )}
 

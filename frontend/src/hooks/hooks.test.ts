@@ -6,7 +6,7 @@ import { useAuthStore } from "../stores/authStore";
 import { makeAdmin, makeUser } from "../test/factories";
 
 describe("useAuth", () => {
-  beforeEach(() => useAuthStore.setState({ accessToken: null, refreshToken: null, user: null }));
+  beforeEach(() => useAuthStore.setState({ accessToken: null, user: null, status: "anonymous" }));
 
   it("reports a logged-out visitor", () => {
     const { result } = renderHook(() => useAuth());

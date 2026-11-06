@@ -25,6 +25,8 @@ os.environ.setdefault(
     "DATABASE_URL", "postgresql+asyncpg://postgres:postgres@localhost:5432/loantrack_test"
 )
 os.environ.setdefault("SECRET_KEY", "test-secret-key-do-not-use-in-prod")
+# The test client talks http://test; a Secure cookie would never be sent back over http.
+os.environ.setdefault("COOKIE_SECURE", "false")
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 

@@ -1,4 +1,7 @@
+import { InlineLoading } from "@carbon/react";
+import { useEffect } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
+import { restoreSession } from "./api/session";
 import { useAuthStore } from "./stores/authStore";
 import { ServerWakingNotice } from "./components/feedback";
 import { DashboardLayout } from "./components/layout/DashboardLayout";
@@ -15,7 +18,19 @@ import MyRequestsPage from "./features/user/MyRequestsPage";
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated());
-  return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
+  const status = useAuthStore((s) => s.status);
+  if (isAuthenticated) return <>{children}</>;
+  // The access token lives only in memory, so right after a page load we cannot tell
+  // "signed out" from "signed in, token not fetched yet". Wait for the answer rather than
+  // bouncing a signed-in user to /login on every refresh.
+  if (status === "unknown") {
+    return (
+      <div className="lt-page" role="status">
+        <InlineLoading description="Restoring your session…" />
+      </div>
+    );
+  }
+  return <Navigate to="/login" replace />;
 }
 
 function RequireAdmin({ children }: { children: React.ReactNode }) {
@@ -29,6 +44,11 @@ function RootRedirect() {
 }
 
 export default function App() {
+  useEffect(() => {
+    // Once per page load: trade the httpOnly refresh cookie (if any) for an access token.
+    if (useAuthStore.getState().status === "unknown") void restoreSession();
+  }, []);
+
   return (
     <>
       <ServerWakingNotice />

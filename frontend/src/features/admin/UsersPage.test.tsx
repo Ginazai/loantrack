@@ -137,6 +137,36 @@ describe("UsersPage", () => {
     });
   });
 
+  describe("the signed-in admin's own row", () => {
+    it("is marked as you and offers no edit, deactivate or delete controls", async () => {
+      renderWithProviders(<UsersPage />);
+      const mine = await row("Admin User");
+      expect(within(mine).getByText("You")).toBeInTheDocument();
+      expect(within(mine).queryByRole("button", { name: "Edit user" })).toBeNull();
+      expect(within(mine).queryByRole("button", { name: "Delete user" })).toBeNull();
+      expect(within(mine).queryByRole("switch")).toBeNull();
+      expect(within(mine).getByText(/Account Settings/)).toBeInTheDocument();
+    });
+
+    it("leaves every control on other people's rows", async () => {
+      renderWithProviders(<UsersPage />);
+      const theirs = await row("Bob Borrower");
+      expect(within(theirs).queryByText("You")).toBeNull();
+      expect(within(theirs).getByRole("button", { name: "Edit user" })).toBeInTheDocument();
+      expect(within(theirs).getByRole("button", { name: "Delete user" })).toBeInTheDocument();
+      expect(within(theirs).getByRole("switch")).toBeInTheDocument();
+    });
+
+    it("can still expand to show their own loans", async () => {
+      api.getUserAccounts.mockResolvedValue([]);
+      const user = userEvent.setup();
+      renderWithProviders(<UsersPage />);
+      const mine = await row("Admin User");
+      await user.click(within(mine).getByRole("button", { name: /Show loans for Admin User/ }));
+      expect(await screen.findByText("No loan accounts")).toBeInTheDocument();
+    });
+  });
+
   describe("editing a user", () => {
     const open = async (user: ReturnType<typeof userEvent.setup>, who = "Bob Borrower") => {
       renderWithProviders(<UsersPage />);
@@ -216,20 +246,6 @@ describe("UsersPage", () => {
       await user.type(within(dialog).getByLabelText("Full Name"), "x");
       await user.click(within(dialog).getByRole("button", { name: "Save changes" }));
       expect(await within(dialog).findByText("Email in use")).toBeInTheDocument();
-    });
-
-    it("prevents an admin from demoting themselves and syncs their session on save", async () => {
-      api.updateUser.mockResolvedValue({ ...me, full_name: "Admin Renamed" });
-      const user = userEvent.setup();
-      const dialog = await open(user, "Admin User");
-      expect(within(dialog).getByLabelText("Role")).toBeDisabled();
-      expect(within(dialog).getByText("You can't remove your own admin role.")).toBeInTheDocument();
-
-      const name = within(dialog).getByLabelText("Full Name");
-      await user.clear(name);
-      await user.type(name, "Admin Renamed");
-      await user.click(within(dialog).getByRole("button", { name: "Save changes" }));
-      await waitFor(() => expect(useAuthStore.getState().user?.full_name).toBe("Admin Renamed"));
     });
 
     it("does not touch the session when editing someone else", async () => {

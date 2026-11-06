@@ -94,8 +94,8 @@ export function WebhookForm({ onSubmit, onCancel, isLoading }: Props) {
 
       <Notice kind="info" title="Security">
         Each webhook request is signed with an HMAC-SHA256 signature sent in the{" "}
-        <code>X-Webhook-Signature</code> header. Verify this on your n8n / Pipedream workflow to
-        authenticate the request.
+        <code>X-Webhook-Signature</code> header. After you save, you'll be shown the signing
+        secret once — copy it into your n8n / Pipedream workflow to verify requests.
       </Notice>
 
       <div className="lt-form__actions lt-form__actions--bleed">

@@ -43,9 +43,15 @@ describe("authApi", () => {
     await authApi.updateMe({ full_name: "New" });
     expect(http.patch).toHaveBeenCalledWith("/auth/me", { full_name: "New" });
   });
-  it("refresh posts the refresh token", async () => {
-    await authApi.refresh("tok");
-    expect(http.post).toHaveBeenCalledWith("/auth/refresh", { refresh_token: "tok" });
+  it("updateMe sends the current and new password under their own names", async () => {
+    await authApi.updateMe({ current_password: "old-pw", new_password: "new-pw-123" });
+    expect(http.patch).toHaveBeenCalledWith("/auth/me", {
+      current_password: "old-pw",
+      new_password: "new-pw-123",
+    });
+  });
+  it("has no refresh(): the refresh token is an httpOnly cookie scripts never handle", () => {
+    expect("refresh" in authApi).toBe(false);
   });
   it("logout posts to /auth/logout", async () => {
     await authApi.logout();

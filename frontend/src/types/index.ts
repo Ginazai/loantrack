@@ -70,6 +70,11 @@ export interface WebhookConfig {
   created_at: string;
 }
 
+/** Returned by create and rotate-secret only. `secret` is never returned again. */
+export interface WebhookConfigCreated extends WebhookConfig {
+  secret: string;
+}
+
 export interface LoanRequest {
   id: string;
   user_id: string;
@@ -104,7 +109,6 @@ export interface LoanRequestReviewData {
 
 export interface TokenResponse {
   access_token: string;
-  refresh_token: string;
   token_type: string;
 }
 
@@ -133,6 +137,13 @@ export interface PaymentFormData {
 export interface WebhookFormData {
   target_url: string;
   events: WebhookEventType[];
+}
+
+export interface SelfUpdateData {
+  full_name?: string;
+  /** Required by the server whenever new_password is set. */
+  current_password?: string;
+  new_password?: string;
 }
 
 export interface UserUpdateData {

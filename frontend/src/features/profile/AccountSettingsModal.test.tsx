@@ -13,7 +13,7 @@ const save = () => screen.getByRole("button", { name: "Save changes" });
 describe("AccountSettingsModal", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useAuthStore.setState({ accessToken: "t", refreshToken: "r", user: makeUser({ full_name: "Ada Lovelace" }) });
+    useAuthStore.setState({ accessToken: "t", status: "authenticated", user: makeUser({ full_name: "Ada Lovelace" }) });
   });
 
   it("prefills the name and shows the email as read-only", () => {
@@ -67,16 +67,45 @@ describe("AccountSettingsModal", () => {
     await waitFor(() => expect(onClose).toHaveBeenCalled(), { timeout: 2000 });
   });
 
-  it("sends a new password when valid and matching", async () => {
-    (authApi.updateMe as any).mockResolvedValue(makeUser());
+  it("won't set a new password without the current one", async () => {
     const user = userEvent.setup();
     render(<AccountSettingsModal onClose={vi.fn()} />);
     await user.type(screen.getByLabelText("New Password"), "a-long-password");
     await user.type(screen.getByLabelText("Confirm Password"), "a-long-password");
     await user.click(save());
+    expect(
+      await screen.findByText("Enter your current password to set a new one"),
+    ).toBeInTheDocument();
+    expect(authApi.updateMe).not.toHaveBeenCalled();
+  });
+
+  it("sends the current and new password when valid and matching", async () => {
+    (authApi.updateMe as any).mockResolvedValue(makeUser());
+    const user = userEvent.setup();
+    render(<AccountSettingsModal onClose={vi.fn()} />);
+    await user.type(screen.getByLabelText("Current Password"), "the-old-one");
+    await user.type(screen.getByLabelText("New Password"), "a-long-password");
+    await user.type(screen.getByLabelText("Confirm Password"), "a-long-password");
+    await user.click(save());
     await waitFor(() =>
-      expect(authApi.updateMe).toHaveBeenCalledWith({ password: "a-long-password" }),
+      expect(authApi.updateMe).toHaveBeenCalledWith({
+        current_password: "the-old-one",
+        new_password: "a-long-password",
+      }),
     );
+  });
+
+  it("shows the server's message when the current password is wrong", async () => {
+    (authApi.updateMe as any).mockRejectedValue({
+      response: { status: 403, data: { detail: "Current password is incorrect" } },
+    });
+    const user = userEvent.setup();
+    render(<AccountSettingsModal onClose={vi.fn()} />);
+    await user.type(screen.getByLabelText("Current Password"), "wrong");
+    await user.type(screen.getByLabelText("New Password"), "a-long-password");
+    await user.type(screen.getByLabelText("Confirm Password"), "a-long-password");
+    await user.click(save());
+    expect(await screen.findByText("Current password is incorrect")).toBeInTheDocument();
   });
 
   it("shows the server's error message when saving fails", async () => {
