@@ -11,7 +11,7 @@ from app.core.config import get_settings
 from app.core.repository import BaseRepository
 from app.core.security import generate_webhook_secret, sign_webhook_payload
 from app.core.url_safety import UnsafeURLError, avalidate_outbound_url
-from app.modules.accounts.interest_engine import get_cycle_dates, project_ledger
+from app.modules.accounts.interest_engine import get_cycle_dates, ledger_anchor, project_ledger
 from app.modules.accounts.models import LoanAccount
 from app.modules.webhooks.models import AccountCycleNotification, WebhookConfig, WebhookEvent
 from app.modules.webhooks.schemas import WebhookConfigCreate
@@ -209,9 +209,13 @@ class CycleCloseScanService:
         from app.modules.payments.models import Payment  # local import avoids a cycle
 
         payments_rows = await self.db.execute(
-            select(Payment.payment_date, Payment.amount).where(Payment.account_id == account.id)
+            select(Payment.payment_date, Payment.amount, Payment.method, Payment.balance_after)
+            .where(Payment.account_id == account.id)
+            .order_by(Payment.payment_date)
         )
-        payment_tuples = [(row.payment_date, float(row.amount)) for row in payments_rows.all()]
+        payment_history = payments_rows.all()
+        payment_tuples = [(row.payment_date, float(row.amount)) for row in payment_history]
+        anchor = ledger_anchor(payment_history)
 
         for cycle_date in pending_dates:
             self.db.add(AccountCycleNotification(account_id=account.id, cycle_date=cycle_date))
@@ -222,6 +226,7 @@ class CycleCloseScanService:
                 account.start_date,
                 payment_tuples,
                 until=cycle_date,
+                anchor=anchor,
             )
             row = next((r for r in rows if r.cycle_date == cycle_date), None)
             payload = {

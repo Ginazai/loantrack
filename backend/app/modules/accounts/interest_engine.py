@@ -20,7 +20,7 @@ both the accounts and payments modules without creating circular imports.
 
 import calendar
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 
 # ── Cycle date primitives ───────────────────────────────────────────────────
@@ -135,12 +135,40 @@ def _round2(value: Decimal) -> Decimal:
     return value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
+# (date, balance): a recorded balance that replay starts from instead of the loan's
+# disbursement. See ``ledger_anchor``.
+Anchor = tuple[date, "Decimal | float"]
+
+
+def ledger_anchor(payments) -> Anchor | None:
+    """Return the replay anchor for an account, or None if it has none.
+
+    Imported history (ADR-004) carries the interest that was actually charged back
+    then; it cannot be reproduced by applying today's ``rate`` per cycle, so replaying
+    it from the disbursement gives a different (and, after payoff, ever-growing)
+    balance. The recorded ``balance_after`` of the *last imported payment* is therefore
+    taken as fact and replay continues from there under the normal rules.
+
+    ``payments`` is any iterable of objects with ``payment_date``, ``method`` and
+    ``balance_after`` (ORM rows or query rows), in chronological order. Payments dated
+    on or before the anchor are considered already reflected in it.
+    """
+    last = None
+    for p in payments:
+        if p.method == "import":
+            last = p
+    if last is None:
+        return None
+    return (last.payment_date, last.balance_after)
+
+
 def project_ledger(
     borrow_amount: float,
     rate: float,
     start_date: date,
     payments: list[tuple[date, float]],  # (payment_date, amount)
     until: date | None = None,
+    anchor: Anchor | None = None,
 ) -> list[CycleRow]:
     """
     Project the full ledger from start_date to *until* (defaults to today).
@@ -149,26 +177,40 @@ def project_ledger(
     the period whose cycle_date is the first cycle date >= payment_date.
     A payment that falls exactly on a cycle date is attributed to that cycle,
     and a payment on *start_date* is attributed to the first cycle.
+
+    With an *anchor* ``(date, balance)`` replay starts from that recorded balance
+    instead of from ``borrow_amount`` at ``start_date``. Interest through the anchor
+    date is already inside the balance, so the first row is the first cycle strictly
+    after it, and payments dated on or before it are ignored. (An off-cycle anchor
+    means the next cycle charges interest on the post-payment balance: imported
+    history does not say what the period opened at.)
     """
     if until is None:
         until = date.today()
 
-    cycle_dates = get_cycle_dates(start_date, until)
+    if anchor is not None:
+        origin, balance = anchor[0], _dec(anchor[1])
+        cycle_from = origin + timedelta(days=1)
+        payments = [p for p in payments if p[0] > origin]
+    else:
+        origin, balance = start_date, _dec(borrow_amount)
+        cycle_from = start_date
+
+    cycle_dates = get_cycle_dates(cycle_from, until)
     if not cycle_dates:
         return []
 
-    # prev_boundaries[i] = the cycle date before cycle_dates[i], or start_date for i=0
-    prev_boundaries: list[date] = [start_date] + cycle_dates[:-1]
+    # prev_boundaries[i] = the cycle date before cycle_dates[i], or the origin for i=0
+    prev_boundaries: list[date] = [origin] + cycle_dates[:-1]
 
     sorted_payments = sorted(payments, key=lambda p: p[0])
 
     rows: list[CycleRow] = []
-    balance = _dec(borrow_amount)
 
     for i, cycle_date in enumerate(cycle_dates):
         prev = prev_boundaries[i]
 
-        # Periods are (prev, cycle_date]. The first one starts at start_date itself, so
+        # Periods are (prev, cycle_date]. The first one starts at the origin itself, so
         # it is closed on the left: a payment made on the disbursement date belongs to
         # it. Otherwise it would match no period at all and vanish from the balance.
         period_payments = _dec(
@@ -202,12 +244,36 @@ def compute_current_balance(
     rate: float,
     start_date: date,
     payments: list[tuple[date, float]],
+    *,
+    anchor: Anchor | None = None,
+    as_of: date | None = None,
 ) -> Decimal:
-    """Return the current outstanding balance."""
-    rows = project_ledger(borrow_amount, rate, start_date, payments)
-    if not rows:
-        return _dec(borrow_amount)
-    return rows[-1].closing_balance
+    """Return the outstanding balance as of *as_of* (default: today).
+
+    This is the one definition of "current balance" shared by the list, the dashboard
+    and the detail page: the closing balance of the last cycle that has closed, minus
+    any payment made since. Per ADR-003 a payment does not reduce the interest of the
+    cycle it falls in, but the borrower owes less the moment they pay, so it comes off
+    the outstanding balance immediately rather than only when the cycle closes.
+    """
+    today = as_of if as_of is not None else date.today()
+    rows = project_ledger(borrow_amount, rate, start_date, payments, until=today, anchor=anchor)
+
+    if anchor is not None:
+        live = [(d, a) for d, a in payments if d > anchor[0]]
+        base = _dec(anchor[1])
+    else:
+        live = [(d, a) for d, a in payments if d >= start_date]
+        base = _dec(borrow_amount)
+
+    if rows:
+        balance = rows[-1].closing_balance
+        pending = [a for d, a in live if rows[-1].cycle_date < d <= today]
+    else:
+        balance = base
+        pending = [a for d, a in live if d <= today]
+
+    return _round2(balance - _dec(sum(pending)))
 
 
 def compute_payment_ledger_entry(
