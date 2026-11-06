@@ -11,7 +11,7 @@ python = "^3.11"
 # Web framework
 fastapi = ">=0.120,<1"
 uvicorn = { extras = ["standard"], version = ">=0.30,<0.55" }
-python-multipart = "^0.0.9"         # form data / file uploads
+python-multipart = ">=0.0.9,<0.0.34"         # form data / file uploads
 
 # Database
 sqlalchemy = { extras = ["asyncio"], version = "^2.0.0" }
