@@ -8,6 +8,7 @@ from app.modules.accounts.interest_engine import (
     compute_current_balance,
     get_cycle_dates,
     get_next_due_date,
+    ledger_anchor,
     next_cycle_date,
     project_ledger,
     upcoming_cycle_dates,
@@ -228,3 +229,113 @@ class TestUpcomingCycleDates:
         assert dates[0].day == 15
         assert dates[1].day == 30
         assert dates[2].day == 15
+
+
+# ── Current balance: one definition, native numbers pinned ───────────────────
+
+
+class TestNativeBalancesAreUnchanged:
+    """The rewrite of compute_current_balance must not move any native account's
+    number when every payment sits on a cycle date (the only case where the old and new
+    definitions can differ is a payment inside a still-open period)."""
+
+    def test_matches_the_replayed_closing_balance(self):
+        payments = [
+            (date(2025, 1, 30), 100.0),
+            (date(2025, 2, 15), 50.0),
+            (date(2025, 4, 15), 80.0),
+        ]
+        for as_of in (date(2025, 3, 1), date(2025, 3, 15), date(2025, 4, 20), date(2025, 6, 30)):
+            expected = project_ledger(1000.0, 0.05, date(2025, 1, 1), payments, until=as_of)[
+                -1
+            ].closing_balance
+            got = compute_current_balance(1000.0, 0.05, date(2025, 1, 1), payments, as_of=as_of)
+            assert got == expected, as_of
+
+    def test_no_payments_is_pure_compounding(self):
+        # 1000 -> 1050 (Jan 15) -> 1102.50 (Jan 30)
+        got = compute_current_balance(1000.0, 0.05, date(2025, 1, 1), [], as_of=date(2025, 1, 30))
+        assert got == Decimal("1102.50")
+
+
+class TestPaymentInAnOpenPeriod:
+    START = date(2025, 1, 1)  # first cycle closes Jan 15: 1000 -> 1050.00
+
+    def test_payment_reduces_the_balance_immediately(self):
+        got = compute_current_balance(
+            1000.0, 0.05, self.START, [(date(2025, 1, 20), 40.0)], as_of=date(2025, 1, 25)
+        )
+        assert got == Decimal("1010.00")  # 1050 - 40, not 1050 until Jan 30
+
+    def test_it_does_not_reduce_that_cycles_interest(self):
+        # ADR-003: when the cycle closes, interest is still charged on the 1050
+        # opening balance: 1050 + 52.50 - 40
+        got = compute_current_balance(
+            1000.0, 0.05, self.START, [(date(2025, 1, 20), 40.0)], as_of=date(2025, 1, 30)
+        )
+        assert got == Decimal("1062.50")
+
+    def test_before_the_first_cycle_closes(self):
+        got = compute_current_balance(
+            100.0, 0.05, date(2025, 1, 20), [(date(2025, 1, 20), 30.0)], as_of=date(2025, 1, 25)
+        )
+        assert got == Decimal("70.00")
+
+
+class TestAnchoredLedger:
+    ANCHOR = (date(2025, 2, 15), Decimal("500.00"))  # an imported, recorded balance
+
+    def test_replay_starts_at_the_anchor_not_the_disbursement(self):
+        rows = project_ledger(
+            1000.0, 0.05, date(2025, 1, 1), [], until=date(2025, 3, 15), anchor=self.ANCHOR
+        )
+        assert [r.cycle_date for r in rows] == [date(2025, 2, 28), date(2025, 3, 15)]
+        assert rows[0].opening_balance == Decimal("500.00")
+        assert rows[0].closing_balance == Decimal("525.00")
+
+    def test_anchor_on_a_cycle_date_is_not_charged_interest_twice(self):
+        rows = project_ledger(
+            1000.0, 0.05, date(2025, 1, 1), [], until=date(2025, 2, 15), anchor=self.ANCHOR
+        )
+        assert rows == []  # Feb 15's interest is already inside the recorded balance
+
+    def test_payments_inside_the_recorded_history_are_ignored(self):
+        payments = [
+            (date(2025, 1, 30), 100.0),
+            (date(2025, 2, 15), 70.0),
+            (date(2025, 2, 20), 25.0),
+        ]
+        got = compute_current_balance(
+            1000.0, 0.05, date(2025, 1, 1), payments, anchor=self.ANCHOR, as_of=date(2025, 2, 28)
+        )
+        assert got == Decimal("500.00")  # 500 + 25.00 interest - 25 paid Feb 20
+
+    def test_balance_grows_from_the_anchor_at_the_current_rate(self):
+        got = compute_current_balance(
+            1000.0, 0.05, date(2025, 1, 1), [], anchor=self.ANCHOR, as_of=date(2025, 3, 15)
+        )
+        assert got == Decimal("551.25")  # 500 -> 525 -> 551.25
+
+    def test_without_an_anchor_the_same_inputs_give_a_different_answer(self):
+        # This is the imported-account bug: replaying from the disbursement.
+        plain = compute_current_balance(1000.0, 0.05, date(2025, 1, 1), [], as_of=date(2025, 3, 15))
+        assert plain != Decimal("551.25")
+
+
+class _P:
+    def __init__(self, d, method, after):
+        self.payment_date, self.method, self.balance_after = d, method, after
+
+
+class TestLedgerAnchor:
+    def test_none_when_nothing_was_imported(self):
+        assert ledger_anchor([_P(date(2025, 1, 15), "auto", Decimal("1"))]) is None
+        assert ledger_anchor([]) is None
+
+    def test_is_the_last_imported_payment(self):
+        ps = [
+            _P(date(2025, 1, 15), "import", Decimal("90.00")),
+            _P(date(2025, 2, 15), "import", Decimal("80.00")),
+            _P(date(2025, 3, 15), "manual", Decimal("70.00")),
+        ]
+        assert ledger_anchor(ps) == (date(2025, 2, 15), Decimal("80.00"))

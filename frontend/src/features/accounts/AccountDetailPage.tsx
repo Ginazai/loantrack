@@ -174,12 +174,10 @@ export function AccountDetailPage() {
   const canClose = !["paid", "closed"].includes(account.status);
   const canPurge = account.status === "closed";
 
-  // Use the most recent payment's balance_after as the authoritative current balance
-  // if it exists — this is always in sync with what the ledger recorded.
-  const lastPayment = payments.length > 0 ? payments[payments.length - 1] : null;
-  const displayBalance = lastPayment
-    ? lastPayment.balance_after
-    : (account.current_balance ?? account.borrow_amount);
+  // The backend owns the definition of "current balance" (interest accrued since the last
+  // payment, imported history, payments in an open cycle) so the list, dashboard and this
+  // page cannot disagree. A payment's balance_after is a point-in-time record, not that.
+  const displayBalance = account.current_balance ?? account.borrow_amount;
 
   const progressPct = Math.max(
     0,

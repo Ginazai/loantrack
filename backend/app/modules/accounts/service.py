@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.repository import BaseRepository
 from app.modules.accounts.interest_engine import (
     compute_current_balance,
+    ledger_anchor,
     next_cycle_date,
     upcoming_cycle_dates,
 )
@@ -281,6 +282,7 @@ class LoanAccountService:
                 float(account.rate),
                 account.start_date,
                 payment_tuples,
+                anchor=ledger_anchor(payments),
             )
         except ArithmeticError:
             # Degenerate terms (e.g. runaway compounding) must not take down every list /
@@ -298,12 +300,9 @@ class LoanAccountService:
         else:
             ndd = last.next_due_date if last else next_cycle_date(account.start_date)
 
-        # For a paid account the recorded ledger is authoritative (ADR-003): its last
-        # snapshot is what the detail page shows. The projection above applies today's
-        # `rate` per cycle, which for imported history (historical interest amounts)
-        # does not reproduce the ledger and keeps compounding after payoff.
-        if account.status == "paid" and last is not None:
-            current_balance = max(Decimal(str(last.balance_after)), Decimal("0.00"))
+        # A paid account owes nothing: never show a credit (overpayment) as a balance.
+        if account.status == "paid" and current_balance is not None:
+            current_balance = max(current_balance, Decimal("0.00"))
 
         result = {
             **account.__dict__,

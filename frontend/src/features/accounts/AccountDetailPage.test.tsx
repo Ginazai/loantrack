@@ -121,12 +121,18 @@ describe("AccountDetailPage", () => {
       expect(kpis.getAllByText("$1,000.00")).toHaveLength(2); // principal + balance
     });
 
-    it("prefers the latest payment's balance_after over the stored balance", async () => {
-      payments.list.mockResolvedValue([p1, p2]);
+    it("shows the balance the API reports, not the last payment's snapshot", async () => {
+      // The backend owns the definition of "current balance" (it accounts for interest
+      // accrued since the last payment and for imported history). A payment's
+      // balance_after is a point-in-time record and can lag or differ from it.
+      payments.list.mockResolvedValue([p1, p2]); // last balance_after = $735.00
       renderPage();
       await ready();
-      await waitFor(() => expect(within(screen.getByLabelText("Account summary")).getByText("$735.00")).toBeInTheDocument());
-      expect(screen.getByText("26.5% paid off")).toBeInTheDocument();
+      await screen.findByText("Payments"); // payments query has settled
+      const kpis = within(screen.getByLabelText("Account summary"));
+      await waitFor(() => expect(kpis.getByText("$500.00")).toBeInTheDocument());
+      expect(kpis.queryByText("$735.00")).toBeNull();
+      expect(screen.getByText("50.0% paid off")).toBeInTheDocument();
     });
 
     it("flags an overdue due date", async () => {

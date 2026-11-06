@@ -10,6 +10,7 @@ from app.core.repository import BaseRepository
 from app.modules.accounts.interest_engine import (
     advance_cycle,
     get_next_due_date,
+    ledger_anchor,
     next_cycle_date,
     project_ledger,
 )
@@ -91,6 +92,7 @@ class PaymentService:
         payment_tuples = [(p.payment_date, float(p.amount)) for p in existing]
         last = existing[-1] if existing else None
         last_cycle = last.payment_date if last else None
+        anchor = ledger_anchor(existing)
 
         # Resolve payment date: auto picks the next cycle date
         payment_date = data.payment_date
@@ -99,6 +101,15 @@ class PaymentService:
             payment_date = next_cycle_date(ref)
             if payment_date <= (last_cycle or account.start_date):
                 payment_date = advance_cycle(payment_date)
+
+        if anchor is not None and payment_date <= anchor[0]:
+            # Imported history is recorded fact, and the importer itself refuses to
+            # insert anything before it (see ImportService.commit): a payment dated
+            # inside it would have no defined place in the ledger.
+            raise HTTPException(
+                422,
+                f"Payment date must be after the last imported payment ({anchor[0]})",
+            )
 
         # ── Correct interest calculation ──────────────────────────────────────
         # Use project_ledger to get the authoritative balance at payment_date.
@@ -111,6 +122,7 @@ class PaymentService:
             account.start_date,
             payment_tuples,  # existing payments only (not this new one)
             until=payment_date,  # include the payment's cycle
+            anchor=anchor,
         )
 
         if rows and rows[-1].cycle_date == payment_date:
@@ -124,7 +136,7 @@ class PaymentService:
             interests_accrued = Decimal("0.00")
         else:
             # Before any cycle — no interest yet
-            balance_before = Decimal(str(account.borrow_amount))
+            balance_before = Decimal(str(anchor[1] if anchor else account.borrow_amount))
             interests_accrued = Decimal("0.00")
 
         payment_amount = _round2(Decimal(str(data.amount)))
@@ -272,25 +284,36 @@ class PaymentService:
             return
 
         history: list[tuple] = []  # (payment_date, amount) replayed so far
-        final_balance = Decimal(str(account.borrow_amount))
+        anchor = None  # set once an imported payment has been replayed
+        running = Decimal(str(account.borrow_amount))
+        final_balance = running
 
         for payment in payments:
-            rows = project_ledger(
-                float(account.borrow_amount),
-                float(account.rate),
-                account.start_date,
-                history,
-                until=payment.payment_date,
-            )
-            if rows and rows[-1].cycle_date == payment.payment_date:
-                balance_before = rows[-1].opening_balance
-                interests_accrued = rows[-1].interests_accrued
-            elif rows:
-                balance_before = rows[-1].closing_balance
-                interests_accrued = Decimal("0.00")
+            if payment.method == "import":
+                # Imported history is recorded fact (ADR-004): its interest is whatever
+                # was charged back then, not today's rate. Replaying it through
+                # project_ledger would overwrite that history with different numbers,
+                # so chain it exactly the way the importer first did.
+                balance_before = running
+                interests_accrued = Decimal(str(payment.interests_accrued))
             else:
-                balance_before = Decimal(str(account.borrow_amount))
-                interests_accrued = Decimal("0.00")
+                rows = project_ledger(
+                    float(account.borrow_amount),
+                    float(account.rate),
+                    account.start_date,
+                    history,
+                    until=payment.payment_date,
+                    anchor=anchor,
+                )
+                if rows and rows[-1].cycle_date == payment.payment_date:
+                    balance_before = rows[-1].opening_balance
+                    interests_accrued = rows[-1].interests_accrued
+                elif rows:
+                    balance_before = rows[-1].closing_balance
+                    interests_accrued = Decimal("0.00")
+                else:
+                    balance_before = Decimal(str(anchor[1] if anchor else account.borrow_amount))
+                    interests_accrued = Decimal("0.00")
 
             balance_after = _round2(balance_before + interests_accrued - payment.amount)
 
@@ -300,7 +323,10 @@ class PaymentService:
             payment.next_due_date = get_next_due_date(payment.payment_date)
 
             history.append((payment.payment_date, float(payment.amount)))
+            running = balance_after
             final_balance = balance_after
+            if payment.method == "import":
+                anchor = (payment.payment_date, balance_after)
 
         if account.status != "closed":
             account.status = "paid" if final_balance <= Decimal("0.00") else "active"
