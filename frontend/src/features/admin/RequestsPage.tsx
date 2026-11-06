@@ -101,7 +101,7 @@ export default function RequestsPage() {
   const pending = requests.filter((r) => r.status === "requested" || r.status === "under_review").length;
 
   return (
-    <div className="lt-page lt-page--narrow lt-stack lt-stack--loose">
+    <div className="lt-page lt-stack lt-stack--loose">
       <PageHeader
         title="Loan Requests"
         subtitle={

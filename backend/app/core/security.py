@@ -1,7 +1,6 @@
 import hashlib
 import hmac
 import json
-import secrets
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -61,24 +60,11 @@ def hash_token(token: str) -> str:
 # ── Webhook HMAC ──────────────────────────────────────────────────────────────
 
 
-def webhook_body(payload: dict) -> bytes:
-    """The exact bytes of a webhook request body (canonical JSON: sorted keys, no spaces).
-
-    The signature is computed over these bytes and these same bytes are what get sent, so a
-    receiver can verify the raw request body without re-serialising anything.
-    """
-    return json.dumps(payload, separators=(",", ":"), sort_keys=True).encode()
-
-
-def sign_webhook_body(body: bytes, secret: str) -> str:
-    """HMAC-SHA256 (hex) of a request body, keyed with the webhook's secret."""
-    return hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
-
-
 def sign_webhook_payload(payload: dict, secret: str) -> str:
     """HMAC-SHA256 signature for outgoing webhook payloads."""
-    return sign_webhook_body(webhook_body(payload), secret)
+    body = json.dumps(payload, separators=(",", ":"), sort_keys=True)
+    return hmac.new(secret.encode(), body.encode(), hashlib.sha256).hexdigest()
 
 
 def generate_webhook_secret() -> str:
-    return "whsec_" + secrets.token_urlsafe(32)
+    return hashlib.sha256(str(uuid.uuid4()).encode()).hexdigest()

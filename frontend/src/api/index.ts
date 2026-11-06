@@ -12,13 +12,11 @@ import type {
   Payment,
   PaymentAttachment,
   PaymentFormData,
-  SelfUpdateData,
   TokenResponse,
   User,
   UserCreateFormData,
   UserUpdateData,
   WebhookConfig,
-  WebhookConfigCreated,
   WebhookFormData,
   AccountFormData,
 } from "../types";
@@ -31,13 +29,12 @@ export const authApi = {
 
   me: () => client.get<User>("/auth/me").then((r) => r.data),
 
-  updateMe: (data: SelfUpdateData) =>
+  updateMe: (data: { full_name?: string; password?: string }) =>
     client.patch<User>("/auth/me", data).then((r) => r.data),
 
-  // No refresh() here on purpose: the refresh token is an httpOnly cookie the browser attaches
-  // itself, so callers never touch it. Token renewal lives in api/client.ts (refreshSession).
+  refresh: (refresh_token: string) =>
+    client.post<TokenResponse>("/auth/refresh", { refresh_token }).then((r) => r.data),
 
-  // The cookie identifies the session, so this works even if the access token has expired.
   logout: () => client.post("/auth/logout"),
 };
 
@@ -126,7 +123,7 @@ export const attachmentsApi = {
   delete: (accountId: string, paymentId: string, attachmentId: string) =>
     client.delete(`/accounts/${accountId}/payments/${paymentId}/attachments/${attachmentId}`),
 
-  // Auth is a bearer header (the cookie is scoped to /auth) — a plain window.open() link would
+  // Auth is a bearer header, not a cookie — a plain window.open() link would
   // hit the endpoint with no Authorization header and get a 401. Fetch as a
   // blob through the authenticated client instead, then hand the browser a
   // throwaway object URL to open/save.
@@ -158,16 +155,8 @@ export const webhooksApi = {
   list: (accountId: string) =>
     client.get<WebhookConfig[]>(`/accounts/${accountId}/webhooks`).then((r) => r.data),
 
-  // The response carries the signing secret. This is the only time it is available.
   create: (accountId: string, data: WebhookFormData) =>
-    client
-      .post<WebhookConfigCreated>(`/accounts/${accountId}/webhooks`, data)
-      .then((r) => r.data),
-
-  rotateSecret: (accountId: string, webhookId: string) =>
-    client
-      .post<WebhookConfigCreated>(`/accounts/${accountId}/webhooks/${webhookId}/rotate-secret`)
-      .then((r) => r.data),
+    client.post<WebhookConfig>(`/accounts/${accountId}/webhooks`, data).then((r) => r.data),
 
   delete: (accountId: string, webhookId: string) =>
     client.delete(`/accounts/${accountId}/webhooks/${webhookId}`),
@@ -193,12 +182,7 @@ export const adminApi = {
     client.get<WebhookConfig[]>("/admin/webhooks").then((r) => r.data),
 
   createGlobalWebhook: (data: WebhookFormData) =>
-    client.post<WebhookConfigCreated>("/admin/webhooks", data).then((r) => r.data),
-
-  rotateGlobalWebhookSecret: (webhookId: string) =>
-    client
-      .post<WebhookConfigCreated>(`/admin/webhooks/${webhookId}/rotate-secret`)
-      .then((r) => r.data),
+    client.post<WebhookConfig>("/admin/webhooks", data).then((r) => r.data),
 
   deleteGlobalWebhook: (webhookId: string) =>
     client.delete(`/admin/webhooks/${webhookId}`),
