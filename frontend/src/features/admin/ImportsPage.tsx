@@ -138,7 +138,7 @@ export default function ImportsPage() {
     });
 
   return (
-    <div className="lt-page lt-page--medium lt-stack lt-stack--loose">
+    <div className="lt-page lt-stack lt-stack--loose">
       <PageHeader
         title="Import data"
         subtitle="Native CSV (round-trip) or external ledger export (Reference/Date/Description/Debit/Credit)"

@@ -12,9 +12,6 @@ import io
 
 import pytest
 
-# Smallest thing that is honestly a PNG to the magic-byte check (signature + a stub body).
-PNG_BYTES = b"\x89PNG\r\n\x1a\n" + b"fake-body"
-
 
 async def _create_account(client, **overrides):
     payload = {
@@ -171,7 +168,7 @@ class TestPaymentAttachments:
         )
         payment_id = payment.json()["id"]
 
-        files = {"file": ("receipt.png", io.BytesIO(PNG_BYTES), "image/png")}
+        files = {"file": ("receipt.png", io.BytesIO(b"\x89PNG\r\n fake"), "image/png")}
         upload = await admin_client.post(
             f"/api/v1/accounts/{account['id']}/payments/{payment_id}/attachments", files=files
         )
@@ -187,7 +184,7 @@ class TestPaymentAttachments:
             f"/api/v1/accounts/{account['id']}/payments/{payment_id}/attachments/{attachment_id}"
         )
         assert download.status_code == 200
-        assert download.content == PNG_BYTES
+        assert download.content == b"\x89PNG\r\n fake"
 
     @pytest.mark.asyncio
     async def test_disallowed_file_type_rejected(self, admin_client):
@@ -214,7 +211,7 @@ class TestPaymentAttachments:
             json={"amount": "50.00", "payment_date": "2026-01-15", "method": "manual"},
         )
         payment_id = payment.json()["id"]
-        files = {"file": ("r.png", io.BytesIO(PNG_BYTES), "image/png")}
+        files = {"file": ("r.png", io.BytesIO(b"\x89PNG"), "image/png")}
         upload = await admin_client.post(
             f"/api/v1/accounts/{account['id']}/payments/{payment_id}/attachments", files=files
         )

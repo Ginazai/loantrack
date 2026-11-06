@@ -6,9 +6,7 @@ from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.core.http import sanitize_filename
 from app.core.repository import BaseRepository
-from app.core.uploads import read_upload_capped
 from app.modules.accounts.interest_engine import (
     advance_cycle,
     get_next_due_date,
@@ -20,9 +18,7 @@ from app.modules.accounts.models import LoanAccount
 from app.modules.audit.service import AuditService
 from app.modules.payments.models import Payment, PaymentAttachment
 from app.modules.payments.schemas import (
-    MAX_ATTACHMENT_SIZE_BYTES,
     PaymentCreate,
-    sniff_attachment_type,
     validate_attachment,
 )
 from app.modules.webhooks.models import WebhookConfig, WebhookEvent
@@ -352,25 +348,21 @@ class PaymentService:
         await self._get_account_or_404(account_id, user_id, is_admin)
         payment = await self._get_payment_or_404(account_id, payment_id)
 
-        # Stream with a hard cap (an oversize upload is refused after one chunk past the
-        # limit, not after it has all been loaded), then trust the bytes, not the label.
-        data = await read_upload_capped(file, MAX_ATTACHMENT_SIZE_BYTES)
-        content_type = sniff_attachment_type(data)
-        if content_type is None:
-            if not data:
-                raise HTTPException(status.HTTP_400_BAD_REQUEST, "Empty file")
-            raise HTTPException(
-                status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-                "File content is not a supported type (JPEG, PNG, WebP or PDF).",
-            )
+        content_type = file.content_type or "application/octet-stream"
+        data = await file.read()
         try:
             validate_attachment(content_type, len(data))
-        except ValueError as exc:  # unreachable in practice; kept as the single source of rules
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc))
+        except ValueError as exc:
+            msg = str(exc)
+            if "not allowed" in msg:
+                raise HTTPException(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, msg)
+            if "Empty file" in msg:
+                raise HTTPException(status.HTTP_400_BAD_REQUEST, msg)
+            raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, msg)
 
         attachment = PaymentAttachment(
             payment_id=payment.id,
-            original_filename=sanitize_filename(file.filename, default="attachment"),
+            original_filename=file.filename or "attachment",
             content_type=content_type,
             size_bytes=len(data),
             content=data,

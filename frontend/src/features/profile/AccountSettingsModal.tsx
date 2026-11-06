@@ -2,7 +2,6 @@ import { Button, FormGroup, InlineLoading, PasswordInput, TextInput } from "@car
 import { useState } from "react";
 import { authApi } from "../../api";
 import { useAuthStore } from "../../stores/authStore";
-import type { SelfUpdateData } from "../../types";
 import { getApiErrorMessage } from "../../utils/apiError";
 import { Drawer, Notice } from "../../components/common";
 
@@ -11,7 +10,6 @@ interface Props { onClose: () => void; }
 export function AccountSettingsModal({ onClose }: Props) {
   const { user, setUser } = useAuthStore();
   const [name, setName] = useState(user?.full_name ?? "");
-  const [currentPassword, setCurrentPassword] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [saving, setSaving] = useState(false);
@@ -22,20 +20,16 @@ export function AccountSettingsModal({ onClose }: Props) {
     setError(null);
     if (password && password !== confirm) { setError("Passwords do not match"); return; }
     if (password && password.length < 8) { setError("Password must be at least 8 characters"); return; }
-    if (password && !currentPassword) { setError("Enter your current password to set a new one"); return; }
     setSaving(true);
     try {
-      const payload: SelfUpdateData = {};
+      const payload: Record<string, string> = {};
       if (name !== user?.full_name) payload.full_name = name;
-      if (password) {
-        payload.current_password = currentPassword;
-        payload.new_password = password;
-      }
+      if (password) payload.password = password;
       if (Object.keys(payload).length === 0) { onClose(); return; }
       const updated = await authApi.updateMe(payload);
       setUser(updated);
       setSuccess(true);
-      setCurrentPassword(""); setPassword(""); setConfirm("");
+      setPassword(""); setConfirm("");
       setTimeout(onClose, 900);
     } catch (e: any) {
       setError(getApiErrorMessage(e, "Failed to save"));
@@ -75,15 +69,6 @@ export function AccountSettingsModal({ onClose }: Props) {
 
         <FormGroup legendText="Change Password">
           <div className="lt-form">
-            <PasswordInput
-              id="settings-current-password"
-              labelText="Current Password"
-              placeholder="Only needed to set a new password"
-              helperText="Setting a new password signs you out on your other devices."
-              autoComplete="current-password"
-              value={currentPassword}
-              onChange={(e) => setCurrentPassword(e.target.value)}
-            />
             <PasswordInput
               id="settings-password"
               labelText="New Password"

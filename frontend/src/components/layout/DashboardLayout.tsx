@@ -146,7 +146,7 @@ export function DashboardLayout() {
               tooltipAlignment="end"
               onClick={toggleTheme}
             >
-              {theme === "light" ? <Asleep size={20} /> : <Light size={20} />}
+              {theme === "light" ? <Asleep size={24} /> : <Light size={24} />}
             </HeaderGlobalAction>
             <div ref={panelWrapRef} className="lt-contents">
               <HeaderGlobalAction
@@ -156,7 +156,7 @@ export function DashboardLayout() {
                 tooltipAlignment="end"
                 onClick={() => setPanelOpen((v) => !v)}
               >
-                <UserAvatar size={20} />
+                <UserAvatar size={24} />
               </HeaderGlobalAction>
               <HeaderPanel aria-label="Account menu" expanded={panelOpen} className="lt-header-panel">
                 <div className="lt-header-user">
