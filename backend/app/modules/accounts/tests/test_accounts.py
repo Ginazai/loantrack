@@ -396,6 +396,7 @@ class TestLedgerAnchor:
         assert rows[0].interests_accrued == Decimal("20.50")
         assert rows[0].closing_balance == Decimal("410.00")
 
+
 class TestFutureDatedPayments:
     START = date(2026, 11, 1)
     TODAY = date(2026, 11, 6)
