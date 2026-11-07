@@ -7,6 +7,7 @@ import pytest
 
 from app.modules.accounts.interest_engine import (
     advance_cycle,
+    balance_as_of,
     compute_current_balance,
     get_cycle_dates,
     get_next_due_date,
@@ -394,3 +395,32 @@ class TestLedgerAnchor:
         assert rows[0].opening_balance == Decimal("410.00")
         assert rows[0].interests_accrued == Decimal("20.50")
         assert rows[0].closing_balance == Decimal("410.00")
+
+class TestFutureDatedPayments:
+    START = date(2026, 11, 1)
+    TODAY = date(2026, 11, 6)
+    PAYMENTS = [(date(2026, 11, 15), 25.0), (date(2026, 11, 30), 130.0)]
+
+    def test_balance_as_of_today_alone_ignores_future_payments(self):
+        got = compute_current_balance(150.0, 0.05, self.START, self.PAYMENTS, as_of=self.TODAY)
+        assert got == Decimal("150.00")
+
+    def test_balance_matches_ledger_last_balance_after(self):
+        as_of = balance_as_of([d for d, _ in self.PAYMENTS], today=self.TODAY)
+        assert as_of == date(2026, 11, 30)
+        got = compute_current_balance(150.0, 0.05, self.START, self.PAYMENTS, as_of=as_of)
+        assert got == Decimal("9.13")
+
+    def test_single_future_payment(self):
+        as_of = balance_as_of([date(2026, 11, 15)], today=self.TODAY)
+        got = compute_current_balance(
+            150.0, 0.05, self.START, [(date(2026, 11, 15), 25.0)], as_of=as_of
+        )
+        assert got == Decimal("132.50")
+
+    def test_past_payments_do_not_move_the_evaluation_date(self):
+        today = date(2026, 12, 20)
+        assert balance_as_of([date(2026, 11, 15), date(2026, 11, 30)], today=today) == today
+
+    def test_no_payments_evaluates_as_of_today(self):
+        assert balance_as_of([], today=self.TODAY) == self.TODAY

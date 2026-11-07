@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.repository import BaseRepository
 from app.modules.accounts.interest_engine import (
+    balance_as_of,
     compute_current_balance,
     ledger_anchor,
     next_cycle_date,
@@ -283,6 +284,7 @@ class LoanAccountService:
                 account.start_date,
                 payment_tuples,
                 anchor=ledger_anchor(payments),
+                as_of=balance_as_of([p.payment_date for p in payments]),
             )
         except ArithmeticError:
             # Degenerate terms (e.g. runaway compounding) must not take down every list /

@@ -296,6 +296,12 @@ def compute_current_balance(
     return _round2(balance - _dec(sum(pending)))
 
 
+def balance_as_of(payment_dates: list[date], today: date | None = None) -> date:
+    """Return the date the displayed current balance should be evaluated at."""
+    today = today if today is not None else date.today()
+    return max([today, *payment_dates])
+
+
 def compute_payment_ledger_entry(
     balance_before: Decimal,
     rate: Decimal,
