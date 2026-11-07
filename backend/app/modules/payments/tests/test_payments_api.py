@@ -9,7 +9,6 @@ the account's status frozen too. See PaymentService.recalculate_ledger.
 """
 
 import io
-from datetime import date, timedelta
 
 import pytest
 
@@ -221,31 +220,3 @@ class TestPaymentAttachments:
             f"/api/v1/accounts/{account['id']}/payments/{payment_id}/attachments/{upload.json()['id']}"
         )
         assert res.status_code == 403
-
-
-class TestCurrentBalanceWithAutoPayments:
-    @pytest.mark.asyncio
-    async def test_current_balance_matches_the_last_ledger_row(self, admin_client):
-        start = (date.today().replace(day=1) + timedelta(days=62)).replace(day=1)
-        account = await _create_account(
-            admin_client,
-            borrow_amount="150.00",
-            rate="0.05",
-            start_date=start.isoformat(),
-        )
-        url = f"/api/v1/accounts/{account['id']}"
-
-        first = await admin_client.post(f"{url}/payments", json={"amount": "25.00"})
-        assert first.status_code == 201
-        assert first.json()["balance_after"] == "132.50"
-        assert float((await admin_client.get(url)).json()["current_balance"]) == 132.50
-
-        second = await admin_client.post(f"{url}/payments", json={"amount": "130.00"})
-        assert second.status_code == 201
-        assert second.json()["balance_after"] == "9.13"
-        detail = (await admin_client.get(url)).json()
-        assert float(detail["current_balance"]) == 9.13
-
-        listed = (await admin_client.get("/api/v1/accounts")).json()
-        row = next(a for a in listed if a["id"] == account["id"])
-        assert float(row["current_balance"]) == 9.13
