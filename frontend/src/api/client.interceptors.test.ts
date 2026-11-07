@@ -26,7 +26,7 @@ describe("axios client interceptors", () => {
   const location = { href: "/accounts" };
 
   beforeEach(() => {
-    useAuthStore.setState({ accessToken: "old-access", refreshToken: "old-refresh", user: null });
+    useAuthStore.setState({ accessToken: "old-access", status: "authenticated", user: null });
     postSpy = vi.spyOn(axios, "post") as unknown as ReturnType<typeof vi.fn>;
     location.href = "/accounts";
     vi.stubGlobal("location", location);
@@ -62,16 +62,32 @@ describe("axios client interceptors", () => {
       c.headers.Authorization === "Bearer new-access" ? ok(c, { n: 1 }) : unauthorized(c),
     );
     client.defaults.adapter = adapter as never;
-    postSpy.mockResolvedValue({ data: { access_token: "new-access", refresh_token: "new-refresh" } });
+    postSpy.mockResolvedValue({ data: { access_token: "new-access" } });
 
     const res = await client.get("/accounts");
 
     expect(res.data).toEqual({ n: 1 });
-    expect(postSpy).toHaveBeenCalledWith(expect.stringContaining("/auth/refresh"), {
-      refresh_token: "old-refresh",
-    });
+    // No body: the refresh token is an httpOnly cookie the browser attaches itself, and the
+    // request must opt in to cookies and carry the CSRF header.
+    expect(postSpy).toHaveBeenCalledWith(
+      expect.stringContaining("/auth/refresh"),
+      undefined,
+      expect.objectContaining({
+        withCredentials: true,
+        headers: expect.objectContaining({ "X-Requested-With": "XMLHttpRequest" }),
+      }),
+    );
     expect(useAuthStore.getState().accessToken).toBe("new-access");
-    expect(useAuthStore.getState().refreshToken).toBe("new-refresh");
+  });
+
+  it("sends cookies and the CSRF header on ordinary requests too", async () => {
+    const adapter = vi.fn((c: Cfg & { withCredentials?: boolean }) => ok(c));
+    client.defaults.adapter = adapter as never;
+
+    await client.get("/accounts");
+
+    expect(adapter.mock.calls[0][0].withCredentials).toBe(true);
+    expect(adapter.mock.calls[0][0].headers["X-Requested-With"]).toBe("XMLHttpRequest");
   });
 
   it("logs out and redirects to /login when the refresh itself fails", async () => {
@@ -86,7 +102,7 @@ describe("axios client interceptors", () => {
 
   it("does not loop: a 401 on the retried request is rejected without a second refresh", async () => {
     client.defaults.adapter = ((c: Cfg) => unauthorized(c)) as never;
-    postSpy.mockResolvedValue({ data: { access_token: "new-access", refresh_token: "r2" } });
+    postSpy.mockResolvedValue({ data: { access_token: "new-access", } });
 
     await expect(client.get("/accounts")).rejects.toMatchObject({ response: { status: 401 } });
 
@@ -133,7 +149,7 @@ describe("axios client interceptors", () => {
     await vi.waitFor(() => expect(adapter).toHaveBeenCalledTimes(2));
     await new Promise((r) => setTimeout(r, 0)); // let the second 401 reach the queue
 
-    resolveRefresh({ data: { access_token: "new-access", refresh_token: "new-refresh" } });
+    resolveRefresh({ data: { access_token: "new-access" } });
     const [a, b] = await Promise.all([first, second]);
 
     expect([a.data, b.data]).toEqual(["/a", "/b"]);

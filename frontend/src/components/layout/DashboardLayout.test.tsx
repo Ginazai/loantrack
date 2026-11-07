@@ -34,7 +34,7 @@ describe("DashboardLayout", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     (authApi.logout as any).mockResolvedValue({});
-    useAuthStore.setState({ accessToken: "t", refreshToken: "r", user: makeAdmin() });
+    useAuthStore.setState({ accessToken: "t", user: makeAdmin() });
     useUIStore.setState({ theme: "light", sidebarOpen: true });
   });
   afterEach(() => {

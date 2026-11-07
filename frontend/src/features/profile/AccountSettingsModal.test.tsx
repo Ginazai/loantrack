@@ -13,7 +13,7 @@ const save = () => screen.getByRole("button", { name: "Save changes" });
 describe("AccountSettingsModal", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useAuthStore.setState({ accessToken: "t", refreshToken: "r", user: makeUser({ full_name: "Ada Lovelace" }) });
+    useAuthStore.setState({ accessToken: "t", user: makeUser({ full_name: "Ada Lovelace" }) });
   });
 
   it("prefills the name and shows the email as read-only", () => {

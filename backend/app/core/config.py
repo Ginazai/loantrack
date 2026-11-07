@@ -1,5 +1,7 @@
 from functools import lru_cache
+from ipaddress import ip_network
 from pathlib import Path
+from typing import Literal
 
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -41,6 +43,31 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
+    # The refresh token lives only in an httpOnly cookie (never in a response body or in
+    # browser storage). The cookie is scoped to the auth routes so it is not sent on every
+    # API call.
+    REFRESH_COOKIE_NAME: str = "lt_refresh"
+    # Secure = HTTPS only. Browsers also accept it on http://localhost; set false only for
+    # plain-HTTP setups that are not localhost (e.g. a LAN IP), never in production.
+    COOKIE_SECURE: bool = True
+    # lax is right when the SPA and API share an origin (nginx proxies /api/). Use "none"
+    # only for a split-origin deployment (it requires COOKIE_SECURE=true).
+    COOKIE_SAMESITE: Literal["lax", "strict", "none"] = "lax"
+    # A refresh token that was rotated away this recently and is presented again is treated
+    # as a benign double-submit (two tabs, a retried request), not as theft: it is rejected
+    # but the session survives. Outside this window a rotated token being replayed revokes
+    # the whole token family.
+    REFRESH_REUSE_GRACE_SECONDS: int = 10
+
+    # Reverse proxies whose X-Forwarded-For we believe (IPs or CIDRs). Empty = trust no one:
+    # the client address is the TCP peer. Behind nginx set this to the proxy's address or
+    # network, otherwise every user shares the proxy's address (and one login rate-limit
+    # bucket). Never put "0.0.0.0/0" here: that lets any client choose its own address.
+    TRUSTED_PROXIES: list[str] = []
+
+    # Upload caps (bytes). Enforced while the body streams in, before it is parsed.
+    MAX_IMPORT_SIZE_BYTES: int = 5 * 1024 * 1024
+
     LOG_LEVEL: str = "INFO"
     # NOT USED. Kept so existing .env files that set it still load. A global per-IP
     # limit would count every user behind the shared proxy address together.
@@ -68,6 +95,18 @@ class Settings(BaseSettings):
                     "SECRET_KEY must be set to a random value of at least 32 characters "
                     "(e.g. `openssl rand -hex 32`). The built-in placeholder is only "
                     "allowed when DEBUG=true."
+                )
+        if self.COOKIE_SAMESITE == "none" and not self.COOKIE_SECURE:
+            raise ValueError("COOKIE_SAMESITE=none requires COOKIE_SECURE=true")
+        for entry in self.TRUSTED_PROXIES:
+            try:
+                net = ip_network(entry, strict=False)
+            except ValueError as exc:
+                raise ValueError(f"TRUSTED_PROXIES: {entry!r} is not an IP or CIDR") from exc
+            if net.prefixlen == 0:
+                raise ValueError(
+                    "TRUSTED_PROXIES must not contain a catch-all network "
+                    f"({entry!r}): clients could then spoof their address."
                 )
         return self
 
