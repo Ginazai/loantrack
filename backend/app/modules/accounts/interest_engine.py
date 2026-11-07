@@ -8,8 +8,8 @@ Rules:
 - ``rate`` is a fraction applied *per cycle* (twice a month), not per year,
   and interest compounds: each cycle's opening balance is the previous
   closing balance, unpaid interest included.
-- Payments between cycle dates are recorded with their actual date but
-  only reduce the balance that feeds the *next* cycle's interest calculation.
+- Payments between cycle dates are recorded with their actual date and reduce
+  the balance that feeds the *next* cycle's interest calculation.
 - The reference point for the first cycle is account.start_date, not
   the first payment date.
 - Auto payments default to the next upcoming cycle date.
@@ -241,8 +241,20 @@ def project_ledger(
             )
         )
 
-        interest = _round2(balance * _dec(rate))
-        closing = _round2(balance + interest - period_payments)
+        # Payments made before the cycle date reduce the balance on which that
+        # cycle's interest is charged. A payment made on the cycle date is
+        # applied after interest, matching the payment snapshot calculation.
+        payments_before_cycle = _dec(
+            sum(
+                amt
+                for pdate, amt in sorted_payments
+                if (prev <= pdate if i == 0 else prev < pdate) and pdate < cycle_date
+            )
+        )
+        payments_on_cycle = period_payments - payments_before_cycle
+        balance_before_interest = balance - payments_before_cycle
+        interest = _round2(balance_before_interest * _dec(rate))
+        closing = _round2(balance_before_interest + interest - payments_on_cycle)
 
         rows.append(
             CycleRow(
@@ -272,9 +284,8 @@ def compute_current_balance(
 
     This is the one definition of "current balance" shared by the list, the dashboard
     and the detail page: the closing balance of the last cycle that has closed, minus
-    any payment made since. Per ADR-003 a payment does not reduce the interest of the
-    cycle it falls in, but the borrower owes less the moment they pay, so it comes off
-    the outstanding balance immediately rather than only when the cycle closes.
+    any payment made since. A payment made before a cycle date reduces that cycle's
+    interest base, while a payment made on the cycle date is applied after interest.
     """
     today = as_of if as_of is not None else date.today()
     rows = project_ledger(borrow_amount, rate, start_date, payments, until=today, anchor=anchor)
