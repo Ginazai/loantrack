@@ -35,6 +35,14 @@ class WebhookConfigCreate(BaseModel):
         return v
 
 
+class WebhookToggle(BaseModel):
+    """Body of PATCH /admin/webhooks/{id}: pause or resume. Nothing else is editable."""
+
+    model_config = {"extra": "forbid"}
+
+    is_active: bool
+
+
 class WebhookConfigUpdate(BaseModel):
     target_url: HttpUrl | None = None
     events: list[str] | None = None
@@ -50,6 +58,22 @@ class WebhookConfigOut(BaseModel):
     events: list[str]
     is_active: bool
     created_at: datetime
+
+
+class WebhookConfigCreated(WebhookConfigOut):
+    """Returned by create and rotate-secret ONLY.
+
+    The signing secret is what lets a receiver verify X-Webhook-Signature, so the person who
+    sets the webhook up has to be able to see it. It is shown once: list/get responses never
+    include it (WebhookConfigOut), the same way an API key is.
+    """
+
+    secret: str
+
+    @classmethod
+    def from_config(cls, config) -> "WebhookConfigCreated":
+        base = WebhookConfigOut.model_validate(config).model_dump()
+        return cls(**base, secret=config.secret_hash)
 
 
 class WebhookEventOut(BaseModel):

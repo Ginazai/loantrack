@@ -34,8 +34,8 @@ const go = (route: string) =>
   );
 const path = () => screen.getByTestId("location").textContent;
 
-const logIn = (user = makeAdmin()) => useAuthStore.setState({ accessToken: "t", refreshToken: "r", user });
-const logOut = () => useAuthStore.setState({ accessToken: null, refreshToken: null, user: null });
+const logIn = (user = makeAdmin()) => useAuthStore.setState({ accessToken: "t", user });
+const logOut = () => useAuthStore.setState({ accessToken: null, user: null });
 
 describe("App routing", () => {
   beforeEach(logOut);

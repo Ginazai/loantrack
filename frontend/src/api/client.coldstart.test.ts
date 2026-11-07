@@ -34,7 +34,7 @@ describe("cold-start retries in the API client", () => {
   beforeEach(() => {
     resetWakeStateForTests();
     vi.useFakeTimers();
-    useAuthStore.setState({ accessToken: "access", refreshToken: "refresh", user: null });
+    useAuthStore.setState({ accessToken: "access", status: "authenticated", user: null });
     useConnectionStore.setState({ waking: false });
     location.href = "/accounts";
     vi.stubGlobal("location", location);
@@ -146,7 +146,7 @@ describe("cold-start retries in the API client", () => {
           config: {} as never,
         }),
       )
-      .mockResolvedValueOnce({ data: { access_token: "new-access", refresh_token: "new-refresh" } });
+      .mockResolvedValueOnce({ data: { access_token: "new-access" } });
 
     const pending = client.get("/accounts");
     await vi.advanceTimersByTimeAsync(10_000);
@@ -187,7 +187,7 @@ describe("sleeping backend that only wakes for direct browser requests (Render f
     vi.useFakeTimers();
     awake = false;
     directWakePings = 0;
-    useAuthStore.setState({ accessToken: "access", refreshToken: "refresh", user: null });
+    useAuthStore.setState({ accessToken: "access", status: "authenticated", user: null });
     useConnectionStore.setState({ waking: false });
 
     // Through nginx: instant 502 until the backend is up. Never wakes it.

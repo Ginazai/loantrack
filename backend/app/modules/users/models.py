@@ -47,9 +47,16 @@ class RefreshToken(Base):
         nullable=False,
         index=True,
     )
+    # One family per login; rotation keeps the family. See auth/service.py (reuse detection).
+    family_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), nullable=False, index=True, default=uuid.uuid4
+    )
     token_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     revoked: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # rotated | reuse | logout | password | deactivated
+    revoked_reason: Mapped[str | None] = mapped_column(String(20), nullable=True)
     ip_address: Mapped[str | None] = mapped_column(String(45), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False

@@ -42,6 +42,8 @@ COPY security-headers.inc.template /etc/nginx/templates/security-headers.inc.tem
 # DNS on the shared network. Override at `docker run`/compose/platform level
 # for any deployment where frontend and backend aren't on the same network.
 ENV BACKEND_URL=http://backend:8000
+# See the REAL_IP_FROM note in nginx.conf.template. Default trusts no upstream proxy.
+ENV REAL_IP_FROM=127.0.0.1
 
 # Copy built assets from builder
 COPY --from=builder /app/dist /usr/share/nginx/html

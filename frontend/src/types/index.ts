@@ -70,6 +70,10 @@ export interface WebhookConfig {
   created_at: string;
 }
 
+export interface WebhookConfigCreated extends WebhookConfig {
+  secret: string;
+}
+
 export interface LoanRequest {
   id: string;
   user_id: string;
@@ -141,6 +145,12 @@ export interface UserUpdateData {
   role?: UserRole;
   is_active?: boolean;
   password?: string;
+}
+
+export interface SelfUpdateData {
+  full_name?: string;
+  current_password?: string;
+  new_password?: string;
 }
 
 export interface UserCreateFormData {
