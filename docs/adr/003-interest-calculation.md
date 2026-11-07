@@ -30,3 +30,8 @@ Behaviour the decision implies but the original text did not state (details and 
 - The anchor is used everywhere the ledger is replayed: balance display, `add_payment`, `recalculate_ledger` and the `cycle.closed` webhook. `recalculate_ledger` re-chains imported payments from their recorded interest instead of replaying them through `project_ledger`, which would overwrite imported history.
 - `add_payment` rejects (422) a payment dated on or before the last imported payment, mirroring the importer's own refusal to insert before existing history.
 - Known and not changed here: a payment's *stored* `balance_before`/`balance_after` ignores earlier payments in the same still-open period (e.g. two payments between the same two cycle dates), so the per-payment table can disagree with the current balance in that case. The current balance itself is correct.
+
+## Update (2026-11-06): current balance is evaluated as of the last recorded payment
+- `auto` payments are dated to the next cycle date after the previous payment, so a freshly recorded payment is usually dated in the future.
+- The displayed balance is evaluated as of the later of today and the last recorded payment date. This includes the cycles settled by future-dated auto payments and keeps the account header consistent with the payment ledger.
+- `compute_current_balance` remains caller-controlled through its explicit `as_of` argument; account enrichment uses `balance_as_of` so list, dashboard, detail, and export views share one definition.
