@@ -127,19 +127,25 @@ export function DashboardPage() {
 
         {isLoading ? (
           <TableSkeleton columns={5} rows={6} label="Loading accounts" />
-        ) : accounts.length === 0 ? (
+        ) : active.length === 0 ? (
           <EmptyState
             Icon={Receipt}
-            title="No accounts yet"
-            description="Create the first loan account to start tracking balances, interest and payments."
+            title={accounts.length === 0 ? "No accounts yet" : "No active accounts"}
+            description={
+              accounts.length === 0
+                ? "Create the first loan account to start tracking balances, interest and payments."
+                : "Every account is settled or closed. View all to see them."
+            }
             action={
-              <Button onClick={() => navigate("/accounts")} renderIcon={ArrowRight}>
-                Create your first account
-              </Button>
+              accounts.length === 0 ? (
+                <Button onClick={() => navigate("/accounts")} renderIcon={ArrowRight}>
+                  Create your first account
+                </Button>
+              ) : undefined
             }
           />
         ) : (
-          <AccountsTable accounts={accounts.slice(0, 8)} variant="summary" />
+          <AccountsTable accounts={active.slice(0, 8)} variant="summary" />
         )}
       </section>
     </div>

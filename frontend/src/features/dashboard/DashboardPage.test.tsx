@@ -64,11 +64,12 @@ describe("DashboardPage", () => {
       expect(within(panel).queryByText("Fresh Loan")).toBeNull();
     });
 
-    it("shows recent accounts in the table", async () => {
+    it("shows only active / open accounts in the recent table", async () => {
       renderWithProviders(<DashboardPage />);
       const table = await screen.findByRole("table", { name: "Recent accounts" });
       expect(within(table).getByText("Fresh Loan")).toBeInTheDocument();
-      expect(within(table).getByText("Old Loan")).toBeInTheDocument();
+      expect(within(table).getByText("Overdue Loan")).toBeInTheDocument();
+      expect(within(table).queryByText("Old Loan")).toBeNull();
     });
 
     it("'View all' navigates to the accounts page", async () => {
@@ -92,6 +93,16 @@ describe("DashboardPage", () => {
     renderWithProviders(<DashboardPage />);
     const table = await screen.findByRole("table", { name: "Recent accounts" });
     expect(within(table).getAllByRole("row")).toHaveLength(1 + 8); // header + 8
+  });
+
+  it("says there are no active accounts when every account is settled or closed", async () => {
+    list.mockResolvedValue([
+      makeAccount({ id: "p1", status: "paid", next_due_date: null }),
+      makeAccount({ id: "c1", status: "closed", next_due_date: null }),
+    ]);
+    renderWithProviders(<DashboardPage />);
+    expect(await screen.findByText("No active accounts")).toBeInTheDocument();
+    expect(screen.queryByRole("table", { name: "Recent accounts" })).toBeNull();
   });
 
   it("offers to create the first account when there are none", async () => {
