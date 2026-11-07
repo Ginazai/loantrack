@@ -76,21 +76,6 @@ def advance_cycle(current: date) -> date:
     return date(current.year, current.month + 1, 15)
 
 
-def nearest_cycle_date(d: date) -> date:
-    """Return the cycle date closest to *d*; a tie goes to the later one.
-
-    Sep 11 → Sep 15, Sep 20 → Sep 15, Sep 26 → Sep 30, Sep 15 → Sep 15.
-    """
-    nxt = next_cycle_date(d)
-    # Cycle before nxt: a 15th is preceded by the previous month's 30th, a 30th by that 15th.
-    if nxt.day == 15:
-        py, pm = (nxt.year - 1, 12) if nxt.month == 1 else (nxt.year, nxt.month - 1)
-        prev = _month_thirtieth(py, pm)
-    else:
-        prev = date(nxt.year, nxt.month, 15)
-    return prev if (d - prev) < (nxt - d) else nxt
-
-
 def get_cycle_dates(start_date: date, until: date) -> list[date]:
     """
     Return all cycle dates from the first one on or after *start_date* up to
@@ -164,12 +149,6 @@ def ledger_anchor(payments) -> Anchor | None:
     balance. The recorded ``balance_after`` of the *last imported payment* is therefore
     taken as fact and replay continues from there under the normal rules.
 
-    The imported row's interest belongs to the *nearest* cycle, so the anchor date is
-    that cycle when it is not before the payment: a Sep 26 import anchors at Sep 30 and
-    replay resumes at Oct 15 rather than charging Sep 30 a second time. When the nearest
-    cycle is the earlier one (Sep 20 → Sep 15) the anchor stays on the payment's own
-    date, so the next cycle (Sep 30) is charged on the recorded balance.
-
     ``payments`` is any iterable of objects with ``payment_date``, ``method`` and
     ``balance_after`` (ORM rows or query rows), in chronological order. Payments dated
     on or before the anchor are considered already reflected in it.
@@ -180,7 +159,7 @@ def ledger_anchor(payments) -> Anchor | None:
             last = p
     if last is None:
         return None
-    return (max(last.payment_date, nearest_cycle_date(last.payment_date)), last.balance_after)
+    return (last.payment_date, last.balance_after)
 
 
 def project_ledger(
@@ -202,8 +181,9 @@ def project_ledger(
     With an *anchor* ``(date, balance)`` replay starts from that recorded balance
     instead of from ``borrow_amount`` at ``start_date``. Interest through the anchor
     date is already inside the balance, so the first row is the first cycle strictly
-    after it, and payments dated on or before it are ignored. (``ledger_anchor`` rounds an
-    import to its nearest cycle, so the interest of that cycle is never charged twice.)
+    after it, and payments dated on or before it are ignored. (An off-cycle anchor
+    means the next cycle charges interest on the post-payment balance: imported
+    history does not say what the period opened at.)
     """
     if until is None:
         until = date.today()
@@ -294,6 +274,12 @@ def compute_current_balance(
         pending = [a for d, a in live if d <= today]
 
     return _round2(balance - _dec(sum(pending)))
+
+
+def balance_as_of(payment_dates: list[date], today: date | None = None) -> date:
+    """Return the date the displayed current balance should be evaluated at."""
+    today = today if today is not None else date.today()
+    return max([today, *payment_dates])
 
 
 def compute_payment_ledger_entry(
