@@ -3,8 +3,13 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter, Outlet } from "react-router-dom";
 import App from "./App";
 import { useAuthStore } from "./stores/authStore";
+import { restoreSession } from "./api/session";
 import { makeAdmin, makeUser } from "./test/factories";
 import { LocationDisplay } from "./test/utils";
+
+// The real one talks to the server; each test says how the restore ends.
+vi.mock("./api/session", () => ({ restoreSession: vi.fn() }));
+const restore = vi.mocked(restoreSession);
 
 // Stub every screen: these tests are about routing and guards only.
 vi.mock("./components/layout/DashboardLayout", () => ({
@@ -34,11 +39,20 @@ const go = (route: string) =>
   );
 const path = () => screen.getByTestId("location").textContent;
 
-const logIn = (user = makeAdmin()) => useAuthStore.setState({ accessToken: "t", user });
-const logOut = () => useAuthStore.setState({ accessToken: null, user: null });
+const logIn = (user = makeAdmin()) =>
+  useAuthStore.setState({ accessToken: "t", user, status: "authenticated" });
+// "anonymous" = the session restore on page load already ran and found nobody signed in.
+const logOut = () => useAuthStore.setState({ accessToken: null, user: null, status: "anonymous" });
+// A fresh page load: nothing in memory yet, the server has not been asked.
+const freshPageLoad = () =>
+  useAuthStore.setState({ accessToken: null, user: null, status: "unknown" });
 
 describe("App routing", () => {
-  beforeEach(logOut);
+  beforeEach(() => {
+    vi.clearAllMocks();
+    restore.mockResolvedValue(undefined);
+    logOut();
+  });
 
   describe("signed out", () => {
     it("shows the login page at /login", () => {
@@ -115,5 +129,62 @@ describe("App routing", () => {
         expect(screen.getByText("my loans page")).toBeInTheDocument();
       },
     );
+  });
+
+  describe("reloading the page", () => {
+    // The access token only lives in memory, so every reload starts signed out locally. The
+    // refresh cookie is what proves the session is still alive, and only the server can say.
+    const restoredAs = (user: ReturnType<typeof makeAdmin>) =>
+      restore.mockImplementation(async () => {
+        useAuthStore.getState().setAccessToken("fresh");
+        // The token arrives before the profile does, as in the real restore.
+        await Promise.resolve();
+        useAuthStore.getState().setUser(user);
+      });
+
+    beforeEach(freshPageLoad);
+
+    it("asks the server to restore the session before deciding anything", () => {
+      restore.mockReturnValue(new Promise(() => {}));
+      go("/accounts");
+      expect(restore).toHaveBeenCalledTimes(1);
+    });
+
+    it("holds the page instead of redirecting to /login while it waits", () => {
+      restore.mockReturnValue(new Promise(() => {}));
+      go("/accounts");
+      expect(screen.getByRole("status")).toHaveTextContent(/restoring your session/i);
+      expect(path()).toBe("/accounts");
+      expect(screen.queryByText("login page")).not.toBeInTheDocument();
+    });
+
+    it("keeps an admin on the admin page they reloaded", async () => {
+      restoredAs(makeAdmin());
+      go("/admin/users");
+      expect(await screen.findByText("users page")).toBeInTheDocument();
+      expect(path()).toBe("/admin/users"); // not bounced to /my-loans while the profile loaded
+    });
+
+    it("keeps a borrower on their page", async () => {
+      restoredAs(makeUser());
+      go("/my-requests");
+      expect(await screen.findByText("my requests page")).toBeInTheDocument();
+      expect(path()).toBe("/my-requests");
+    });
+
+    it("sends the visitor to /login only once the server says there is no session", async () => {
+      restore.mockImplementation(async () => useAuthStore.getState().logout());
+      go("/accounts");
+      expect(await screen.findByText("login page")).toBeInTheDocument();
+      expect(path()).toBe("/login");
+    });
+
+    it("does not ask again when the session is already known", () => {
+      logIn(makeAdmin());
+      go("/dashboard");
+      logOut();
+      go("/dashboard");
+      expect(restore).not.toHaveBeenCalled();
+    });
   });
 });

@@ -11,6 +11,7 @@ from app.modules.accounts.interest_engine import (
     compute_current_balance,
     get_cycle_dates,
     get_next_due_date,
+    import_next_due_date,
     ledger_anchor,
     nearest_cycle_date,
     next_cycle_date,
@@ -153,9 +154,11 @@ class TestProjectLedger:
         # June 15: no payment in period (June 20 > June 15) → closing = 1050
         assert rows[0].payments_in_period == Decimal("0")
         assert rows[0].closing_balance == Decimal("1050.00")
-        # June 30: 100 payment applied → 1050 * 5% = 52.50 → 1050 + 52.50 - 100 = 1002.50
+        # June 30: the payment is made before the cycle, so interest is charged
+        # on 950: 1050 - 100 + 47.50 = 997.50.
         assert rows[1].payments_in_period == Decimal("100")
-        assert rows[1].closing_balance == Decimal("1002.50")
+        assert rows[1].interests_accrued == Decimal("47.50")
+        assert rows[1].closing_balance == Decimal("997.50")
 
 
 # ── compute_current_balance ───────────────────────────────────────────────────
@@ -271,13 +274,13 @@ class TestPaymentInAnOpenPeriod:
         )
         assert got == Decimal("1010.00")  # 1050 - 40, not 1050 until Jan 30
 
-    def test_it_does_not_reduce_that_cycles_interest(self):
-        # ADR-003: when the cycle closes, interest is still charged on the 1050
-        # opening balance: 1050 + 52.50 - 40
+    def test_it_reduces_the_next_cycles_interest(self):
+        # The payment is made before Jan 30, so interest is charged on 1010:
+        # 1050 - 40 + 50.50.
         got = compute_current_balance(
             1000.0, 0.05, self.START, [(date(2025, 1, 20), 40.0)], as_of=date(2025, 1, 30)
         )
-        assert got == Decimal("1062.50")
+        assert got == Decimal("1060.50")
 
     def test_before_the_first_cycle_closes(self):
         got = compute_current_balance(
@@ -312,7 +315,7 @@ class TestAnchoredLedger:
         got = compute_current_balance(
             1000.0, 0.05, date(2025, 1, 1), payments, anchor=self.ANCHOR, as_of=date(2025, 2, 28)
         )
-        assert got == Decimal("500.00")  # 500 + 25.00 interest - 25 paid Feb 20
+        assert got == Decimal("498.75")  # 500 - 25 + 23.75 interest
 
     def test_balance_grows_from_the_anchor_at_the_current_rate(self):
         got = compute_current_balance(
@@ -342,6 +345,38 @@ class TestAnchoredLedger:
 )
 def test_nearest_cycle_date(d, expected):
     assert nearest_cycle_date(d) == expected
+
+
+@pytest.mark.parametrize(
+    "paid_on, expected",
+    [
+        (date(2026, 9, 26), date(2026, 10, 15)),
+        (date(2026, 9, 30), date(2026, 10, 15)),
+        (date(2026, 9, 11), date(2026, 9, 30)),
+        (date(2026, 9, 15), date(2026, 9, 30)),
+        (date(2026, 9, 20), date(2026, 9, 30)),
+        (date(2026, 10, 31), date(2026, 11, 15)),
+        (date(2026, 12, 28), date(2027, 1, 15)),
+        (date(2027, 2, 27), date(2027, 3, 15)),
+    ],
+)
+def test_import_next_due_date(paid_on, expected):
+    assert import_next_due_date(paid_on) == expected
+
+
+def test_import_next_due_date_matches_first_cycle_after_anchor():
+    for day in range(1, 31):
+        paid_on = date(2026, 9, day)
+        anchor_date, balance = ledger_anchor([_P(paid_on, "import", Decimal("410.00"))])
+        first_charged = project_ledger(
+            410.0,
+            0.05,
+            date(2026, 1, 1),
+            [],
+            until=date(2026, 12, 31),
+            anchor=(anchor_date, balance),
+        )[0].cycle_date
+        assert import_next_due_date(paid_on) == first_charged, paid_on
 
 
 class _P:
@@ -425,3 +460,16 @@ class TestFutureDatedPayments:
 
     def test_no_payments_evaluates_as_of_today(self):
         assert balance_as_of([], today=self.TODAY) == self.TODAY
+
+
+def test_payment_before_cycle_reduces_the_interest_base():
+    rows = project_ledger(
+        475.0,
+        0.05,
+        date(2026, 9, 26),
+        [(date(2026, 9, 26), 25.0)],
+        until=date(2026, 9, 30),
+    )
+
+    assert rows[-1].interests_accrued == Decimal("22.50")
+    assert rows[-1].closing_balance == Decimal("472.50")
