@@ -120,6 +120,12 @@ def get_next_due_date(reference: date) -> date:
     return candidate
 
 
+def import_next_due_date(payment_date: date) -> date:
+    """Return the next cycle after an imported payment's settled-through cycle."""
+    settled_through = max(payment_date, nearest_cycle_date(payment_date))
+    return get_next_due_date(settled_through)
+
+
 def upcoming_cycle_dates(from_date: date, count: int = 6) -> list[date]:
     """Return the next *count* upcoming cycle dates for frontend preview."""
     dates: list[date] = []

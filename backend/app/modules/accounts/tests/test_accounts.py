@@ -11,6 +11,7 @@ from app.modules.accounts.interest_engine import (
     compute_current_balance,
     get_cycle_dates,
     get_next_due_date,
+    import_next_due_date,
     ledger_anchor,
     nearest_cycle_date,
     next_cycle_date,
@@ -344,6 +345,38 @@ class TestAnchoredLedger:
 )
 def test_nearest_cycle_date(d, expected):
     assert nearest_cycle_date(d) == expected
+
+
+@pytest.mark.parametrize(
+    "paid_on, expected",
+    [
+        (date(2026, 9, 26), date(2026, 10, 15)),
+        (date(2026, 9, 30), date(2026, 10, 15)),
+        (date(2026, 9, 11), date(2026, 9, 30)),
+        (date(2026, 9, 15), date(2026, 9, 30)),
+        (date(2026, 9, 20), date(2026, 9, 30)),
+        (date(2026, 10, 31), date(2026, 11, 15)),
+        (date(2026, 12, 28), date(2027, 1, 15)),
+        (date(2027, 2, 27), date(2027, 3, 15)),
+    ],
+)
+def test_import_next_due_date(paid_on, expected):
+    assert import_next_due_date(paid_on) == expected
+
+
+def test_import_next_due_date_matches_first_cycle_after_anchor():
+    for day in range(1, 31):
+        paid_on = date(2026, 9, day)
+        anchor_date, balance = ledger_anchor([_P(paid_on, "import", Decimal("410.00"))])
+        first_charged = project_ledger(
+            410.0,
+            0.05,
+            date(2026, 1, 1),
+            [],
+            until=date(2026, 12, 31),
+            anchor=(anchor_date, balance),
+        )[0].cycle_date
+        assert import_next_due_date(paid_on) == first_charged, paid_on
 
 
 class _P:
