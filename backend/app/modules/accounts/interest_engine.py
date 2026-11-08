@@ -161,6 +161,11 @@ def _round2(value: Decimal) -> Decimal:
 Anchor = tuple[date, "Decimal | float"]
 
 
+def settled_through(payment_date: date) -> date:
+    """Return the date an imported payment's recorded interest runs through."""
+    return max(payment_date, nearest_cycle_date(payment_date))
+
+
 def ledger_anchor(payments) -> Anchor | None:
     """Return the replay anchor for an account, or None if it has none.
 
@@ -186,7 +191,7 @@ def ledger_anchor(payments) -> Anchor | None:
             last = p
     if last is None:
         return None
-    return (max(last.payment_date, nearest_cycle_date(last.payment_date)), last.balance_after)
+    return (settled_through(last.payment_date), last.balance_after)
 
 
 def project_ledger(

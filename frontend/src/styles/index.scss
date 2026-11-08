@@ -1070,6 +1070,15 @@ div:has(.cds--header) ~ .cds--content {
   }
 }
 
+// ── Session restore (page load) ─────────────────────────────────────────────
+.lt-session-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-block-size: 100dvh;
+  background: $background;
+}
+
 // ── Login ───────────────────────────────────────────────────────────────────
 .lt-login {
   display: grid;

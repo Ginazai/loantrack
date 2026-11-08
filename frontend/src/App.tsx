@@ -1,5 +1,8 @@
+import { useEffect, useState } from "react";
+import { InlineLoading } from "@carbon/react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { useAuthStore } from "./stores/authStore";
+import { restoreSession } from "./api/session";
 import { ServerWakingNotice } from "./components/feedback";
 import { DashboardLayout } from "./components/layout/DashboardLayout";
 import { LoginPage } from "./features/auth/LoginPage";
@@ -12,6 +15,40 @@ import RequestsPage from "./features/admin/RequestsPage";
 import ImportsPage from "./features/admin/ImportsPage";
 import UserPortalPage from "./features/user/UserPortalPage";
 import MyRequestsPage from "./features/user/MyRequestsPage";
+
+/**
+ * On a page load the access token is gone (it lives in memory only) but the httpOnly refresh
+ * cookie may still be good, and only the server can say. So no route is mounted until the
+ * restore has fully settled: token AND profile, or a definite "no session". Deciding earlier
+ * would send a signed-in user to /login, or an admin to /my-loans while the profile loads.
+ */
+function useSessionRestored(): boolean {
+  const [done, setDone] = useState(() => {
+    const { status, accessToken } = useAuthStore.getState();
+    return status !== "unknown" || !!accessToken;
+  });
+
+  useEffect(() => {
+    if (done) return;
+    let live = true;
+    void restoreSession().finally(() => {
+      if (live) setDone(true);
+    });
+    return () => {
+      live = false;
+    };
+  }, [done]);
+
+  return done;
+}
+
+function SessionLoading() {
+  return (
+    <div className="lt-session-loading" role="status">
+      <InlineLoading description="Restoring your session…" />
+    </div>
+  );
+}
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated());
@@ -29,9 +66,13 @@ function RootRedirect() {
 }
 
 export default function App() {
+  const restored = useSessionRestored();
   return (
     <>
       <ServerWakingNotice />
+      {!restored ? (
+        <SessionLoading />
+      ) : (
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/" element={<RequireAuth><RootRedirect /></RequireAuth>} />
@@ -53,6 +94,7 @@ export default function App() {
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      )}
     </>
   );
 }

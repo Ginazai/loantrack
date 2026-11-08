@@ -198,6 +198,7 @@ export default function UsersPage() {
   const [userAccounts, setUserAccounts] = useState<Record<string, any[]>>({});
   const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
   const [editUser, setEditUser] = useState<User | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const currentUserId = useAuthStore((s) => s.user?.id);
   const setAuthUser = useAuthStore((s) => s.setUser);
 
@@ -206,8 +207,14 @@ export default function UsersPage() {
   }, []);
 
   const toggleActive = async (user: User) => {
-    const updated = await adminApi.updateUser(user.id, { is_active: !user.is_active });
-    setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
+    if (user.id === currentUserId) return; // the switch is disabled; the API refuses this too
+    setActionError(null);
+    try {
+      const updated = await adminApi.updateUser(user.id, { is_active: !user.is_active });
+      setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
+    } catch (e: any) {
+      setActionError(getApiErrorMessage(e, "Failed to update user"));
+    }
   };
 
   const handleDeleteUser = async (id: string) => {
@@ -236,6 +243,8 @@ export default function UsersPage() {
           </Button>
         }
       />
+
+      {actionError && <Notice kind="error">{actionError}</Notice>}
 
       <section className="lt-panel" aria-label="Users">
         {loading ? (
@@ -294,6 +303,7 @@ export default function UsersPage() {
                             labelText=""
                             aria-label={`${user.full_name} is ${user.is_active ? "active" : "inactive"}`}
                             toggled={user.is_active}
+                            disabled={user.id === currentUserId}
                             onToggle={() => toggleActive(user)}
                           />
                           <Button

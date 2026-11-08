@@ -81,6 +81,33 @@ describe("UsersPage", () => {
     });
   });
 
+  describe("deactivating yourself", () => {
+    it("disables your own switch and never calls the API", async () => {
+      const user = userEvent.setup();
+      renderWithProviders(<UsersPage />);
+      const mine = within(await row("Admin User")).getByRole("switch", { name: "Admin User is active" });
+      expect(mine).toBeDisabled();
+      await user.click(mine);
+      expect(api.updateUser).not.toHaveBeenCalled();
+      expect(within(await row("Admin User")).getByText("Active")).toBeInTheDocument();
+    });
+
+    it("leaves other users' switches enabled", async () => {
+      renderWithProviders(<UsersPage />);
+      const theirs = within(await row("Bob Borrower")).getByRole("switch", { name: "Bob Borrower is active" });
+      expect(theirs).toBeEnabled();
+    });
+
+    it("shows the server's reason when a change is refused, instead of failing silently", async () => {
+      api.updateUser.mockRejectedValue({ response: { data: { detail: "Cannot do that" } } });
+      const user = userEvent.setup();
+      renderWithProviders(<UsersPage />);
+      await user.click(within(await row("Bob Borrower")).getByRole("switch", { name: "Bob Borrower is active" }));
+      expect(await screen.findByText("Cannot do that")).toBeInTheDocument();
+      expect(within(await row("Bob Borrower")).getByText("Active")).toBeInTheDocument();
+    });
+  });
+
   describe("creating a user", () => {
     const open = async (user: ReturnType<typeof userEvent.setup>) => {
       renderWithProviders(<UsersPage />);
