@@ -25,7 +25,7 @@ from app.core.config import get_settings
 from app.core.http import sanitize_filename
 from app.core.repository import BaseRepository
 from app.core.uploads import read_upload_capped
-from app.modules.accounts.interest_engine import get_next_due_date
+from app.modules.accounts.interest_engine import import_next_due_date
 from app.modules.accounts.models import LoanAccount
 from app.modules.audit.service import AuditService
 from app.modules.imports.models import ImportBatch, ImportRow
@@ -349,7 +349,7 @@ class ImportService:
                     interests_accrued=p.interests_accrued,
                     balance_after=balance_after,
                     payment_date=p.payment_date,
-                    next_due_date=get_next_due_date(p.payment_date),
+                    next_due_date=import_next_due_date(p.payment_date),
                     method="import",
                 )
                 self.db.add(payment)

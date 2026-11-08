@@ -12,6 +12,7 @@ from app.core.uploads import read_upload_capped
 from app.modules.accounts.interest_engine import (
     advance_cycle,
     get_next_due_date,
+    import_next_due_date,
     ledger_anchor,
     next_cycle_date,
     project_ledger,
@@ -326,7 +327,11 @@ class PaymentService:
             payment.balance_before = balance_before
             payment.interests_accrued = interests_accrued
             payment.balance_after = balance_after
-            payment.next_due_date = get_next_due_date(payment.payment_date)
+            payment.next_due_date = (
+                import_next_due_date(payment.payment_date)
+                if payment.method == "import"
+                else get_next_due_date(payment.payment_date)
+            )
 
             history.append((payment.payment_date, float(payment.amount)))
             running = balance_after

@@ -36,3 +36,10 @@ Behaviour the decision implies but the original text did not state (details and 
 - `auto` payments are dated to the next cycle date after the previous payment, so a freshly recorded payment is usually dated in the future.
 - The displayed balance is evaluated as of the later of today and the last recorded payment date. This includes the cycles settled by future-dated auto payments and keeps the account header consistent with the payment ledger.
 - `compute_current_balance` remains caller-controlled through its explicit `as_of` argument; account enrichment uses `balance_as_of` so list, dashboard, detail, and export views share one definition.
+
+## Update (2026-11-07): next due date of an imported payment
+- An imported row's interest belongs to its nearest cycle, so its next due date is the
+  cycle after that settled-through date. Native payments continue to use the next cycle
+  after their recorded payment date.
+- Importing and recalculating ledger snapshots use the same rule, so displayed due dates
+  agree with the cycle replay.
