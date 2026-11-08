@@ -31,9 +31,9 @@ if not DATABASE_URL:
     print("ERROR: DATABASE_URL is not set.", file=sys.stderr)
     sys.exit(1)
 
-ADMIN_EMAIL    = os.environ.get("SEED_ADMIN_EMAIL",    "admin@loantrack.dev")
+ADMIN_EMAIL = os.environ.get("SEED_ADMIN_EMAIL", "admin@loantrack.dev")
 ADMIN_PASSWORD = os.environ.get("SEED_ADMIN_PASSWORD", "")
-ADMIN_NAME     = os.environ.get("SEED_ADMIN_NAME",     "Admin User")
+ADMIN_NAME = os.environ.get("SEED_ADMIN_NAME", "Admin User")
 
 if len(ADMIN_PASSWORD) < 12 or ADMIN_PASSWORD == "ChangeMe123!":
     print(
@@ -50,6 +50,7 @@ AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=F
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
+
 def _banner(msg: str) -> None:
     width = max(len(msg) + 4, 50)
     print("─" * width)
@@ -59,16 +60,14 @@ def _banner(msg: str) -> None:
 
 async def _table_exists(session: AsyncSession, table: str) -> bool:
     result = await session.execute(
-        text(
-            "SELECT EXISTS (SELECT 1 FROM information_schema.tables "
-            "WHERE table_name = :t)"
-        ),
+        text("SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = :t)"),
         {"t": table},
     )
     return result.scalar()
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
+
 
 async def seed() -> None:
     # Import the registry FIRST — this registers every ORM model so SQLAlchemy

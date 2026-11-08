@@ -43,3 +43,7 @@ Behaviour the decision implies but the original text did not state (details and 
   after their recorded payment date.
 - Importing and recalculating ledger snapshots use the same rule, so displayed due dates
   agree with the cycle replay.
+- Stored snapshots are written once and only refreshed by `recalculate_ledger`, so rows
+  created under an older rule keep their old values. Use
+  `python -m scripts.recalculate_ledgers` in dry-run mode to review repairs, or add
+  `--apply` to write them.
