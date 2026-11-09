@@ -35,6 +35,8 @@ export interface LoanAccount {
   // enriched by service layer
   current_balance: string | null;
   next_due_date: string | null;
+  /** Lifetime sum of every payment received on this account. */
+  total_paid: string;
 }
 
 export interface Payment {

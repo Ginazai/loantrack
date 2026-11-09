@@ -1071,12 +1071,223 @@ div:has(.cds--header) ~ .cds--content {
 }
 
 // ── Session restore (page load) ─────────────────────────────────────────────
-.lt-session-loading {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-block-size: 100dvh;
+.lt-session {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center; // true centre on every viewport, phones included
+  padding: $spacing-06;
   background: $background;
+  z-index: 9000;
+
+  &__card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: $spacing-05;
+    inline-size: min(16rem, 100%);
+    text-align: center;
+    // Hold back for a beat so a fast restore never flashes the screen at all.
+    opacity: 0;
+    animation: lt-session-in $duration-moderate-02 motion(entrance, productive) 150ms forwards;
+  }
+
+  // Same mark as the favicon: a square, an "L", and the accent block.
+  &__mark {
+    position: relative;
+    display: block;
+    inline-size: $spacing-08;
+    block-size: $spacing-08;
+    background: $background-inverse;
+  }
+
+  &__mark-l {
+    position: absolute;
+    inset-block-start: 22%;
+    inset-inline-start: 25%;
+    inline-size: 12.5%;
+    block-size: 44%;
+    background: $text-inverse;
+
+    &::after {
+      content: '';
+      position: absolute;
+      inset-block-end: 0;
+      inset-inline-start: 0;
+      inline-size: 300%;
+      block-size: 28%;
+      background: $text-inverse;
+    }
+  }
+
+  &__mark-dot {
+    position: absolute;
+    inset-block-start: 22%;
+    inset-inline-end: 25%;
+    inline-size: 22%;
+    block-size: 12.5%;
+    background: $interactive;
+  }
+
+  &__brand {
+    @include type-style('productive-heading-03');
+    color: $text-primary;
+  }
+
+  // Carbon-style indeterminate bar.
+  &__bar {
+    position: relative;
+    display: block;
+    inline-size: 100%;
+    block-size: 0.25rem;
+    overflow: hidden;
+    background: $border-subtle-01;
+
+    &::after {
+      content: '';
+      position: absolute;
+      inset-block: 0;
+      inline-size: 40%;
+      background: $interactive;
+      animation: lt-session-slide 1.4s ease-in-out infinite;
+    }
+  }
+
+  &__text {
+    @include type-style('body-compact-01');
+    color: $text-secondary;
+    margin: 0;
+  }
+}
+
+@keyframes lt-session-in {
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes lt-session-slide {
+  from {
+    inset-inline-start: -40%;
+  }
+  to {
+    inset-inline-start: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lt-session__card {
+    animation: none;
+    opacity: 1;
+  }
+
+  .lt-session__bar::after {
+    animation: none;
+    inset-inline-start: 0;
+    inline-size: 100%;
+    opacity: 0.4;
+  }
+}
+
+// ── Return on investment (dashboard) ────────────────────────────────────────
+.lt-roi {
+  &__scope {
+    @include type-style('helper-text-01');
+    color: $text-secondary;
+  }
+
+  &__body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+    align-items: end;
+    gap: $spacing-05 $spacing-07;
+    padding-block-start: $spacing-03;
+
+    @include breakpoint-down('md') {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  &__pct {
+    @include type-style('productive-heading-07');
+    font-weight: 300;
+    margin: 0;
+  }
+
+  &__caption {
+    @include type-style('body-compact-01');
+    display: flex;
+    align-items: center;
+    gap: $spacing-02;
+    color: $text-secondary;
+    margin: $spacing-02 0 0;
+  }
+
+  &__ok {
+    flex-shrink: 0;
+    fill: $support-success;
+  }
+
+  &__figures {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: $spacing-05;
+    margin: 0;
+
+    dt {
+      @include type-style('label-02');
+      color: $text-secondary;
+    }
+
+    dd {
+      @include type-style('productive-heading-04');
+      font-weight: 300;
+      margin: $spacing-02 0 0;
+      overflow-wrap: anywhere;
+    }
+
+    @include breakpoint-down('md') {
+      grid-template-columns: minmax(0, 1fr);
+      gap: $spacing-04;
+
+      > div {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: $spacing-04;
+      }
+
+      dd {
+        @include type-style('productive-heading-03');
+        margin: 0;
+      }
+    }
+  }
+
+  &__gain {
+    color: $support-success;
+  }
+
+  &__track {
+    grid-column: 1 / -1;
+    block-size: 0.5rem;
+    background: $border-subtle-01;
+  }
+
+  &__fill {
+    display: block;
+    block-size: 100%;
+    background: $interactive;
+    transition: inline-size $duration-moderate-02 motion(standard, productive);
+
+    @media (prefers-reduced-motion: reduce) {
+      transition: none;
+    }
+  }
+
+  &__track--complete &__fill {
+    background: $support-success;
+  }
 }
 
 // ── Login ───────────────────────────────────────────────────────────────────

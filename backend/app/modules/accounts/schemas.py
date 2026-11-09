@@ -60,6 +60,8 @@ class LoanAccountOut(BaseModel):
     # Computed fields added by the service layer
     current_balance: Decimal | None = None
     next_due_date: date | None = None
+    # Lifetime sum of every payment recorded against this account (principal + interest).
+    total_paid: Decimal = Decimal("0.00")
 
 
 class LoanAccountFilter(BaseModel):

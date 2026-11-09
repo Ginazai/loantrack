@@ -54,6 +54,25 @@ describe("DashboardPage", () => {
       expect(s.getByText("1 closed")).toBeInTheDocument();
     });
 
+    it("shows the ROI panel: invested vs recovered across every account", async () => {
+      list.mockResolvedValue([
+        makeAccount({ id: "a1", borrow_amount: "1000.00", total_paid: "400.00" }),
+        makeAccount({ id: "a3", borrow_amount: "1000.00", total_paid: "100.00", status: "closed", next_due_date: null }),
+      ]);
+      renderWithProviders(<DashboardPage />);
+      const panel = (await screen.findByRole("heading", { name: "Return on investment" })).closest("section")!;
+      expect(within(panel).getByText("25.0%")).toBeInTheDocument();
+      expect(within(panel).getByText("$2,000.00")).toBeInTheDocument();
+      expect(within(panel).getByText("$500.00")).toBeInTheDocument();
+    });
+
+    it("hides the ROI panel when nothing has been lent yet", async () => {
+      list.mockResolvedValue([]);
+      renderWithProviders(<DashboardPage />);
+      await screen.findByRole("heading", { name: "Ada's Ledger" });
+      expect(screen.queryByRole("heading", { name: "Return on investment" })).toBeNull();
+    });
+
     it("lists overdue accounts with a link to each", async () => {
       renderWithProviders(<DashboardPage />);
       const panel = (await screen.findByRole("heading", { name: "Overdue Payments" })).closest("section")!;

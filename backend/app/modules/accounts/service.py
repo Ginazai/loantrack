@@ -310,6 +310,7 @@ class LoanAccountService:
             **account.__dict__,
             "current_balance": current_balance,
             "next_due_date": ndd,
+            "total_paid": sum((Decimal(str(p.amount)) for p in payments), Decimal("0.00")),
         }
         result.pop("_sa_instance_state", None)
         return result

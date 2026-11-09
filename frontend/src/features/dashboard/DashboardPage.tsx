@@ -15,6 +15,8 @@ import { EmptyState, PageHeader, StatCard, StatCardSkeleton, TableSkeleton } fro
 import { useAuthStore } from "../../stores/authStore";
 import { formatCurrency, formatDate, isOverdue } from "../../utils/dateUtils";
 import { AccountsTable } from "../accounts/AccountsTable";
+import { RoiPanel } from "./RoiPanel";
+import { summariseRoi } from "./roi";
 
 export function DashboardPage() {
   const { user } = useAuthStore();
@@ -32,6 +34,7 @@ export function DashboardPage() {
     0
   );
   const totalPrincipal = active.reduce((sum, a) => sum + Number.parseFloat(a.borrow_amount), 0);
+  const roi = summariseRoi(accounts);
 
   return (
     <div className="lt-page lt-stack lt-stack--loose">
@@ -81,6 +84,9 @@ export function DashboardPage() {
           />
         </section>
       )}
+
+      {/* Return on investment */}
+      {!isLoading && roi.invested > 0 && <RoiPanel roi={roi} />}
 
       {/* Overdue */}
       {overdue.length > 0 && (
