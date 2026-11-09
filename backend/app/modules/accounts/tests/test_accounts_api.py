@@ -200,3 +200,25 @@ class TestCyclePreview:
         dates = res.json()
         assert isinstance(dates, list)
         assert len(dates) > 0
+
+
+class TestTotalPaid:
+    """`total_paid` feeds the dashboard's return-on-investment panel."""
+
+    @pytest.mark.asyncio
+    async def test_total_paid_sums_every_payment(self, admin_client):
+        created = (await admin_client.post("/api/v1/accounts", json=_account_payload())).json()
+        assert created["total_paid"] == "0.00"
+
+        for amount, day in (("40.00", "2026-01-15"), ("35.50", "2026-01-30")):
+            res = await admin_client.post(
+                f"/api/v1/accounts/{created['id']}/payments",
+                json={"amount": amount, "payment_date": day, "method": "manual"},
+            )
+            assert res.status_code == 201
+
+        detail = (await admin_client.get(f"/api/v1/accounts/{created['id']}")).json()
+        account_rows = (await admin_client.get("/api/v1/accounts")).json()
+        listed = next(a for a in account_rows if a["id"] == created["id"])
+        assert float(detail["total_paid"]) == 75.50
+        assert float(listed["total_paid"]) == 75.50

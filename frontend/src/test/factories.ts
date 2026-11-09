@@ -33,6 +33,7 @@ export const makeAccount = (o: Partial<LoanAccount> = {}): LoanAccount => ({
   status: "active",
   current_balance: "500.00",
   next_due_date: "2999-01-15",
+  total_paid: "0.00",
   close_reason: null,
   created_at: "2026-01-01T00:00:00Z",
   updated_at: "2026-01-02T00:00:00Z",

@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
-import { InlineLoading } from "@carbon/react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { useAuthStore } from "./stores/authStore";
 import { restoreSession } from "./api/session";
-import { ServerWakingNotice } from "./components/feedback";
+import { ServerWakingNotice, SessionLoading } from "./components/feedback";
 import { DashboardLayout } from "./components/layout/DashboardLayout";
 import { LoginPage } from "./features/auth/LoginPage";
 import { DashboardPage } from "./features/dashboard/DashboardPage";
@@ -40,14 +39,6 @@ function useSessionRestored(): boolean {
   }, [done]);
 
   return done;
-}
-
-function SessionLoading() {
-  return (
-    <div className="lt-session-loading" role="status">
-      <InlineLoading description="Restoring your session…" />
-    </div>
-  );
 }
 
 function RequireAuth({ children }: { children: React.ReactNode }) {

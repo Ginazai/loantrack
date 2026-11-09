@@ -45,6 +45,7 @@ const sampleAccount: LoanAccount = {
   status: "active",
   current_balance: "900.00",
   next_due_date: "2026-02-15",
+  total_paid: "0.00",
   close_reason: null,
   created_at: "2026-01-01T00:00:00Z",
   updated_at: "2026-01-01T00:00:00Z",
