@@ -64,7 +64,7 @@ function EditUserDrawer({
   };
 
   return (
-    <Drawer title="Edit User" onClose={onClose}>
+    <Drawer title="Edit User" onClose={onClose} notice={error ? <Notice kind="error">{error}</Notice> : undefined}>
       <form
         className="lt-form"
         noValidate
@@ -73,7 +73,6 @@ function EditUserDrawer({
           void handleSave();
         }}
       >
-        {error && <Notice kind="error">{error}</Notice>}
         <TextInput
           id="edit-user-name"
           labelText="Full Name"
@@ -137,7 +136,7 @@ function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreate
   };
 
   return (
-    <Drawer title="Create New User" onClose={onClose}>
+    <Drawer title="Create New User" onClose={onClose} notice={error ? <Notice kind="error">{error}</Notice> : undefined}>
       <form
         className="lt-form"
         noValidate
@@ -146,7 +145,6 @@ function CreateUserModal({ onClose, onCreated }: { onClose: () => void; onCreate
           void handleCreate();
         }}
       >
-        {error && <Notice kind="error">{error}</Notice>}
         <TextInput
           id="user-name"
           labelText="Full Name"

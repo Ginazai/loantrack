@@ -37,7 +37,17 @@ export function AccountSettingsModal({ onClose }: Props) {
   };
 
   return (
-    <Drawer title="Account Settings" onClose={onClose}>
+    <Drawer
+      title="Account Settings"
+      onClose={onClose}
+      notice={
+        error ? (
+          <Notice kind="error">{error}</Notice>
+        ) : success ? (
+          <Notice kind="success">Changes saved.</Notice>
+        ) : undefined
+      }
+    >
       <form
         className="lt-form"
         noValidate
@@ -46,9 +56,6 @@ export function AccountSettingsModal({ onClose }: Props) {
           void handleSave();
         }}
       >
-        {error && <Notice kind="error">{error}</Notice>}
-        {success && <Notice kind="success">Changes saved.</Notice>}
-
         <FormGroup legendText="Profile">
           <div className="lt-form">
             <TextInput

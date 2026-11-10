@@ -72,7 +72,7 @@ function RequestLoanModal({ onClose, onSuccess }: { onClose: () => void; onSucce
   };
 
   return (
-    <Drawer title="New Loan Request" onClose={onClose}>
+    <Drawer title="New Loan Request" onClose={onClose} notice={error ? <Notice kind="error">{error}</Notice> : undefined}>
       <form
         className="lt-form"
         noValidate
@@ -81,7 +81,6 @@ function RequestLoanModal({ onClose, onSuccess }: { onClose: () => void; onSucce
           void handleSubmit();
         }}
       >
-        {error && <Notice kind="error">{error}</Notice>}
         <TextInput
           id="request-name"
           labelText="Loan Name / Purpose"

@@ -54,16 +54,14 @@ describe("AccountsPage", () => {
     expect(screen.getByText("Loading accounts…")).toBeInTheDocument();
   });
 
-  it("filters by one or more statuses and resets with 'All'", async () => {
+  it("filters by a single status and resets with 'All'", async () => {
     const user = userEvent.setup();
     renderWithProviders(<AccountsPage />);
     await screen.findByText("2 accounts found");
 
     await user.click(filters().getByText("Open"));
     await waitFor(() => expect(lastListArgs().status).toEqual(["open"]));
-    await user.click(filters().getByText("Paid"));
-    await waitFor(() => expect(lastListArgs().status).toEqual(["open", "paid"]));
-    await user.click(filters().getByText("Open")); // toggle off
+    await user.click(filters().getByText("Paid")); // replaces the previous selection
     await waitFor(() => expect(lastListArgs().status).toEqual(["paid"]));
     await user.click(filters().getByText("All"));
     await waitFor(() => expect(lastListArgs().status).toBeUndefined());
