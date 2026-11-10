@@ -154,6 +154,12 @@ export function AccountDetailPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["webhooks", id] }),
   });
 
+  // Closing a drawer also clears its mutation, so a failed attempt's error doesn't greet the
+  // user again the next time they open it.
+  const closePayment = () => { setShowPayment(false); addPayment.reset(); };
+  const closeEdit = () => { setShowEdit(false); updateAccount.reset(); };
+  const closeWebhook = () => { setShowWebhook(false); addWebhook.reset(); };
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   if (isLoading || !account) {
@@ -482,29 +488,43 @@ export function AccountDetailPage() {
       {/* ── Overlays ─────────────────────────────────────────────────────── */}
 
       {showPayment && (
-        <Drawer title="Record Payment" onClose={() => setShowPayment(false)}>
-          <PaymentForm
-            account={account}
-            onSubmit={async (data) => { await addPayment.mutateAsync(data); }}
-            onCancel={() => setShowPayment(false)}
-            isLoading={addPayment.isPending}
-          />
-          {addPayment.isError && (
-            <div className="lt-mt-md">
+        <Drawer
+          title="Record Payment"
+          onClose={closePayment}
+          notice={
+            addPayment.isError ? (
               <Notice kind="error" title="Couldn’t record payment">
                 {getApiErrorMessage(addPayment.error, "Failed to record payment")}
               </Notice>
-            </div>
-          )}
+            ) : undefined
+          }
+        >
+          <PaymentForm
+            account={account}
+            onSubmit={async (data) => { await addPayment.mutateAsync(data); }}
+            onCancel={closePayment}
+            isLoading={addPayment.isPending}
+          />
         </Drawer>
       )}
 
       {showEdit && (
-        <Drawer title="Edit Account" onClose={() => setShowEdit(false)} width="lg">
+        <Drawer
+          title="Edit Account"
+          onClose={closeEdit}
+          width="lg"
+          notice={
+            updateAccount.isError ? (
+              <Notice kind="error" title="Couldn’t save changes">
+                {getApiErrorMessage(updateAccount.error, "Failed to update account")}
+              </Notice>
+            ) : undefined
+          }
+        >
           <AccountForm
             account={account}
             onSubmit={async (data) => { await updateAccount.mutateAsync(data); }}
-            onCancel={() => setShowEdit(false)}
+            onCancel={closeEdit}
             isLoading={updateAccount.isPending}
           />
         </Drawer>
@@ -572,10 +592,20 @@ export function AccountDetailPage() {
       )}
 
       {showWebhook && (
-        <Drawer title="Add Webhook" onClose={() => setShowWebhook(false)}>
+        <Drawer
+          title="Add Webhook"
+          onClose={closeWebhook}
+          notice={
+            addWebhook.isError ? (
+              <Notice kind="error" title="Couldn’t add webhook">
+                {getApiErrorMessage(addWebhook.error, "Failed to add webhook")}
+              </Notice>
+            ) : undefined
+          }
+        >
           <WebhookForm
             onSubmit={async (data) => { await addWebhook.mutateAsync(data); }}
-            onCancel={() => setShowWebhook(false)}
+            onCancel={closeWebhook}
             isLoading={addWebhook.isPending}
           />
         </Drawer>

@@ -55,7 +55,7 @@ function CreateWebhookModal({ onClose, onCreated }: { onClose: () => void; onCre
   };
 
   return (
-    <Drawer title="New Global Webhook" onClose={onClose}>
+    <Drawer title="New Global Webhook" onClose={onClose} notice={error ? <Notice kind="error">{error}</Notice> : undefined}>
       <form
         className="lt-form"
         noValidate
@@ -64,7 +64,6 @@ function CreateWebhookModal({ onClose, onCreated }: { onClose: () => void; onCre
           void handleCreate();
         }}
       >
-        {error && <Notice kind="error">{error}</Notice>}
         <TextInput
           id="global-webhook-url"
           labelText="Endpoint URL"

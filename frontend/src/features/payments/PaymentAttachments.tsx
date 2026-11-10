@@ -68,7 +68,7 @@ export function PaymentAttachmentsModal({ accountId, paymentId, isAdmin, onClose
   };
 
   return (
-    <Drawer title="Comprobantes" onClose={onClose}>
+    <Drawer title="Comprobantes" onClose={onClose} notice={error ? <Notice kind="error">{error}</Notice> : undefined}>
       <div className="lt-stack">
         {isLoading ? (
           <SkeletonText paragraph lineCount={3} />
@@ -113,8 +113,6 @@ export function PaymentAttachmentsModal({ accountId, paymentId, isAdmin, onClose
             ))}
           </ul>
         )}
-
-        {error && <Notice kind="error">{error}</Notice>}
 
         <input
           ref={fileInputRef}

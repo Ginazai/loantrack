@@ -1,5 +1,5 @@
 import { Add, Download, Receipt, SearchLocate } from "@carbon/icons-react";
-import { Button, MenuButton, MenuItem, Search, SelectableTag } from "@carbon/react";
+import { Button, ContentSwitcher, MenuButton, MenuItem, Search, Switch } from "@carbon/react";
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { accountsApi, adminApi } from "../../api";
@@ -9,7 +9,9 @@ import { AccountForm } from "./AccountForm";
 import { AccountsTable } from "./AccountsTable";
 import { getApiErrorMessage } from "../../utils/apiError";
 
-const STATUS_FILTERS: { value: AccountStatus | "all"; label: string }[] = [
+type StatusFilter = AccountStatus | "all";
+
+const STATUS_FILTERS: { value: StatusFilter; label: string }[] = [
   { value: "all", label: "All" },
   { value: "open", label: "Open" },
   { value: "active", label: "Active" },
@@ -19,15 +21,15 @@ const STATUS_FILTERS: { value: AccountStatus | "all"; label: string }[] = [
 
 export function AccountsPage() {
   const qc = useQueryClient();
-  const [selectedStatuses, setSelectedStatuses] = useState<AccountStatus[]>([]);
+  const [status, setStatus] = useState<StatusFilter>("all");
   const [search, setSearch] = useState("");
   const [showCreate, setShowCreate] = useState(false);
 
   const { data: accounts = [], isLoading } = useQuery({
-    queryKey: ["accounts", selectedStatuses, search],
+    queryKey: ["accounts", status, search],
     queryFn: () =>
       accountsApi.list({
-        status: selectedStatuses.length ? selectedStatuses : undefined,
+        status: status === "all" ? undefined : [status],
         search: search || undefined,
       }),
   });
@@ -40,13 +42,13 @@ export function AccountsPage() {
     },
   });
 
-  const toggleStatus = (status: AccountStatus) => {
-    setSelectedStatuses((prev) =>
-      prev.includes(status) ? prev.filter((s) => s !== status) : [...prev, status]
-    );
-  };
+  const filtered = status !== "all" || search !== "";
 
-  const filtered = selectedStatuses.length > 0 || search !== "";
+  // Closing the drawer also clears a failed attempt's error so it doesn't reappear on reopen.
+  const closeCreate = () => {
+    setShowCreate(false);
+    createMutation.reset();
+  };
 
   return (
     <div className="lt-page lt-stack lt-stack--loose">
@@ -66,22 +68,22 @@ export function AccountsPage() {
         }
       />
 
+      {/* Same status filter as the Loan Requests page. */}
+      <div className="lt-filter-switcher" role="group" aria-label="Filter by status">
+        <ContentSwitcher
+          size="md"
+          selectedIndex={STATUS_FILTERS.findIndex((f) => f.value === status)}
+          onChange={({ name }) => setStatus(name as StatusFilter)}
+        >
+          {STATUS_FILTERS.map((f) => (
+            <Switch key={f.value} name={f.value} text={f.label} />
+          ))}
+        </ContentSwitcher>
+      </div>
+
       <section className="lt-panel" aria-label="Accounts">
-        <div className="lt-toolbar-chips" role="group" aria-label="Filter by status">
-          {STATUS_FILTERS.map((f) => {
-            const isAll = f.value === "all";
-            const on = isAll ? selectedStatuses.length === 0 : selectedStatuses.includes(f.value as AccountStatus);
-            return (
-              <SelectableTag
-                key={f.value}
-                text={f.label}
-                size="lg"
-                selected={on}
-                onChange={() => (isAll ? setSelectedStatuses([]) : toggleStatus(f.value as AccountStatus))}
-              />
-            );
-          })}
-          <div className="lt-spacer lt-toolbar-search">
+        <div className="lt-toolbar">
+          <div className="lt-toolbar-search">
             <Search
               size="md"
               labelText="Search accounts"
@@ -109,7 +111,7 @@ export function AccountsPage() {
                 <Button
                   kind="tertiary"
                   onClick={() => {
-                    setSelectedStatuses([]);
+                    setStatus("all");
                     setSearch("");
                   }}
                 >
@@ -135,21 +137,25 @@ export function AccountsPage() {
       </section>
 
       {showCreate && (
-        <Drawer title="New Loan Account" onClose={() => setShowCreate(false)} width="lg">
+        <Drawer
+          title="New Loan Account"
+          onClose={closeCreate}
+          width="lg"
+          notice={
+            createMutation.isError ? (
+              <Notice kind="error" title="Couldn’t create account">
+                {getApiErrorMessage(createMutation.error, "Failed to create account")}
+              </Notice>
+            ) : undefined
+          }
+        >
           <AccountForm
             onSubmit={async (data) => {
               await createMutation.mutateAsync(data);
             }}
-            onCancel={() => setShowCreate(false)}
+            onCancel={closeCreate}
             isLoading={createMutation.isPending}
           />
-          {createMutation.isError && (
-            <div className="lt-mt-md">
-              <Notice kind="error" title="Couldn’t create account">
-                {getApiErrorMessage(createMutation.error, "Failed to create account")}
-              </Notice>
-            </div>
-          )}
         </Drawer>
       )}
     </div>

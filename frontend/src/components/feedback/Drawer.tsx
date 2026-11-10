@@ -8,6 +8,12 @@ interface Props {
   onClose: () => void;
   children: React.ReactNode;
   width?: "md" | "lg";
+  /**
+   * Error / status message for the whole panel. Rendered pinned directly under the header,
+   * outside the scrolling body, so it is always in view whatever the scroll position and never
+   * ends up below the footer buttons. Pass a `<Notice>` (or nothing).
+   */
+  notice?: React.ReactNode;
 }
 
 const FOCUSABLE =
@@ -21,7 +27,7 @@ const FOCUSABLE =
  * Behaves like a modal dialog: Escape closes, Tab is trapped inside, and focus returns to
  * whatever opened it.
  */
-export function Drawer({ title, subtitle, onClose, children, width = "md" }: Props) {
+export function Drawer({ title, subtitle, onClose, children, width = "md", notice }: Props) {
   const panelRef = useRef<HTMLDivElement>(null);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
@@ -91,6 +97,7 @@ export function Drawer({ title, subtitle, onClose, children, width = "md" }: Pro
             onClick={onClose}
           />
         </div>
+        {notice && <div className="lt-drawer__notice">{notice}</div>}
         <div className="lt-drawer__body">{children}</div>
       </div>
     </div>

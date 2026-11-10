@@ -96,4 +96,29 @@ describe("Drawer", () => {
     );
     expect(screen.getByRole("dialog")).toHaveAttribute("data-width", "md");
   });
+
+  it("renders the notice under the header and outside the scrolling body", () => {
+    render(
+      <Drawer title="Test" onClose={vi.fn()} notice={<p role="alert">Something failed</p>}>
+        <p>Content</p>
+      </Drawer>
+    );
+    const notice = screen.getByRole("alert");
+    const dialog = screen.getByRole("dialog");
+    const body = dialog.querySelector(".lt-drawer__body")!;
+    expect(notice.closest(".lt-drawer__notice")).not.toBeNull();
+    expect(body.contains(notice)).toBe(false);
+    // Order: header, notice, body
+    const kids = Array.from(dialog.children).map((c) => c.className);
+    expect(kids).toEqual(["lt-drawer__header", "lt-drawer__notice", "lt-drawer__body"]);
+  });
+
+  it("renders no notice region when none is given", () => {
+    render(
+      <Drawer title="Test" onClose={vi.fn()}>
+        <p>Content</p>
+      </Drawer>
+    );
+    expect(screen.getByRole("dialog").querySelector(".lt-drawer__notice")).toBeNull();
+  });
 });

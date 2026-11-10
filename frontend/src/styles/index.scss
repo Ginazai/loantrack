@@ -722,13 +722,13 @@ div:has(.cds--header) ~ .cds--content {
   }
 }
 
-// Footer buttons: Carbon modal-style, full-bleed pair.
+// Footer buttons: Carbon modal-style, full-bleed pair. Lives in a drawer body that has no
+// bottom padding (see `.lt-drawer__body:has(...)`), so it sits flush with the panel edge.
 .lt-drawer__footer,
 .lt-form__actions--bleed {
   display: flex;
   justify-content: flex-end;
   margin-inline: -#{$spacing-06};
-  margin-block-end: -#{$spacing-06};
   margin-block-start: auto; // pin to the bottom of a short form…
   position: sticky; // …and keep it in reach on a long one
   inset-block-end: 0;
@@ -837,12 +837,37 @@ div:has(.cds--header) ~ .cds--content {
     margin: $spacing-02 0 0;
   }
 
+  // Panel-level error/status banner: pinned between header and body so it never scrolls away
+  // and never ends up underneath the footer buttons.
+  &__notice {
+    flex: none;
+
+    // Carbon insets and caps inline notifications; inside a panel they read best as a
+    // full-width banner flush under the header.
+    .cds--inline-notification {
+      inline-size: 100%;
+      max-inline-size: none;
+      margin: 0;
+      // The header already draws a rule above, and the panel edge closes the right side.
+      border-block-start: 0;
+      border-inline-end: 0;
+    }
+  }
+
   &__body {
     flex: 1;
     display: flex;
     flex-direction: column;
     overflow-y: auto;
     padding: $spacing-06;
+
+    // A sticky footer pins to the scroller's *content* edge, not its padding edge, so any
+    // bottom padding leaves a strip under the buttons that scrolled content shows through.
+    // When the body ends in the pinned action bar, drop the bottom padding so the bar sits
+    // flush against the bottom of the panel.
+    &:has(.lt-form__actions--bleed) {
+      padding-block-end: 0;
+    }
 
     > .lt-form {
       flex: 1;
@@ -1499,11 +1524,7 @@ dl.lt-kpis dd {
   inline-size: 100%;
 }
 
-.lt-toolbar-chips {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: $spacing-03;
+.lt-toolbar {
   padding: $spacing-04 $spacing-05;
 }
 
@@ -1546,7 +1567,6 @@ dl.lt-kpis dd {
   max-inline-size: 100%;
 
   @include breakpoint-down('md') {
-    margin-inline-start: 0;
     inline-size: 100%;
   }
 }
