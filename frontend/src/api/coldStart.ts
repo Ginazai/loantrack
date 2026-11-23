@@ -82,6 +82,13 @@ export function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/** Linear-time replacement for `.replace(/\/+$/, "")`, which backtracks super-linearly. */
+export function trimTrailingSlashes(value: string): string {
+  let end = value.length;
+  while (end > 0 && value.charCodeAt(end - 1) === 47) end--; // 47 === "/"
+  return value.slice(0, end);
+}
+
 let backendUrl: Promise<string | null> | null = null;
 
 /**
@@ -95,7 +102,7 @@ export function resolveBackendUrl(): Promise<string | null> {
       .then((r) => (r.ok ? r.json() : null))
       .then((cfg: { backendUrl?: unknown } | null) => {
         const url = typeof cfg?.backendUrl === "string" ? cfg.backendUrl.trim() : "";
-        return /^https?:\/\//.test(url) ? url.replace(/\/+$/, "") : null;
+        return /^https?:\/\//.test(url) ? trimTrailingSlashes(url) : null;
       })
       .catch(() => null)
       .then((url) => {
