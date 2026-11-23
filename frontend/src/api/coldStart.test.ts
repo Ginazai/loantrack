@@ -1,6 +1,11 @@
 import { describe, it, expect } from "vitest";
 import axios, { AxiosError } from "axios";
-import { MAX_COLD_RETRIES, retryDelayMs, shouldRetryColdStart } from "./coldStart";
+import {
+  MAX_COLD_RETRIES,
+  retryDelayMs,
+  shouldRetryColdStart,
+  trimTrailingSlashes,
+} from "./coldStart";
 
 function httpError(status: number, opts: { method?: string; data?: unknown } = {}) {
   const config = { method: opts.method ?? "get", headers: {} } as never;
@@ -87,5 +92,25 @@ describe("retryDelayMs", () => {
     expect(retryDelayMs(3, "1")).toBe(retryDelayMs(3));
     expect(retryDelayMs(1, "soon")).toBe(retryDelayMs(1));
     expect(retryDelayMs(1, null)).toBe(retryDelayMs(1));
+  });
+});
+
+describe("trimTrailingSlashes", () => {
+  it("strips any number of trailing slashes", () => {
+    expect(trimTrailingSlashes("https://api.example.com")).toBe("https://api.example.com");
+    expect(trimTrailingSlashes("https://api.example.com/")).toBe("https://api.example.com");
+    expect(trimTrailingSlashes("https://api.example.com///")).toBe("https://api.example.com");
+  });
+
+  it("keeps inner slashes and handles degenerate input", () => {
+    expect(trimTrailingSlashes("https://a.com/x/y/")).toBe("https://a.com/x/y");
+    expect(trimTrailingSlashes("////")).toBe("");
+    expect(trimTrailingSlashes("")).toBe("");
+  });
+
+  it("stays fast on a long run of slashes (the old regex was super-linear)", () => {
+    const start = performance.now();
+    trimTrailingSlashes("a" + "/".repeat(200_000) + "b");
+    expect(performance.now() - start).toBeLessThan(200);
   });
 });

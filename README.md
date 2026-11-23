@@ -74,7 +74,7 @@ The frontend type contract is generated from the backend OpenAPI spec:
 
 ```bash
 # Backend must be running
-npx openapi-typescript http://localhost:8000/api/v1/openapi.json \
+npx openapi-typescript@7 http://localhost:8000/api/v1/openapi.json \
   -o frontend/src/api/openapi.ts
 ```
 

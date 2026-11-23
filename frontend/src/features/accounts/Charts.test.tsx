@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { cloneElement, type ReactElement } from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { BalanceChart, InterestChart } from "./Charts";
 import { makePayment } from "../../test/factories";
 
@@ -45,11 +45,12 @@ describe("BalanceChart", () => {
     expect(screen.getByText("$4")).toBeInTheDocument();
   });
 
-  it("shows a tooltip with the formatted balance while hovering the plot", () => {
+  it("shows a tooltip with the formatted balance while hovering the plot", async () => {
     const { container } = render(<BalanceChart payments={payments} borrowAmount="1000.00" />);
     fireEvent.mouseMove(container.querySelector(".recharts-wrapper")!, { clientX: 300, clientY: 100 });
+    // recharts 3 resolves hover inside a requestAnimationFrame, so the tooltip shows up a frame later.
+    await waitFor(() => expect(container.querySelector(".lt-chart-tooltip")).not.toBeNull());
     const tip = container.querySelector(".lt-chart-tooltip");
-    expect(tip).not.toBeNull();
     expect(tip).toHaveTextContent("Balance");
     expect(tip).toHaveTextContent(/\$[\d,]+\.\d{2}/);
   });

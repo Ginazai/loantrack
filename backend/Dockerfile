@@ -28,8 +28,13 @@ WORKDIR /app
 # Copy the pre-built venv from builder
 COPY --from=builder /app/.venv /app/.venv
 
-# Copy application source
-COPY . .
+# Copy only what the runtime needs (explicit allow-list instead of `COPY . .`, so stray
+# files such as .env, tests or tooling configs can never end up in the image).
+COPY alembic.ini ./
+COPY alembic/ ./alembic/
+COPY app/ ./app/
+COPY scripts/ ./scripts/
+COPY seed.py ./
 
 # Make the venv the active Python environment
 ENV PATH="/app/.venv/bin:$PATH" \
