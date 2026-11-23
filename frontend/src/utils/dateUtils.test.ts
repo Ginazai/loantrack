@@ -8,6 +8,7 @@ import {
   formatCurrency,
   formatRate,
   isOverdue,
+  toDateInputValue,
 } from "./dateUtils";
 
 describe("nextCycleDate", () => {
@@ -143,5 +144,12 @@ describe("isOverdue", () => {
 
   it("returns false for a date far in the future", () => {
     expect(isOverdue("2099-01-01")).toBe(false);
+  });
+});
+
+describe("toDateInputValue", () => {
+  it("formats the local calendar day, whatever the time zone", () => {
+    expect(toDateInputValue(new Date(2026, 10, 30))).toBe("2026-11-30");
+    expect(toDateInputValue(new Date(2026, 0, 5, 23, 59))).toBe("2026-01-05");
   });
 });

@@ -61,6 +61,11 @@ export function upcomingCycleDates(count = 6, from?: Date): Date[] {
   return dates;
 }
 
+/** "YYYY-MM-DD" for a date input, from the local calendar day (toISOString would shift it). */
+export function toDateInputValue(d: Date): string {
+  return format(d, "yyyy-MM-dd");
+}
+
 export function formatDate(d: Date | string): string {
   const date = typeof d === "string" && /^\d{4}-\d{2}-\d{2}T/.test(d)
     ? parseISO(d.slice(0, 10))

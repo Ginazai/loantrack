@@ -47,3 +47,12 @@ Behaviour the decision implies but the original text did not state (details and 
   created under an older rule keep their old values. Use
   `python -m scripts.recalculate_ledgers` in dry-run mode to review repairs, or add
   `--apply` to write them.
+
+## Update (2026-11-19): a loan does not accrue or fall due on its own start date
+The 2026-10-24 note above ("accrues that cycle's interest immediately") is **reversed**. An account whose `start_date` is the 15th or 30th showed a full cycle of interest and a due date on the day it started (a $250.00 loan at 5% read $262.50 the day it began), which no borrower or lender expects.
+
+- `get_cycle_dates(start_date, until)` now returns cycle dates strictly *after* `start_date`. A loan started on the 15th has its first cycle on the 30th; one started on the 30th, on the next 15th.
+- A new account's `next_due_date` uses `get_next_due_date(start_date)` (strictly after) rather than `next_cycle_date` (on or after).
+- `project_ledger` passes the origin (the start date, or the anchor date) straight to `get_cycle_dates`; the anchored ledger is unchanged in behavior.
+- Approving a loan request on the 15th or 30th no longer charges a cycle straight away.
+- Payments already stored keep their snapshots (ADR-003 still stores them at write time). Run `python -m scripts.recalculate_ledgers` (dry run) and then `--apply` to re-derive them for accounts that started on a cycle date.

@@ -1,4 +1,4 @@
-import { Add, Webhook } from "@carbon/icons-react";
+import { Add, Code, Webhook } from "@carbon/icons-react";
 import { Button, CodeSnippet, Checkbox, InlineLoading, Layer, SkeletonText, Tag, TextInput, Toggle } from "@carbon/react";
 import { TrashCan } from "@carbon/icons-react";
 import { useEffect, useState } from "react";
@@ -132,8 +132,9 @@ export default function WebhooksAdminPage() {
         action={
           <>
             <Button
-              kind="ghost"
+              kind="tertiary"
               size="md"
+              renderIcon={Code}
               aria-expanded={showPayload}
               onClick={() => setShowPayload(!showPayload)}
             >

@@ -237,7 +237,7 @@ div:has(.cds--header) ~ .cds--content {
     align-items: center;
     gap: $spacing-03;
 
-    // Ghost buttons ("Payload") stay content-sized so they sit next to the primary action.
+    // Ghost buttons stay content-sized so they sit next to the primary action.
     .cds--btn:not(.cds--btn--icon-only):not(.cds--btn--ghost) {
       min-inline-size: 10rem;
     }
@@ -245,9 +245,15 @@ div:has(.cds--header) ~ .cds--content {
     // Phones: actions share the row equally instead of ragged left-aligned boxes.
     @include breakpoint-down('md') {
       inline-size: 100%;
+      justify-content: flex-end; // a lone overflow menu sits at the right, not the left
 
       > * {
         flex: 1 1 auto;
+      }
+
+      // The overflow menu stays a square next to the primary action instead of stretching.
+      > .cds--overflow-menu__wrapper {
+        flex: 0 0 auto;
       }
 
       .cds--btn {
@@ -259,6 +265,26 @@ div:has(.cds--header) ~ .cds--content {
         inline-size: 100%;
         max-inline-size: none;
       }
+    }
+  }
+
+  // "More actions" trigger: outlined like the tertiary buttons beside it, so it reads as a
+  // button rather than a stray icon. Carbon ships it as a borderless ghost.
+  .lt-actions-menu.cds--overflow-menu {
+    inline-size: 2.5rem;
+    max-inline-size: 2.5rem;
+    block-size: 2.5rem;
+    min-block-size: 2.5rem;
+    padding: 0;
+    border: 1px solid $background-inverse;
+    color: $background-inverse;
+
+    &:hover {
+      background-color: $layer-hover-01;
+    }
+
+    .cds--overflow-menu__icon {
+      fill: currentcolor;
     }
   }
 

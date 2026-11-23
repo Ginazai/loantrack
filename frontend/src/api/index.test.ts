@@ -228,15 +228,52 @@ describe("adminApi", () => {
     await adminApi.deleteRequest("r1");
     expect(http.delete).toHaveBeenCalledWith("/admin/requests/r1");
   });
-  it("CSV exports open the right URLs in a new tab", () => {
-    const open = vi.spyOn(window, "open").mockImplementation(() => null);
-    adminApi.exportAccountsCsv();
-    adminApi.exportPaymentsCsv();
-    adminApi.exportAccountFullCsv("a1");
-    expect(open).toHaveBeenNthCalledWith(1, "/api/v1/admin/export/accounts.csv", "_blank");
-    expect(open).toHaveBeenNthCalledWith(2, "/api/v1/admin/export/payments.csv", "_blank");
-    expect(open).toHaveBeenNthCalledWith(3, "/api/v1/admin/export/accounts/a1/full.csv", "_blank");
-    open.mockRestore();
+  describe("CSV exports", () => {
+    let click: ReturnType<typeof vi.spyOn>;
+    let open: ReturnType<typeof vi.spyOn>;
+    beforeEach(() => {
+      URL.createObjectURL = vi.fn(() => "blob:fake");
+      URL.revokeObjectURL = vi.fn();
+      click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+      open = vi.spyOn(window, "open").mockImplementation(() => null);
+      http.get.mockResolvedValue({ data: new Blob(["id,name"]) });
+    });
+    afterEach(() => {
+      click.mockRestore();
+      open.mockRestore();
+    });
+
+    // Regression: window.open() carries no Authorization header (the token lives in memory),
+    // so the export opened a tab that answered 401. It must go through the authenticated client.
+    it.each([
+      ["accounts", () => adminApi.exportAccountsCsv(), "/admin/export/accounts.csv", "accounts.csv"],
+      ["payments", () => adminApi.exportPaymentsCsv(), "/admin/export/payments.csv", "payments.csv"],
+      [
+        "one account with its payments",
+        () => adminApi.exportAccountFullCsv("a1"),
+        "/admin/export/accounts/a1/full.csv",
+        "account-a1.csv",
+      ],
+    ])("%s: fetches a blob through the authenticated client and saves it", async (_n, run, path, file) => {
+      let saved: string | undefined;
+      click.mockImplementation(function (this: HTMLAnchorElement) {
+        saved = this.download;
+      });
+
+      await run();
+
+      expect(http.get).toHaveBeenCalledWith(path, { responseType: "blob" });
+      expect(click).toHaveBeenCalledTimes(1);
+      expect(saved).toBe(file);
+      expect(open).not.toHaveBeenCalled();
+      expect(document.querySelector("a[download]")).toBeNull();
+    });
+
+    it("rejects, and saves nothing, when the server refuses", async () => {
+      http.get.mockRejectedValue(new Error("403"));
+      await expect(adminApi.exportAccountsCsv()).rejects.toThrow("403");
+      expect(click).not.toHaveBeenCalled();
+    });
   });
 });
 

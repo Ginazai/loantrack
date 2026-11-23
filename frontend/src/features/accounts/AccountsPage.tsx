@@ -7,6 +7,7 @@ import { Drawer, EmptyState, Notice, PageHeader, TableSkeleton } from "../../com
 import type { AccountFormData, AccountStatus } from "../../types";
 import { AccountForm } from "./AccountForm";
 import { AccountsTable } from "./AccountsTable";
+import { useDownload } from "../../hooks";
 import { getApiErrorMessage } from "../../utils/apiError";
 
 type StatusFilter = AccountStatus | "all";
@@ -24,6 +25,7 @@ export function AccountsPage() {
   const [status, setStatus] = useState<StatusFilter>("all");
   const [search, setSearch] = useState("");
   const [showCreate, setShowCreate] = useState(false);
+  const download = useDownload();
 
   const { data: accounts = [], isLoading } = useQuery({
     queryKey: ["accounts", status, search],
@@ -57,9 +59,21 @@ export function AccountsPage() {
         subtitle="Manage and track all borrower accounts."
         action={
           <>
-            <MenuButton label="Export" kind="tertiary" size="md" menuAlignment="bottom-end">
-              <MenuItem label="Accounts only (.csv)" onClick={() => adminApi.exportAccountsCsv()} />
-              <MenuItem label="All payments (.csv)" onClick={() => adminApi.exportPaymentsCsv()} />
+            <MenuButton
+              label={download.pending ? "Exporting…" : "Export"}
+              kind="tertiary"
+              size="md"
+              menuAlignment="bottom-end"
+              disabled={download.pending}
+            >
+              <MenuItem
+                label="Accounts only (.csv)"
+                onClick={() => download.run(() => adminApi.exportAccountsCsv(), "Couldn’t export accounts")}
+              />
+              <MenuItem
+                label="All payments (.csv)"
+                onClick={() => download.run(() => adminApi.exportPaymentsCsv(), "Couldn’t export payments")}
+              />
             </MenuButton>
             <Button size="md" renderIcon={Add} onClick={() => setShowCreate(true)}>
               New account
@@ -67,6 +81,12 @@ export function AccountsPage() {
           </>
         }
       />
+
+      {download.error && (
+        <Notice kind="error" title="Export failed" onClose={download.clear}>
+          {download.error}
+        </Notice>
+      )}
 
       {/* Same status filter as the Loan Requests page. */}
       <div className="lt-filter-switcher" role="group" aria-label="Filter by status">

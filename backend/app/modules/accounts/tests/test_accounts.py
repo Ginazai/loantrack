@@ -88,14 +88,22 @@ class TestGetCycleDates:
         dates = get_cycle_dates(date(2026, 6, 14), date(2026, 6, 14))
         assert dates == []
 
-    def test_start_on_cycle_date_includes_it(self):
-        # next_cycle_date is documented as "on or after" (see its docstring:
-        # "June 15 -> June 15, same day counts") — add_payment's own auto-date
-        # logic relies on this and explicitly guards against it staying put
-        # (advancing again if payment_date <= last_cycle), so this is
-        # intentional behavior to preserve, not a bug to "fix" by excluding it.
+    def test_start_on_cycle_date_excludes_it(self):
+        # A loan that starts on the 15th is not due on the 15th: its first cycle is the
+        # 30th. (get_next_due_date is "strictly after", unlike next_cycle_date, which is
+        # "on or after" and still used for dates that may legitimately land on a cycle.)
         dates = get_cycle_dates(date(2026, 6, 15), date(2026, 6, 30))
-        assert dates == [date(2026, 6, 15), date(2026, 6, 30)]
+        assert dates == [date(2026, 6, 30)]
+
+    def test_start_on_the_thirtieth_first_cycle_is_next_months_fifteenth(self):
+        assert get_cycle_dates(date(2026, 6, 30), date(2026, 7, 15)) == [date(2026, 7, 15)]
+
+    def test_start_on_last_day_of_a_short_month(self):
+        # Feb 28 is that month's "thirtieth"
+        assert get_cycle_dates(date(2026, 2, 28), date(2026, 3, 15)) == [date(2026, 3, 15)]
+
+    def test_start_the_day_before_a_cycle_date_still_includes_it(self):
+        assert get_cycle_dates(date(2026, 6, 14), date(2026, 6, 15)) == [date(2026, 6, 15)]
 
 
 # ── project_ledger ────────────────────────────────────────────────────────────
@@ -186,6 +194,41 @@ class TestPaymentOnStartDate:
             100.0, 0.0, date(2026, 1, 15), [(date(2026, 1, 15), 30.0)], until=date(2026, 3, 15)
         )
         assert sum(r.payments_in_period for r in rows) == Decimal("30")
+
+
+class TestNoInterestOnTheStartDate:
+    """A loan struck on a cycle date accrues nothing until the *next* cycle."""
+
+    def test_ledger_has_no_row_on_the_start_date(self):
+        rows = project_ledger(250.0, 0.05, date(2026, 11, 15), [], until=date(2026, 11, 15))
+        assert rows == []
+
+    def test_first_cycle_is_the_thirtieth(self):
+        rows = project_ledger(250.0, 0.05, date(2026, 11, 15), [], until=date(2026, 11, 30))
+        assert [r.cycle_date for r in rows] == [date(2026, 11, 30)]
+        assert rows[0].opening_balance == Decimal("250.00")
+        assert rows[0].interests_accrued == Decimal("12.50")
+        assert rows[0].closing_balance == Decimal("262.50")
+
+    def test_balance_is_the_principal_until_the_first_cycle(self):
+        # $250 @ 5% started Nov 15, looked at on Nov 19: nothing has accrued yet.
+        # (It used to read $262.50 because the 15th itself was charged.)
+        balance = compute_current_balance(
+            250.0, 0.05, date(2026, 11, 15), [], as_of=date(2026, 11, 19)
+        )
+        assert balance == Decimal("250.00")
+
+    def test_balance_after_the_first_cycle_closes(self):
+        balance = compute_current_balance(
+            250.0, 0.05, date(2026, 11, 15), [], as_of=date(2026, 11, 30)
+        )
+        assert balance == Decimal("262.50")
+
+    def test_payment_on_the_start_date_is_not_charged_interest_first(self):
+        balance = compute_current_balance(
+            250.0, 0.05, date(2026, 11, 15), [(date(2026, 11, 15), 50.0)], as_of=date(2026, 11, 19)
+        )
+        assert balance == Decimal("200.00")
 
 
 class TestComputeCurrentBalance:

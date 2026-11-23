@@ -11,7 +11,9 @@ Rules:
 - Payments between cycle dates are recorded with their actual date and reduce
   the balance that feeds the *next* cycle's interest calculation.
 - The reference point for the first cycle is account.start_date, not
-  the first payment date.
+  the first payment date. The first cycle is the first cycle date strictly
+  *after* start_date: a loan that starts on the 15th owes nothing on the 15th
+  itself, its first due date and first interest accrual are the 30th.
 - Auto payments default to the next upcoming cycle date.
 
 This module is pure (no DB, no FastAPI imports) so it can be imported by
@@ -20,7 +22,7 @@ both the accounts and payments modules without creating circular imports.
 
 import calendar
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
 
 # ── Cycle date primitives ───────────────────────────────────────────────────
@@ -93,16 +95,16 @@ def nearest_cycle_date(d: date) -> date:
 
 def get_cycle_dates(start_date: date, until: date) -> list[date]:
     """
-    Return all cycle dates from the first one on or after *start_date* up to
-    *until* (inclusive).
+    Return all cycle dates strictly *after* *start_date*, up to *until* (inclusive).
 
-    If *start_date* is itself the 15th or 30th, it is included, so that cycle's
-    interest accrues on day zero. This is intentional (see
-    ``test_start_on_cycle_date_includes_it``); approving a loan request on a
-    cycle date relies on it too.
+    *start_date* is the day the loan (or an imported balance) was struck, so a
+    cycle date that falls on that very day is not a cycle of it: a loan that
+    starts on the 15th is not due, and accrues no interest, on the 15th. Its
+    first cycle is the 30th. (Before this rule the start day itself counted,
+    which charged a full cycle of interest on day zero.)
     """
     cycles: list[date] = []
-    current = next_cycle_date(start_date)
+    current = get_next_due_date(start_date)
     while current <= until:
         cycles.append(current)
         current = advance_cycle(current)
@@ -221,13 +223,13 @@ def project_ledger(
 
     if anchor is not None:
         origin, balance = anchor[0], _dec(anchor[1])
-        cycle_from = origin + timedelta(days=1)
         payments = [p for p in payments if p[0] > origin]
     else:
         origin, balance = start_date, _dec(borrow_amount)
-        cycle_from = start_date
 
-    cycle_dates = get_cycle_dates(cycle_from, until)
+    # Cycles strictly after the origin, in both cases: interest through an anchor is already
+    # inside its balance, and a loan owes nothing on the day it starts.
+    cycle_dates = get_cycle_dates(origin, until)
     if not cycle_dates:
         return []
 

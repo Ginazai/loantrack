@@ -103,6 +103,35 @@ export const paymentsApi = {
     client.delete(`/accounts/${accountId}/payments/${paymentId}`),
 };
 
+// ── Authenticated file downloads ──────────────────────────────────────────────
+
+/** Hand a blob to the browser as a file save, via a throwaway object URL. */
+function saveBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.rel = "noopener";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+/**
+ * Download an authenticated endpoint as a file.
+ *
+ * Auth is a bearer header held in memory (the refresh cookie is scoped to /auth), so a plain
+ * link or window.open() reaches the endpoint with no Authorization header and gets a 401 in a
+ * new tab. Fetching through the authenticated client also gets the 401-refresh retry and the
+ * cold-start wait for free. The filename is chosen here rather than read from
+ * Content-Disposition, which a cross-origin API does not expose to scripts.
+ */
+async function downloadFile(path: string, filename: string) {
+  const res = await client.get(path, { responseType: "blob" });
+  saveBlob(res.data as Blob, filename);
+}
+
 // ── Payment attachments (ADR-005 — stored as bytea, streamed through here) ────
 
 export const attachmentsApi = {
@@ -126,30 +155,9 @@ export const attachmentsApi = {
   delete: (accountId: string, paymentId: string, attachmentId: string) =>
     client.delete(`/accounts/${accountId}/payments/${paymentId}/attachments/${attachmentId}`),
 
-  // Auth is a bearer header (the cookie is scoped to /auth) — a plain window.open() link would
-  // hit the endpoint with no Authorization header and get a 401. Fetch as a
-  // blob through the authenticated client instead, then hand the browser a
-  // throwaway object URL to open/save.
-  download: async (
-    accountId: string,
-    paymentId: string,
-    attachmentId: string,
-    filename: string,
-  ) => {
-    const res = await client.get(
-      `/accounts/${accountId}/payments/${paymentId}/attachments/${attachmentId}`,
-      { responseType: "blob" },
-    );
-    const url = URL.createObjectURL(res.data as Blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    a.rel = "noopener";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  },
+  // See downloadFile: a plain link would carry no Authorization header and get a 401.
+  download: (accountId: string, paymentId: string, attachmentId: string, filename: string) =>
+    downloadFile(`/accounts/${accountId}/payments/${paymentId}/attachments/${attachmentId}`, filename),
 };
 
 // ── Webhooks (per-account) ────────────────────────────────────────────────────
@@ -208,11 +216,11 @@ export const adminApi = {
 
   deleteRequest: (id: string) => client.delete(`/admin/requests/${id}`),
 
-  // CSV exports — open in new tab to trigger browser download
-  exportAccountsCsv: () => window.open(`${client.defaults.baseURL}/admin/export/accounts.csv`, "_blank"),
-  exportPaymentsCsv: () => window.open(`${client.defaults.baseURL}/admin/export/payments.csv`, "_blank"),
+  // CSV exports. Not window.open(): that sends no Authorization header (see downloadFile).
+  exportAccountsCsv: () => downloadFile("/admin/export/accounts.csv", "accounts.csv"),
+  exportPaymentsCsv: () => downloadFile("/admin/export/payments.csv", "payments.csv"),
   exportAccountFullCsv: (accountId: string) =>
-    window.open(`${client.defaults.baseURL}/admin/export/accounts/${accountId}/full.csv`, "_blank"),
+    downloadFile(`/admin/export/accounts/${accountId}/full.csv`, `account-${accountId}.csv`),
 };
 
 // ── Loan Requests ─────────────────────────────────────────────────────────────

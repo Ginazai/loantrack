@@ -11,8 +11,8 @@ from app.core.repository import BaseRepository
 from app.modules.accounts.interest_engine import (
     balance_as_of,
     compute_current_balance,
+    get_next_due_date,
     ledger_anchor,
-    next_cycle_date,
     upcoming_cycle_dates,
 )
 from app.modules.accounts.models import LoanAccount
@@ -300,7 +300,7 @@ class LoanAccountService:
         if account.status in ("paid", "closed"):
             ndd = None
         else:
-            ndd = last.next_due_date if last else next_cycle_date(account.start_date)
+            ndd = last.next_due_date if last else get_next_due_date(account.start_date)
 
         # A paid account owes nothing: never show a credit (overpayment) as a balance.
         if account.status == "paid" and current_balance is not None:
