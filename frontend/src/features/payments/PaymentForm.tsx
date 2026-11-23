@@ -1,5 +1,6 @@
 import { InlineLoading, Button, ContentSwitcher, OperationalTag, Switch, Tag, TextInput } from "@carbon/react";
 import { useEffect } from "react";
+import { parseISO } from "date-fns";
 import { useForm, type Resolver } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -7,7 +8,8 @@ import type { LoanAccount, PaymentFormData } from "../../types";
 import {
   formatCurrency,
   formatDate,
-  nextCycleDate,
+  getNextDueDate,
+  toDateInputValue,
   upcomingCycleDates,
 } from "../../utils/dateUtils";
 import { CycleDates } from "../../components/ui";
@@ -26,9 +28,12 @@ interface Props {
 }
 
 export function PaymentForm({ account, onSubmit, onCancel, isLoading }: Props) {
+  // parseISO reads "YYYY-MM-DD" as a local date; new Date() reads it as UTC midnight, which
+  // is the previous evening west of Greenwich and shows (and submits) the day before.
+  // Strictly after the start: a loan is not due on the day it starts.
   const nextDue = account.next_due_date
-    ? new Date(account.next_due_date)
-    : nextCycleDate(new Date(account.start_date));
+    ? parseISO(account.next_due_date.slice(0, 10))
+    : getNextDueDate(parseISO(account.start_date.slice(0, 10)));
 
   const upcoming = upcomingCycleDates(4);
 
@@ -42,7 +47,7 @@ export function PaymentForm({ account, onSubmit, onCancel, isLoading }: Props) {
     resolver: zodResolver(schema) as unknown as Resolver<PaymentFormData>, // coerce => zod input is unknown
     defaultValues: {
       method: "auto",
-      payment_date: nextDue.toISOString().split("T")[0],
+      payment_date: toDateInputValue(nextDue),
     },
   });
 
@@ -51,7 +56,7 @@ export function PaymentForm({ account, onSubmit, onCancel, isLoading }: Props) {
 
   useEffect(() => {
     if (method === "auto") {
-      setValue("payment_date", nextDue.toISOString().split("T")[0]);
+      setValue("payment_date", toDateInputValue(nextDue));
     }
   }, [method]);
 
@@ -117,7 +122,7 @@ export function PaymentForm({ account, onSubmit, onCancel, isLoading }: Props) {
           id="payment-date"
           type="date"
           labelText="Payment Date"
-          max={new Date().toISOString().split("T")[0]}
+          max={toDateInputValue(new Date())}
           {...register("payment_date")}
         />
       )}
@@ -130,7 +135,7 @@ export function PaymentForm({ account, onSubmit, onCancel, isLoading }: Props) {
               key={d.toISOString()}
               text={formatDate(d)}
               size="md"
-              onClick={() => setValue("payment_date", d.toISOString().split("T")[0])}
+              onClick={() => setValue("payment_date", toDateInputValue(d))}
             />
           ) : (
             <Tag key={d.toISOString()} type="outline" size="md">

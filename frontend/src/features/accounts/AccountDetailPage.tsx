@@ -3,6 +3,8 @@ import {
   Button,
   InlineLoading,
   Modal,
+  OverflowMenu,
+  OverflowMenuItem,
   ProgressBar,
   SkeletonText,
   Tab,
@@ -45,6 +47,7 @@ import { BalanceChart, InterestChart } from "./Charts";
 import { PaymentForm } from "../payments/PaymentForm";
 import { PaymentAttachmentsModal } from "../payments/PaymentAttachments";
 import { WebhookForm } from "../webhooks/WebhookForm";
+import { useDownload } from "../../hooks";
 import { useAuthStore } from "../../stores/authStore";
 import { getApiErrorMessage } from "../../utils/apiError";
 
@@ -63,6 +66,7 @@ export function AccountDetailPage() {
   const qc = useQueryClient();
   const { user } = useAuthStore();
   const isAdmin = user?.role === "admin";
+  const download = useDownload();
 
   const [tab, setTab] = useState<Tab>("overview");
   const [showPayment, setShowPayment] = useState(false);
@@ -211,19 +215,28 @@ export function AccountDetailPage() {
                 Record payment
               </Button>
             )}
-            <Button size="md" kind="tertiary" onClick={() => setShowEdit(true)}>
-              Edit
-            </Button>
-            {canClose && (
-              <Button size="md" kind="tertiary" onClick={() => setShowClose(true)}>
-                Close
-              </Button>
-            )}
-            {canPurge && (
-              <Button size="md" kind="danger--tertiary" onClick={() => setShowPurge(true)}>
-                Purge
-              </Button>
-            )}
+            {/* Edit / Close / Purge are occasional, so they live in one menu and leave
+                "Record payment" as the only loud action on the page. */}
+            <OverflowMenu
+              className="lt-actions-menu"
+              aria-label="Account actions"
+              iconDescription="Account actions"
+              size="md"
+              flipped
+            >
+              <OverflowMenuItem itemText="Edit account" onClick={() => setShowEdit(true)} />
+              {canClose && (
+                <OverflowMenuItem itemText="Close account" onClick={() => setShowClose(true)} />
+              )}
+              {canPurge && (
+                <OverflowMenuItem
+                  itemText="Purge account"
+                  isDelete
+                  hasDivider
+                  onClick={() => setShowPurge(true)}
+                />
+              )}
+            </OverflowMenu>
           </>
         }
       />
@@ -384,13 +397,24 @@ export function AccountDetailPage() {
                     </div>
                     {isAdmin && (
                       <div className="lt-table-footer">
+                        {download.error && (
+                          <Notice kind="error" title="Export failed" onClose={download.clear}>
+                            {download.error}
+                          </Notice>
+                        )}
                         <Button
                           kind="ghost"
                           size="md"
                           renderIcon={Download}
-                          onClick={() => adminApi.exportAccountFullCsv(id!)}
+                          disabled={download.pending}
+                          onClick={() =>
+                            download.run(
+                              () => adminApi.exportAccountFullCsv(id!),
+                              "Couldn’t export this account",
+                            )
+                          }
                         >
-                          Export with payments (.csv)
+                          {download.pending ? "Exporting…" : "Export with payments (.csv)"}
                         </Button>
                       </div>
                     )}

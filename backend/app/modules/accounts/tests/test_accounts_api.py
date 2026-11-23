@@ -74,6 +74,31 @@ class TestCreateAccount:
         assert res.status_code == 422
 
 
+class TestFirstDueDate:
+    """The day a loan starts is never its own due date."""
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("start", "first_due"),
+        [
+            ("2026-01-15", "2026-01-30"),  # starts on the 15th -> due the 30th
+            ("2026-01-30", "2026-02-15"),  # starts on the 30th -> due the next 15th
+            ("2026-02-28", "2026-03-15"),  # Feb 28 is February's "thirtieth"
+            ("2026-01-10", "2026-01-15"),  # off-cycle start: unchanged
+            ("2026-01-20", "2026-01-30"),
+        ],
+    )
+    async def test_new_account_next_due_date_is_strictly_after_start(
+        self, admin_client, start, first_due
+    ):
+        res = await admin_client.post("/api/v1/accounts", json=_account_payload(start_date=start))
+        assert res.status_code == 201
+        assert res.json()["next_due_date"] == first_due
+
+        got = await admin_client.get(f"/api/v1/accounts/{res.json()['id']}")
+        assert got.json()["next_due_date"] == first_due
+
+
 class TestListAndGetAccount:
     @pytest.mark.asyncio
     async def test_user_only_sees_own_accounts(self, user_client, admin_client, regular_user):

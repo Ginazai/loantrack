@@ -162,5 +162,20 @@ describe("AccountsPage", () => {
       await user.click(await screen.findByRole("menuitem", { name: "All payments (.csv)" }));
       expect(adminApi.exportPaymentsCsv).toHaveBeenCalledTimes(1);
     });
+
+    it("tells the user when an export fails instead of failing silently", async () => {
+      (adminApi.exportAccountsCsv as unknown as ReturnType<typeof vi.fn>).mockRejectedValueOnce({
+        response: { data: { detail: "Not authenticated" } },
+      });
+      const user = userEvent.setup();
+      renderWithProviders(<AccountsPage />);
+      await user.click(await screen.findByRole("button", { name: "Export" }));
+      await user.click(await screen.findByRole("menuitem", { name: "Accounts only (.csv)" }));
+
+      expect(await screen.findByText("Export failed")).toBeInTheDocument();
+      expect(screen.getByText("Not authenticated")).toBeInTheDocument();
+      // and the button is usable again
+      expect(await screen.findByRole("button", { name: "Export" })).toBeEnabled();
+    });
   });
 });

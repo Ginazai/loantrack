@@ -59,6 +59,27 @@ const payments = paymentsApi as unknown as Record<"list" | "add" | "delete", Ret
 const webhooks = webhooksApi as unknown as Record<"list" | "create" | "delete", ReturnType<typeof vi.fn>>;
 const exportFull = adminApi.exportAccountFullCsv as unknown as ReturnType<typeof vi.fn>;
 
+type User = ReturnType<typeof userEvent.setup>;
+
+/**
+ * Edit / Close / Purge live in the "Account actions" overflow menu. Carbon keeps the open menu
+ * `visibility: hidden` until it can measure it, which jsdom never does. Hidden elements have no
+ * accessible name, so the items are matched by role and text rather than by name.
+ */
+async function openActionsMenu(user: User) {
+  await user.click(screen.getByRole("button", { name: "Account actions" }));
+  return screen.findAllByRole("menuitem", { hidden: true });
+}
+
+const itemNamed = (items: HTMLElement[], text: string) =>
+  items.find((el) => el.textContent === text) ?? null;
+
+async function chooseAction(user: User, text: string) {
+  const item = itemNamed(await openActionsMenu(user), text);
+  if (!item) throw new Error(`No "${text}" item in the actions menu`);
+  await user.click(item);
+}
+
 function renderPage() {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 }, mutations: { retry: false } } });
   return render(
@@ -153,29 +174,42 @@ describe("AccountDetailPage", () => {
   });
 
   describe("actions available per status", () => {
-    const actions = () => ({
-      record: screen.queryByRole("button", { name: "Record payment" }),
-      edit: screen.queryByRole("button", { name: "Edit" }),
-      close: screen.queryByRole("button", { name: "Close" }),
-      purge: screen.queryByRole("button", { name: "Purge" }),
-    });
+    const actions = async () => {
+      const items = await openActionsMenu(userEvent.setup());
+      return {
+        record: screen.queryByRole("button", { name: "Record payment" }),
+        edit: itemNamed(items, "Edit account"),
+        close: itemNamed(items, "Close account"),
+        purge: itemNamed(items, "Purge account"),
+      };
+    };
 
     it.each(["open", "active"] as const)("a %s account can take payments and be closed", async (status) => {
       accounts.get.mockResolvedValue(makeAccount({ status }));
       renderPage();
       await ready();
-      const a = actions();
+      const a = await actions();
       expect(a.record).not.toBeNull();
       expect(a.edit).not.toBeNull();
       expect(a.close).not.toBeNull();
       expect(a.purge).toBeNull();
     });
 
+    it("keeps Edit, Close and Purge out of the page header as loose buttons", async () => {
+      accounts.get.mockResolvedValue(makeAccount({ status: "open" }));
+      renderPage();
+      await ready();
+      for (const name of ["Edit", "Close", "Purge"]) {
+        expect(screen.queryByRole("button", { name })).toBeNull();
+      }
+      expect(screen.getByRole("button", { name: "Record payment" })).toBeInTheDocument();
+    });
+
     it("a paid account can only be edited", async () => {
       accounts.get.mockResolvedValue(makeAccount({ status: "paid" }));
       renderPage();
       await ready();
-      const a = actions();
+      const a = await actions();
       expect(a.record).toBeNull();
       expect(a.close).toBeNull();
       expect(a.purge).toBeNull();
@@ -186,7 +220,7 @@ describe("AccountDetailPage", () => {
       accounts.get.mockResolvedValue(makeAccount({ status: "closed" }));
       renderPage();
       await ready();
-      const a = actions();
+      const a = await actions();
       expect(a.purge).not.toBeNull();
       expect(a.record).toBeNull();
       expect(a.close).toBeNull();
@@ -366,7 +400,7 @@ describe("AccountDetailPage", () => {
       const user = userEvent.setup();
       renderPage();
       await ready();
-      await user.click(screen.getByRole("button", { name: "Edit" }));
+      await chooseAction(user, "Edit account");
       await user.click(within(screen.getByRole("dialog", { name: "Edit Account" })).getByRole("button", { name: "submit-account" }));
       await waitFor(() => expect(accounts.update).toHaveBeenCalled());
       expect(accounts.update.mock.calls[0].slice(0, 2)).toEqual(["acc-1", { account_name: "Renamed" }]);
@@ -377,7 +411,7 @@ describe("AccountDetailPage", () => {
       const user = userEvent.setup();
       renderPage();
       await ready();
-      await user.click(screen.getByRole("button", { name: "Edit" }));
+      await chooseAction(user, "Edit account");
       await user.click(screen.getByRole("button", { name: "cancel-account" }));
       expect(screen.queryByRole("dialog", { name: "Edit Account" })).toBeNull();
       expect(accounts.update).not.toHaveBeenCalled();
@@ -388,7 +422,7 @@ describe("AccountDetailPage", () => {
     const open = async (user: ReturnType<typeof userEvent.setup>) => {
       renderPage();
       await ready();
-      await user.click(screen.getByRole("button", { name: "Close" }));
+      await chooseAction(user, "Close account");
       return screen.getByRole("dialog", { name: "Close Account" });
     };
 
@@ -424,7 +458,7 @@ describe("AccountDetailPage", () => {
     const open = async (user: ReturnType<typeof userEvent.setup>) => {
       renderPage();
       await ready();
-      await user.click(screen.getByRole("button", { name: "Purge" }));
+      await chooseAction(user, "Purge account");
       return screen.getByRole("dialog", { name: "Permanently Delete Account" });
     };
 

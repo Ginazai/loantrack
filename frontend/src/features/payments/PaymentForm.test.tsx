@@ -22,7 +22,29 @@ const account: LoanAccount = {
   updated_at: "2026-01-01T00:00:00Z",
 };
 
+/** The KPI tiles at the top of the form (balance, next due date). */
+const kpiValues = () => Array.from(document.querySelectorAll(".lt-kpi__value")).map((e) => e.textContent);
+
 describe("PaymentForm", () => {
+  it("shows the due date as stored, not the day before (UTC vs local midnight)", () => {
+    render(
+      <PaymentForm account={{ ...account, next_due_date: "2026-11-30" }} onSubmit={vi.fn()} onCancel={vi.fn()} />,
+    );
+    expect(kpiValues()).toContain("Nov 30, 2026");
+  });
+
+  it("without a due date, a loan started on the 15th falls due on the 30th, not the 15th", () => {
+    render(
+      <PaymentForm
+        account={{ ...account, start_date: "2026-11-15", next_due_date: null }}
+        onSubmit={vi.fn()}
+        onCancel={vi.fn()}
+      />,
+    );
+    expect(kpiValues()).toContain("Nov 30, 2026");
+    expect(kpiValues()).not.toContain("Nov 15, 2026");
+  });
+
   it("shows the current balance and next due date", () => {
     render(<PaymentForm account={account} onSubmit={vi.fn()} onCancel={vi.fn()} />);
     expect(screen.getByText("$750.00")).toBeInTheDocument();
